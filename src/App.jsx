@@ -46,7 +46,7 @@ function Avatar({ profile }) {
 export default function App() {
   const { token, profile, loading, error, signIn, signOut, isAuthed } = useAuth()
   const { theme, scheme, toggleTheme, setScheme, SCHEMES, SCHEME_COLORS } = useTheme()
-  const { syncToDrive, saveState } = useDriveSync(token)
+  const { syncToDrive, saveState } = useDriveSync()
   const [sidebarOpen, setSidebarOpen] = useState(false)
 
   const handleDataChange = useCallback(() => {

@@ -1,70 +1,76 @@
-// useDriveSync — auto-saves data to Google Drive on every change
-// Shows a 'Saved' indicator for 2 seconds after each save
-
+// useDriveSync — reads token directly from localStorage so it's always available
 import { useState, useCallback, useRef } from 'react'
 
-const FILE_NAME = 'planner_data_v1.json'
+const FILE_NAME  = 'planner_data_v1.json'
+const TOKEN_KEY  = 'planner_token_v1'
 
-export function useDriveSync(token) {
-  const [saveState, setSaveState] = useState('idle') // idle | saving | saved | error
-  const fileIdRef  = useRef(null)
+function getToken() {
+  try { return localStorage.getItem(TOKEN_KEY) || '' } catch(e) { return '' }
+}
+
+export function useDriveSync() {
+  const [saveState,  setSaveState]  = useState('idle')
+  const fileIdRef   = useRef(null)
   const debounceRef = useRef(null)
 
-  // Find or create the data file in Drive
-  const getFileId = useCallback(async () => {
+  const getFileId = useCallback(async (token) => {
     if (fileIdRef.current) return fileIdRef.current
-    const res = await fetch(
-      `https://www.googleapis.com/drive/v3/files?q=name%3D'${FILE_NAME}'%20and%20trashed%3Dfalse&spaces=drive&fields=files(id)`,
+    // Search for existing file
+    const res  = await fetch(
+      `https://www.googleapis.com/drive/v3/files?q=name%3D'${FILE_NAME}'%20and%20trashed%3Dfalse&fields=files(id,name)`,
       { headers: { Authorization: 'Bearer ' + token } }
     )
     const data = await res.json()
-    if (data.files && data.files.length > 0) {
+    if (data.files?.length) {
       fileIdRef.current = data.files[0].id
       return fileIdRef.current
     }
     // Create new file
     const create = await fetch('https://www.googleapis.com/drive/v3/files', {
-      method: 'POST',
+      method:  'POST',
       headers: { Authorization: 'Bearer ' + token, 'Content-Type': 'application/json' },
-      body: JSON.stringify({ name: FILE_NAME, mimeType: 'application/json' })
+      body:    JSON.stringify({ name: FILE_NAME, mimeType: 'application/json' }),
     })
     const file = await create.json()
     fileIdRef.current = file.id
     return fileIdRef.current
-  }, [token])
+  }, [])
 
-  // Save all localStorage planner data to Drive (debounced 2s)
   const syncToDrive = useCallback((allData) => {
-    if (!token) return
+    const token = getToken()
+    if (!token) { console.log('[drive] no token, skipping sync'); return }
+
     clearTimeout(debounceRef.current)
     debounceRef.current = setTimeout(async () => {
       setSaveState('saving')
       try {
-        const fileId = await getFileId()
-        await fetch(
+        const fileId = await getFileId(token)
+        const res = await fetch(
           `https://www.googleapis.com/upload/drive/v3/files/${fileId}?uploadType=media`,
           {
-            method: 'PATCH',
+            method:  'PATCH',
             headers: { Authorization: 'Bearer ' + token, 'Content-Type': 'application/json' },
-            body: JSON.stringify(allData)
+            body:    JSON.stringify(allData, null, 2),
           }
         )
+        if (!res.ok) throw new Error('HTTP ' + res.status)
+        console.log('[drive] saved ok')
         setSaveState('saved')
-        setTimeout(() => setSaveState('idle'), 2000)
+        setTimeout(() => setSaveState('idle'), 2500)
       } catch(e) {
         console.error('[drive] save error:', e)
         setSaveState('error')
         setTimeout(() => setSaveState('idle'), 3000)
       }
-    }, 2000)
-  }, [token, getFileId])
+    }, 1500)
+  }, [getFileId])
 
-  // Load data from Drive on boot
   const loadFromDrive = useCallback(async () => {
+    const token = getToken()
     if (!token) return null
     try {
-      const fileId = await getFileId()
-      const res = await fetch(
+      const fileId = await getFileId(token)
+      const res    = await fetch(
         `https://www.googleapis.com/drive/v3/files/${fileId}?alt=media`,
         { headers: { Authorization: 'Bearer ' + token } }
       )
@@ -74,7 +80,7 @@ export function useDriveSync(token) {
       console.error('[drive] load error:', e)
       return null
     }
-  }, [token, getFileId])
+  }, [getFileId])
 
   return { syncToDrive, loadFromDrive, saveState }
 }
