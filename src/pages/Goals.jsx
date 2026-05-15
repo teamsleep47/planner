@@ -18,10 +18,10 @@ function makeEmptyGrid() {
   }, {})
 }
 
-export default function Goals() {
+export default function Goals({ onDataChange }) {
   const [grid, setGrid] = useState(() => load('habit_grid', makeEmptyGrid()))
 
-  useEffect(() => { save('habit_grid', grid) }, [grid])
+  useEffect(() => { save('habit_grid', grid); onDataChange?.() }, [grid])
 
   const toggle = (habitId, dayIdx) => {
     if (dayIdx > TODAY) return

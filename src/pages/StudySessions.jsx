@@ -5,7 +5,7 @@ import { load, save } from '../utils/storage.js'
 const DURATIONS = { focus: 25 * 60, short: 5 * 60, long: 15 * 60 }
 const COURSES   = ['Humanities', 'Written Communication', 'Anatomy & Physiology', 'A&P Lab', 'American Government']
 
-export default function StudySessions() {
+export default function StudySessions({ onDataChange }) {
   const [mode,     setMode]     = useState('focus')
   const [secs,     setSecs]     = useState(DURATIONS.focus)
   const [running,  setRunning]  = useState(false)
@@ -15,7 +15,7 @@ export default function StudySessions() {
   const [recallInput, setRecallInput] = useState('')
   const intervalRef = useRef(null)
 
-  useEffect(() => { save('study_sessions', sessions) }, [sessions])
+  useEffect(() => { save('study_sessions', sessions); onDataChange?.() }, [sessions])
 
   useEffect(() => {
     setSecs(DURATIONS[mode])

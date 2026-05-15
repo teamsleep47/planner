@@ -1,66 +1,80 @@
-/**
- * useDriveSync — Google Drive persistence hook
- *
- * Status: scaffold only. Wire up after setting up
- * a Google Cloud project and getting a client ID.
- *
- * Usage (in any page):
- *   const { connected, save, load, connect } = useDriveSync()
- */
+// useDriveSync — auto-saves data to Google Drive on every change
+// Shows a 'Saved' indicator for 2 seconds after each save
 
-import { useState, useCallback } from 'react'
+import { useState, useCallback, useRef } from 'react'
 
-const SCOPES   = 'https://www.googleapis.com/auth/drive.file'
-const FILE_KEY = 'dashboard_data_v1.json'
+const FILE_NAME = 'planner_data_v1.json'
 
-export function useDriveSync() {
-  const [connected, setConnected] = useState(false)
-  const [token, setToken]         = useState(null)
+export function useDriveSync(token) {
+  const [saveState, setSaveState] = useState('idle') // idle | saving | saved | error
+  const fileIdRef  = useRef(null)
+  const debounceRef = useRef(null)
 
-  // Step 1 — trigger OAuth popup
-  const connect = useCallback(() => {
-    const CLIENT_ID  = import.meta.env.VITE_GOOGLE_CLIENT_ID
-    const REDIRECT   = encodeURIComponent(window.location.origin + window.location.pathname)
-    const url = [
-      'https://accounts.google.com/o/oauth2/v2/auth',
-      `?client_id=${CLIENT_ID}`,
-      `&redirect_uri=${REDIRECT}`,
-      `&response_type=token`,   // implicit flow — safe for static sites (no secret)
-      `&scope=${encodeURIComponent(SCOPES)}`,
-      `&prompt=consent`,
-    ].join('')
-    window.location.href = url
-  }, [])
-
-  // Step 2 — on page load, check URL hash for token (implicit flow callback)
-  const handleCallback = useCallback(() => {
-    const hash   = new URLSearchParams(window.location.hash.replace('#', '?'))
-    const access = hash.get('access_token')
-    if (access) {
-      setToken(access)
-      setConnected(true)
-      window.history.replaceState({}, '', window.location.pathname)
+  // Find or create the data file in Drive
+  const getFileId = useCallback(async () => {
+    if (fileIdRef.current) return fileIdRef.current
+    const res = await fetch(
+      `https://www.googleapis.com/drive/v3/files?q=name%3D'${FILE_NAME}'%20and%20trashed%3Dfalse&spaces=drive&fields=files(id)`,
+      { headers: { Authorization: 'Bearer ' + token } }
+    )
+    const data = await res.json()
+    if (data.files && data.files.length > 0) {
+      fileIdRef.current = data.files[0].id
+      return fileIdRef.current
     }
-  }, [])
-
-  // Step 3 — save data object to Drive as JSON
-  const save = useCallback(async (data) => {
-    if (!token) return
-    const body = JSON.stringify(data, null, 2)
-    // TODO: check if file exists first, then patch vs create
-    await fetch('https://www.googleapis.com/upload/drive/v3/files?uploadType=media', {
-      method:  'POST',
-      headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
-      body,
+    // Create new file
+    const create = await fetch('https://www.googleapis.com/drive/v3/files', {
+      method: 'POST',
+      headers: { Authorization: 'Bearer ' + token, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name: FILE_NAME, mimeType: 'application/json' })
     })
+    const file = await create.json()
+    fileIdRef.current = file.id
+    return fileIdRef.current
   }, [token])
 
-  // Step 4 — load data object from Drive
-  const load = useCallback(async () => {
+  // Save all localStorage planner data to Drive (debounced 2s)
+  const syncToDrive = useCallback((allData) => {
+    if (!token) return
+    clearTimeout(debounceRef.current)
+    debounceRef.current = setTimeout(async () => {
+      setSaveState('saving')
+      try {
+        const fileId = await getFileId()
+        await fetch(
+          `https://www.googleapis.com/upload/drive/v3/files/${fileId}?uploadType=media`,
+          {
+            method: 'PATCH',
+            headers: { Authorization: 'Bearer ' + token, 'Content-Type': 'application/json' },
+            body: JSON.stringify(allData)
+          }
+        )
+        setSaveState('saved')
+        setTimeout(() => setSaveState('idle'), 2000)
+      } catch(e) {
+        console.error('[drive] save error:', e)
+        setSaveState('error')
+        setTimeout(() => setSaveState('idle'), 3000)
+      }
+    }, 2000)
+  }, [token, getFileId])
+
+  // Load data from Drive on boot
+  const loadFromDrive = useCallback(async () => {
     if (!token) return null
-    // TODO: search for file by name, then fetch its content
-    return null
-  }, [token])
+    try {
+      const fileId = await getFileId()
+      const res = await fetch(
+        `https://www.googleapis.com/drive/v3/files/${fileId}?alt=media`,
+        { headers: { Authorization: 'Bearer ' + token } }
+      )
+      if (!res.ok) return null
+      return await res.json()
+    } catch(e) {
+      console.error('[drive] load error:', e)
+      return null
+    }
+  }, [token, getFileId])
 
-  return { connected, connect, handleCallback, save, load }
+  return { syncToDrive, loadFromDrive, saveState }
 }

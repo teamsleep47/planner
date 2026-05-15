@@ -25,13 +25,13 @@ const DEFAULT_ASSIGNMENTS = [
   { id: 2, title: 'Essay Draft 1',          course: 'Written Communication', type: 'Essay', due: '2026-05-28', status: 'To do', notes: '' },
 ]
 
-export default function Courses() {
+export default function Courses({ onDataChange }) {
   const [tab,         setTab]         = useState('summer')
   const [assignments, setAssignments] = useState(() => load('assignments', DEFAULT_ASSIGNMENTS))
   const [showForm,    setShowForm]    = useState(false)
   const [form,        setForm]        = useState({ title: '', course: SEMESTERS.summer.courses[0], type: TYPES[0], due: '', status: 'To do', notes: '' })
 
-  useEffect(() => { save('assignments', assignments) }, [assignments])
+  useEffect(() => { save('assignments', assignments); onDataChange?.() }, [assignments])
 
   const sem        = SEMESTERS[tab]
   const filtered   = assignments.filter(a => sem.courses.includes(a.course))
