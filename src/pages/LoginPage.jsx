@@ -1,54 +1,41 @@
-import { useEffect } from 'react'
-
-function initials(name) {
-  const parts = (name || '?').trim().split(/\s+/)
-  return (parts[0][0] + (parts[1] ? parts[1][0] : '')).toUpperCase()
-}
-
 export default function LoginPage({ onSignIn, error, loading }) {
   return (
     <div style={{
       minHeight: '100vh',
-      background: 'var(--bg-primary)',
       display: 'flex',
       alignItems: 'center',
       justifyContent: 'center',
       padding: 24,
     }}>
       <div style={{
-        background: 'var(--bg-card)',
-        border: '1px solid var(--border)',
-        borderRadius: 'var(--radius-lg)',
-        padding: '48px 40px',
+        background: 'var(--glass-bg-2)',
+        backdropFilter: 'var(--blur)',
+        WebkitBackdropFilter: 'var(--blur)',
+        border: '1px solid var(--glass-border)',
+        borderRadius: 'var(--radius-xl)',
+        padding: '52px 44px',
         width: '100%',
-        maxWidth: 380,
+        maxWidth: 400,
         textAlign: 'center',
+        boxShadow: 'var(--shadow)',
       }}>
-        {/* Logo */}
-        <div style={{ display: 'flex', justifyContent: 'center', marginBottom: 24 }}>
-          <svg width="48" height="48" viewBox="0 0 32 32">
-            <rect width="32" height="32" rx="8" fill="#6366f1"/>
-            <rect x="6" y="6" width="8" height="8" rx="2" fill="white" opacity="0.9"/>
-            <rect x="18" y="6" width="8" height="8" rx="2" fill="white" opacity="0.6"/>
-            <rect x="6" y="18" width="8" height="8" rx="2" fill="white" opacity="0.6"/>
-            <rect x="18" y="18" width="8" height="8" rx="2" fill="white" opacity="0.9"/>
+        <div style={{display:'flex',justifyContent:'center',marginBottom:28}}>
+          <svg width="52" height="52" viewBox="0 0 32 32">
+            <rect width="32" height="32" rx="9" fill="var(--accent)"/>
+            <rect x="6" y="6" width="8" height="8" rx="2.5" fill="white" opacity="0.95"/>
+            <rect x="18" y="6" width="8" height="8" rx="2.5" fill="white" opacity="0.55"/>
+            <rect x="6" y="18" width="8" height="8" rx="2.5" fill="white" opacity="0.55"/>
+            <rect x="18" y="18" width="8" height="8" rx="2.5" fill="white" opacity="0.95"/>
           </svg>
         </div>
 
-        <h1 style={{ fontSize: 22, fontWeight: 700, marginBottom: 6 }}>My Planner</h1>
-        <p style={{ fontSize: 14, color: 'var(--text-secondary)', marginBottom: 36 }}>
-          Sign in to access your dashboard
+        <h1 style={{fontSize:26,fontWeight:700,letterSpacing:'-0.5px',marginBottom:8}}>My Planner</h1>
+        <p style={{fontSize:14,color:'var(--text-2)',marginBottom:36}}>
+          Your academic dashboard — sign in to continue
         </p>
 
         {error && (
-          <div style={{
-            background: 'var(--coral-dim)',
-            color: 'var(--coral)',
-            borderRadius: 'var(--radius-md)',
-            padding: '10px 14px',
-            fontSize: 13,
-            marginBottom: 20,
-          }}>
+          <div style={{background:'var(--coral-dim)',color:'var(--coral)',borderRadius:'var(--radius-md)',padding:'10px 14px',fontSize:13,marginBottom:20,border:'1px solid var(--coral-dim)'}}>
             Sign-in failed — please try again.
           </div>
         )}
@@ -62,22 +49,22 @@ export default function LoginPage({ onSignIn, error, loading }) {
             alignItems: 'center',
             justifyContent: 'center',
             gap: 12,
-            padding: '12px 20px',
+            padding: '13px 20px',
             background: 'white',
             color: '#1f1f1f',
-            border: '1px solid #dadce0',
-            borderRadius: 8,
+            border: 'none',
+            borderRadius: 'var(--radius-md)',
             fontSize: 15,
-            fontWeight: 500,
+            fontWeight: 600,
             cursor: loading ? 'not-allowed' : 'pointer',
             opacity: loading ? 0.6 : 1,
-            transition: 'box-shadow .15s',
+            boxShadow: '0 2px 16px rgba(0,0,0,.15)',
+            transition: 'box-shadow .2s, transform .2s',
             fontFamily: 'inherit',
           }}
-          onMouseOver={e => e.currentTarget.style.boxShadow = '0 1px 6px rgba(0,0,0,.2)'}
-          onMouseOut={e => e.currentTarget.style.boxShadow = 'none'}
+          onMouseOver={e => { e.currentTarget.style.boxShadow='0 4px 24px rgba(0,0,0,.25)'; e.currentTarget.style.transform='translateY(-1px)' }}
+          onMouseOut={e => { e.currentTarget.style.boxShadow='0 2px 16px rgba(0,0,0,.15)'; e.currentTarget.style.transform='none' }}
         >
-          {/* Google G logo */}
           <svg width="18" height="18" viewBox="0 0 18 18">
             <path fill="#4285F4" d="M17.64 9.2c0-.637-.057-1.251-.164-1.84H9v3.481h4.844c-.209 1.125-.843 2.078-1.796 2.717v2.258h2.908c1.702-1.567 2.684-3.874 2.684-6.615z"/>
             <path fill="#34A853" d="M9 18c2.43 0 4.467-.806 5.956-2.18l-2.908-2.259c-.806.54-1.837.86-3.048.86-2.344 0-4.328-1.584-5.036-3.711H.957v2.332A8.997 8.997 0 0 0 9 18z"/>
@@ -87,8 +74,8 @@ export default function LoginPage({ onSignIn, error, loading }) {
           {loading ? 'Signing in…' : 'Continue with Google'}
         </button>
 
-        <p style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 24 }}>
-          Your data stays in your own Google Drive.
+        <p style={{fontSize:12,color:'var(--text-3)',marginTop:24,lineHeight:1.6}}>
+          Your data is stored privately in your own Google Drive.<br/>No servers, no sharing.
         </p>
       </div>
     </div>
