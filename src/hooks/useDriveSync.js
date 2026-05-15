@@ -1,4 +1,5 @@
-import { useState, useCallback, useRef } from 'react'
+import { useState, useCallback, useRef, useEffect } from 'react'
+import { save } from '../utils/storage.js'
 
 const FILE_NAME = 'planner_data_v1.json'
 const LS_TOKEN  = 'planner_token_v1'
@@ -9,6 +10,7 @@ function getToken() {
 
 export function useDriveSync() {
   const [saveState,  setSaveState]  = useState('idle')
+  const [synced,     setSynced]     = useState(false)
   const fileIdRef   = useRef(null)
   const debounceRef = useRef(null)
 
@@ -34,9 +36,43 @@ export function useDriveSync() {
     return fileIdRef.current
   }, [])
 
+  // ── Load from Drive on boot, overwrite localStorage ──
+  useEffect(() => {
+    const token = getToken()
+    if (!token) return
+
+    const loadFromDrive = async () => {
+      try {
+        const fileId = await getFileId(token)
+        const res = await fetch(
+          `https://www.googleapis.com/drive/v3/files/${fileId}?alt=media`,
+          { headers: { Authorization: 'Bearer ' + token } }
+        )
+        if (!res.ok) { setSynced(true); return }
+        const data = await res.json()
+        // Write each key from Drive into localStorage
+        Object.entries(data).forEach(([key, value]) => {
+          if (value !== null && value !== undefined) {
+            save(key, value)
+          }
+        })
+        console.log('[drive] loaded from Drive, refreshing…')
+        setSynced(true)
+        // Force re-render so pages pick up new localStorage values
+        window.dispatchEvent(new Event('drive-loaded'))
+      } catch(e) {
+        console.error('[drive] load error:', e)
+        setSynced(true)
+      }
+    }
+
+    loadFromDrive()
+  }, [getFileId])
+
+  // ── Save to Drive (debounced 1.5s) ──────────────────
   const syncToDrive = useCallback((allData) => {
     const token = getToken()
-    if (!token) { console.log('[drive] no token, skipping sync'); return }
+    if (!token) return
 
     clearTimeout(debounceRef.current)
     debounceRef.current = setTimeout(async () => {
@@ -63,22 +99,5 @@ export function useDriveSync() {
     }, 1500)
   }, [getFileId])
 
-  const loadFromDrive = useCallback(async () => {
-    const token = getToken()
-    if (!token) return null
-    try {
-      const fileId = await getFileId(token)
-      const res = await fetch(
-        `https://www.googleapis.com/drive/v3/files/${fileId}?alt=media`,
-        { headers: { Authorization: 'Bearer ' + token } }
-      )
-      if (!res.ok) return null
-      return await res.json()
-    } catch(e) {
-      console.error('[drive] load error:', e)
-      return null
-    }
-  }, [getFileId])
-
-  return { syncToDrive, loadFromDrive, saveState }
+  return { syncToDrive, saveState, synced }
 }
