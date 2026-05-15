@@ -1,11 +1,10 @@
-// useDriveSync — reads token directly from localStorage so it's always available
 import { useState, useCallback, useRef } from 'react'
 
-const FILE_NAME  = 'planner_data_v1.json'
-const TOKEN_KEY  = 'planner_token_v1'
+const FILE_NAME = 'planner_data_v1.json'
+const LS_TOKEN  = 'planner_token_v1'
 
 function getToken() {
-  try { return localStorage.getItem(TOKEN_KEY) || '' } catch(e) { return '' }
+  try { return localStorage.getItem(LS_TOKEN) || '' } catch(e) { return '' }
 }
 
 export function useDriveSync() {
@@ -15,9 +14,8 @@ export function useDriveSync() {
 
   const getFileId = useCallback(async (token) => {
     if (fileIdRef.current) return fileIdRef.current
-    // Search for existing file
-    const res  = await fetch(
-      `https://www.googleapis.com/drive/v3/files?q=name%3D'${FILE_NAME}'%20and%20trashed%3Dfalse&fields=files(id,name)`,
+    const res = await fetch(
+      `https://www.googleapis.com/drive/v3/files?q=name%3D'${FILE_NAME}'%20and%20trashed%3Dfalse&fields=files(id)`,
       { headers: { Authorization: 'Bearer ' + token } }
     )
     const data = await res.json()
@@ -27,9 +25,9 @@ export function useDriveSync() {
     }
     // Create new file
     const create = await fetch('https://www.googleapis.com/drive/v3/files', {
-      method:  'POST',
+      method: 'POST',
       headers: { Authorization: 'Bearer ' + token, 'Content-Type': 'application/json' },
-      body:    JSON.stringify({ name: FILE_NAME, mimeType: 'application/json' }),
+      body: JSON.stringify({ name: FILE_NAME, mimeType: 'application/json' })
     })
     const file = await create.json()
     fileIdRef.current = file.id
@@ -48,9 +46,9 @@ export function useDriveSync() {
         const res = await fetch(
           `https://www.googleapis.com/upload/drive/v3/files/${fileId}?uploadType=media`,
           {
-            method:  'PATCH',
+            method: 'PATCH',
             headers: { Authorization: 'Bearer ' + token, 'Content-Type': 'application/json' },
-            body:    JSON.stringify(allData, null, 2),
+            body: JSON.stringify(allData)
           }
         )
         if (!res.ok) throw new Error('HTTP ' + res.status)
@@ -70,7 +68,7 @@ export function useDriveSync() {
     if (!token) return null
     try {
       const fileId = await getFileId(token)
-      const res    = await fetch(
+      const res = await fetch(
         `https://www.googleapis.com/drive/v3/files/${fileId}?alt=media`,
         { headers: { Authorization: 'Bearer ' + token } }
       )
