@@ -2,77 +2,57 @@ import { useState } from 'react'
 import { HashRouter, Routes, Route, NavLink } from 'react-router-dom'
 import {
   LayoutDashboard, BookOpen, Clock, Target,
-  BookMarked, Wallet, StickyNote, Menu, X, HardDrive, LogOut
+  Link, Menu, X, HardDrive, LogOut
 } from 'lucide-react'
 
-import { useAuth } from './hooks/useAuth.js'
-import LoginPage     from './pages/LoginPage.jsx'
-import WeeklyHome    from './pages/WeeklyHome.jsx'
-import Courses       from './pages/Courses.jsx'
-import StudySessions from './pages/StudySessions.jsx'
-import Goals         from './pages/Goals.jsx'
-import Reading       from './pages/Reading.jsx'
-import Notes         from './pages/Notes.jsx'
-import Finance       from './pages/Finance.jsx'
+import { useAuth }       from './hooks/useAuth.js'
+import LoginPage         from './pages/LoginPage.jsx'
+import WeeklyHome        from './pages/WeeklyHome.jsx'
+import Courses           from './pages/Courses.jsx'
+import StudySessions     from './pages/StudySessions.jsx'
+import Goals             from './pages/Goals.jsx'
+import Notes             from './pages/Notes.jsx'
 
 const NAV = [
-  { label: 'Core', items: [
-    { to: '/',        icon: LayoutDashboard, text: 'Weekly home'    },
-    { to: '/courses', icon: BookOpen,        text: 'Courses'        },
+  { label: 'Daily', items: [
+    { to: '/',        icon: LayoutDashboard, text: 'Home'           },
+    { to: '/courses', icon: BookOpen,        text: 'Assignments'    },
     { to: '/study',   icon: Clock,           text: 'Study sessions' },
   ]},
   { label: 'Progress', items: [
-    { to: '/goals',   icon: Target,          text: 'Goals & habits' },
-    { to: '/reading', icon: BookMarked,      text: 'Reading'        },
+    { to: '/goals',   icon: Target,          text: 'Habits'         },
   ]},
-  { label: 'Other', items: [
-    { to: '/notes',   icon: StickyNote,      text: 'Notes'          },
-    { to: '/finance', icon: Wallet,          text: 'Finance'        },
+  { label: 'Resources', items: [
+    { to: '/links',   icon: Link,            text: 'Quick links'    },
   ]},
 ]
 
 function Avatar({ profile }) {
-  const initials = (name) => {
-    const parts = (name || '?').trim().split(/\s+/)
-    return (parts[0][0] + (parts[1] ? parts[1][0] : '')).toUpperCase()
+  const initials = name => {
+    const p = (name || '?').trim().split(/\s+/)
+    return (p[0][0] + (p[1] ? p[1][0] : '')).toUpperCase()
   }
   return (
-    <div style={{
-      width: 30, height: 30, borderRadius: '50%',
-      background: 'var(--accent-dim)',
-      display: 'flex', alignItems: 'center', justifyContent: 'center',
-      fontSize: 12, fontWeight: 600, color: 'var(--accent-light)',
-      overflow: 'hidden', flexShrink: 0,
-    }}>
+    <div style={{ width: 30, height: 30, borderRadius: '50%', background: 'var(--accent-dim)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 12, fontWeight: 600, color: 'var(--accent-light)', overflow: 'hidden', flexShrink: 0 }}>
       {profile?.picture
-        ? <img src={profile.picture} referrerPolicy="no-referrer"
-            style={{ width: '100%', height: '100%', objectFit: 'cover' }}
-            onError={e => { e.target.style.display = 'none' }} />
-        : initials(profile?.name || '?')
-      }
+        ? <img src={profile.picture} referrerPolicy="no-referrer" style={{ width: '100%', height: '100%', objectFit: 'cover' }} onError={e => { e.target.style.display = 'none' }} />
+        : initials(profile?.name || '?')}
     </div>
   )
 }
 
 export default function App() {
-  const { token, profile, loading, error, signIn, signOut, isAuthed } = useAuth()
+  const { profile, loading, error, signIn, signOut, isAuthed } = useAuth()
   const [sidebarOpen, setSidebarOpen] = useState(false)
 
-  // Still checking hash / attempting silent restore
-  if (loading) {
-    return (
-      <div style={{ minHeight: '100vh', background: 'var(--bg-primary)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-        <div style={{ color: 'var(--text-muted)', fontSize: 14 }}>Loading…</div>
-      </div>
-    )
-  }
+  if (loading) return (
+    <div style={{ minHeight: '100vh', background: 'var(--bg-primary)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+      <div style={{ color: 'var(--text-muted)', fontSize: 14 }}>Loading…</div>
+    </div>
+  )
 
-  // Not signed in — show login page
-  if (!isAuthed) {
-    return <LoginPage onSignIn={signIn} error={error} loading={loading} />
-  }
+  if (!isAuthed) return <LoginPage onSignIn={signIn} error={error} loading={loading} />
 
-  // Signed in — show dashboard
   return (
     <HashRouter>
       <div className="app-shell">
@@ -106,23 +86,17 @@ export default function App() {
           </nav>
 
           <div className="sidebar-footer">
-            {/* User profile row */}
             <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '8px 10px', marginBottom: 4 }}>
               <Avatar profile={profile} />
               <div style={{ flex: 1, minWidth: 0 }}>
-                <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--text-primary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                  {profile?.name || 'User'}
-                </div>
-                <div style={{ fontSize: 11, color: 'var(--text-muted)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                  {profile?.email || ''}
-                </div>
+                <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--text-primary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{profile?.name || 'User'}</div>
+                <div style={{ fontSize: 11, color: 'var(--text-muted)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{profile?.email || ''}</div>
               </div>
             </div>
-            {/* Drive + sign out */}
             <div className="drive-status">
               <div className="drive-dot connected" />
               <HardDrive size={13} />
-              <span style={{ flex: 1 }}>Drive connected</span>
+              <span style={{ flex: 1 }}>Signed in</span>
               <button onClick={signOut} style={{ background: 'none', border: 'none', color: 'var(--text-muted)', cursor: 'pointer', display: 'flex', padding: 2 }} title="Sign out">
                 <LogOut size={13} />
               </button>
@@ -144,9 +118,7 @@ export default function App() {
             <Route path="/courses" element={<Courses />}       />
             <Route path="/study"   element={<StudySessions />} />
             <Route path="/goals"   element={<Goals />}         />
-            <Route path="/reading" element={<Reading />}       />
-            <Route path="/notes"   element={<Notes />}         />
-            <Route path="/finance" element={<Finance />}       />
+            <Route path="/links"   element={<Notes />}         />
           </Routes>
         </div>
       </div>

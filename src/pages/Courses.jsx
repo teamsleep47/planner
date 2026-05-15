@@ -1,118 +1,166 @@
-import { useState } from 'react'
-import { Plus, GraduationCap } from 'lucide-react'
+import { useState, useEffect } from 'react'
+import { Plus, Trash2 } from 'lucide-react'
+import { load, save } from '../utils/storage.js'
 
-const INIT_COURSES = [
-  { id: 1, name: 'Data Structures',    color: 'var(--accent)', grade: 88, target: 90 },
-  { id: 2, name: 'Technical Writing',  color: 'var(--teal)',   grade: 92, target: 90 },
-  { id: 3, name: 'Linear Algebra',     color: 'var(--amber)',  grade: 74, target: 80 },
-]
+const SEMESTERS = {
+  summer: {
+    label: 'Summer 2026',
+    color: 'var(--amber)',
+    courses: ['Humanities', 'Written Communication'],
+  },
+  fall: {
+    label: 'Fall 2026',
+    color: 'var(--teal)',
+    courses: ['Anatomy & Physiology', 'A&P Lab', 'American Government'],
+  },
+}
 
-const INIT_ASSIGNMENTS = [
-  { id: 1, title: 'HW 4 — Linked lists',      courseId: 1, due: '2026-05-16', status: 'todo',       weight: 10 },
-  { id: 2, title: 'Essay draft',               courseId: 2, due: '2026-05-17', status: 'todo',       weight: 20 },
-  { id: 3, title: 'Problem set 5',             courseId: 3, due: '2026-05-20', status: 'inprogress', weight: 15 },
-  { id: 4, title: 'Midterm study guide',       courseId: 1, due: '2026-05-22', status: 'inprogress', weight: 0  },
-  { id: 5, title: 'Essay outline',             courseId: 2, due: '2026-05-10', status: 'done',       weight: 10 },
-  { id: 6, title: 'Problem set 4',             courseId: 3, due: '2026-05-08', status: 'done',       weight: 15 },
-]
+const TYPES = ['Essay', 'Discussion Post', 'Reading Response', 'Quiz', 'Exam', 'Lab Report', 'Other']
+const STATUS = ['To do', 'In progress', 'Done']
+const STATUS_COLOR = { 'To do': 'var(--text-muted)', 'In progress': 'var(--amber)', 'Done': 'var(--green)' }
+const STATUS_BG    = { 'To do': 'var(--bg-hover)', 'In progress': 'var(--amber-dim)', 'Done': 'var(--green-dim)' }
 
-const COLS = [
-  { key: 'todo',       label: 'To do',      color: 'var(--text-muted)'  },
-  { key: 'inprogress', label: 'In progress', color: 'var(--amber)'      },
-  { key: 'done',       label: 'Done',        color: 'var(--green)'      },
+const DEFAULT_ASSIGNMENTS = [
+  { id: 1, title: 'Discussion Post Week 1', course: 'Humanities', type: 'Discussion Post', due: '2026-05-26', status: 'To do', notes: '' },
+  { id: 2, title: 'Essay Draft 1',          course: 'Written Communication', type: 'Essay', due: '2026-05-28', status: 'To do', notes: '' },
 ]
 
 export default function Courses() {
-  const [courses]     = useState(INIT_COURSES)
-  const [assignments, setAssignments] = useState(INIT_ASSIGNMENTS)
+  const [tab,         setTab]         = useState('summer')
+  const [assignments, setAssignments] = useState(() => load('assignments', DEFAULT_ASSIGNMENTS))
+  const [showForm,    setShowForm]    = useState(false)
+  const [form,        setForm]        = useState({ title: '', course: SEMESTERS.summer.courses[0], type: TYPES[0], due: '', status: 'To do', notes: '' })
 
-  const move = (id, status) =>
+  useEffect(() => { save('assignments', assignments) }, [assignments])
+
+  const sem        = SEMESTERS[tab]
+  const filtered   = assignments.filter(a => sem.courses.includes(a.course))
+
+  const addAssignment = () => {
+    if (!form.title || !form.due) return
+    setAssignments(as => [...as, { ...form, id: Date.now() }])
+    setForm({ title: '', course: sem.courses[0], type: TYPES[0], due: '', status: 'To do', notes: '' })
+    setShowForm(false)
+  }
+
+  const updateStatus = (id, status) =>
     setAssignments(as => as.map(a => a.id === id ? { ...a, status } : a))
 
-  const courseOf = id => courses.find(c => c.id === id)
+  const deleteAssignment = id =>
+    setAssignments(as => as.filter(a => a.id !== id))
+
+  const daysUntil = due => {
+    const d = Math.ceil((new Date(due) - new Date()) / 86400000)
+    if (d < 0)  return { label: 'Overdue',     color: 'var(--coral)'  }
+    if (d === 0) return { label: 'Due today',   color: 'var(--coral)'  }
+    if (d === 1) return { label: 'Due tomorrow',color: 'var(--amber)'  }
+    return { label: `${d}d left`, color: 'var(--text-muted)' }
+  }
 
   return (
     <>
       <div className="page-header">
         <div>
-          <div className="page-title">Courses</div>
-          <div className="page-subtitle">Assignments, grades, and progress</div>
+          <div className="page-title">Assignments</div>
+          <div className="page-subtitle">Track essays, posts, and exams by semester</div>
         </div>
-        <button className="btn btn-primary"><Plus size={14} /> Add assignment</button>
+        <button className="btn btn-primary" onClick={() => setShowForm(s => !s)}>
+          <Plus size={14} /> Add assignment
+        </button>
       </div>
 
-      <div className="page-body" style={{ display: 'flex', flexDirection: 'column', gap: 24 }}>
+      <div className="page-body" style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
 
-        {/* Course cards */}
+        {/* Semester tabs */}
+        <div style={{ display: 'flex', gap: 8, background: 'var(--bg-secondary)', padding: 4, borderRadius: 'var(--radius-md)', width: 'fit-content' }}>
+          {Object.entries(SEMESTERS).map(([key, s]) => (
+            <button key={key} onClick={() => setTab(key)} style={{
+              padding: '8px 20px', borderRadius: 'var(--radius-sm)', border: 'none',
+              background: tab === key ? s.color : 'transparent',
+              color: tab === key ? (key === 'summer' ? '#1a1a2e' : 'white') : 'var(--text-secondary)',
+              fontWeight: 600, fontSize: 13, cursor: 'pointer', transition: 'all .15s',
+            }}>{s.label}</button>
+          ))}
+        </div>
+
+        {/* Add form */}
+        {showForm && (
+          <div className="card" style={{ borderColor: sem.color }}>
+            <div className="card-title">New assignment — {sem.label}</div>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 12 }}>
+              <input placeholder="Title" value={form.title} onChange={e => setForm(f => ({ ...f, title: e.target.value }))}
+                style={{ gridColumn: '1/-1', padding: '8px 12px', background: 'var(--bg-secondary)', border: '1px solid var(--border)', borderRadius: 'var(--radius-md)', color: 'var(--text-primary)', fontSize: 13 }} />
+              <select value={form.course} onChange={e => setForm(f => ({ ...f, course: e.target.value }))}
+                style={{ padding: '8px 12px', background: 'var(--bg-secondary)', border: '1px solid var(--border)', borderRadius: 'var(--radius-md)', color: 'var(--text-primary)', fontSize: 13 }}>
+                {sem.courses.map(c => <option key={c} value={c}>{c}</option>)}
+              </select>
+              <select value={form.type} onChange={e => setForm(f => ({ ...f, type: e.target.value }))}
+                style={{ padding: '8px 12px', background: 'var(--bg-secondary)', border: '1px solid var(--border)', borderRadius: 'var(--radius-md)', color: 'var(--text-primary)', fontSize: 13 }}>
+                {TYPES.map(t => <option key={t} value={t}>{t}</option>)}
+              </select>
+              <input type="date" value={form.due} onChange={e => setForm(f => ({ ...f, due: e.target.value }))}
+                style={{ padding: '8px 12px', background: 'var(--bg-secondary)', border: '1px solid var(--border)', borderRadius: 'var(--radius-md)', color: 'var(--text-primary)', fontSize: 13 }} />
+              <input placeholder="Notes (optional)" value={form.notes} onChange={e => setForm(f => ({ ...f, notes: e.target.value }))}
+                style={{ padding: '8px 12px', background: 'var(--bg-secondary)', border: '1px solid var(--border)', borderRadius: 'var(--radius-md)', color: 'var(--text-primary)', fontSize: 13 }} />
+            </div>
+            <div style={{ display: 'flex', gap: 8 }}>
+              <button className="btn btn-primary" onClick={addAssignment}>Save</button>
+              <button className="btn btn-ghost" onClick={() => setShowForm(false)}>Cancel</button>
+            </div>
+          </div>
+        )}
+
+        {/* Stats row */}
         <div className="grid-3">
-          {courses.map(c => (
-            <div key={c.id} className="card" style={{ borderTop: `3px solid ${c.color}` }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 12 }}>
-                <GraduationCap size={15} style={{ color: c.color }} />
-                <span style={{ fontWeight: 600, fontSize: 14 }}>{c.name}</span>
+          {['To do', 'In progress', 'Done'].map(s => (
+            <div key={s} className="stat-card">
+              <div className="stat-label">{s}</div>
+              <div className="stat-value" style={{ color: STATUS_COLOR[s] }}>
+                {filtered.filter(a => a.status === s).length}
               </div>
-              <div style={{ marginBottom: 8 }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12, color: 'var(--text-secondary)', marginBottom: 4 }}>
-                  <span>Grade</span>
-                  <span style={{ color: c.grade >= c.target ? 'var(--green)' : 'var(--coral)' }}>
-                    {c.grade}% / {c.target}% target
-                  </span>
-                </div>
-                <div className="progress-bar">
-                  <div className="progress-fill" style={{ width: `${c.grade}%`, background: c.color }} />
-                </div>
-              </div>
-              <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>
-                {assignments.filter(a => a.courseId === c.id && a.status !== 'done').length} pending assignments
-              </div>
+              <div className="stat-sub">assignments</div>
             </div>
           ))}
         </div>
 
-        {/* Kanban */}
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 16, alignItems: 'start' }}>
-          {COLS.map(col => (
-            <div key={col.key}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10 }}>
-                <span style={{ fontWeight: 600, fontSize: 12, color: col.color, textTransform: 'uppercase', letterSpacing: '.06em' }}>
-                  {col.label}
-                </span>
-                <span style={{ fontSize: 11, background: 'var(--bg-hover)', color: 'var(--text-muted)', padding: '1px 7px', borderRadius: 20 }}>
-                  {assignments.filter(a => a.status === col.key).length}
-                </span>
-              </div>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-                {assignments.filter(a => a.status === col.key).map(a => {
-                  const course = courseOf(a.courseId)
-                  return (
-                    <div key={a.id} className="card" style={{ padding: '12px 14px', borderLeft: `3px solid ${course.color}` }}>
-                      <div style={{ fontWeight: 500, marginBottom: 6, fontSize: 13 }}>{a.title}</div>
-                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                        <span style={{ fontSize: 11, color: 'var(--text-muted)' }}>
-                          Due {new Date(a.due).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
-                        </span>
-                        {a.weight > 0 && <span className="badge badge-accent">{a.weight}%</span>}
+        {/* Assignment list */}
+        {filtered.length === 0 ? (
+          <div className="card" style={{ textAlign: 'center', padding: '40px 20px', color: 'var(--text-muted)' }}>
+            No assignments yet — add one above.
+          </div>
+        ) : (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+            {filtered
+              .sort((a, b) => new Date(a.due) - new Date(b.due))
+              .map(a => {
+                const due = daysUntil(a.due)
+                return (
+                  <div key={a.id} className="card" style={{ padding: '14px 18px', borderLeft: `3px solid ${sem.color}`, display: 'flex', alignItems: 'center', gap: 14 }}>
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
+                        <span style={{ fontWeight: 600, fontSize: 14 }}>{a.title}</span>
+                        <span style={{ fontSize: 11, padding: '2px 7px', borderRadius: 20, background: 'var(--bg-hover)', color: 'var(--text-muted)' }}>{a.type}</span>
                       </div>
-                      {/* Quick move buttons */}
-                      <div style={{ display: 'flex', gap: 4, marginTop: 8 }}>
-                        {COLS.filter(c => c.key !== col.key).map(c => (
-                          <button
-                            key={c.key}
-                            className="btn btn-ghost"
-                            onClick={() => move(a.id, c.key)}
-                            style={{ fontSize: 10, padding: '3px 7px' }}
-                          >
-                            → {c.label}
-                          </button>
-                        ))}
+                      <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>
+                        {a.course} · Due {new Date(a.due).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })} · <span style={{ color: due.color, fontWeight: 600 }}>{due.label}</span>
                       </div>
+                      {a.notes && <div style={{ fontSize: 12, color: 'var(--text-secondary)', marginTop: 4 }}>{a.notes}</div>}
                     </div>
-                  )
-                })}
-              </div>
-            </div>
-          ))}
-        </div>
+                    <select
+                      value={a.status}
+                      onChange={e => updateStatus(a.id, e.target.value)}
+                      style={{ padding: '6px 10px', borderRadius: 'var(--radius-md)', border: 'none', background: STATUS_BG[a.status], color: STATUS_COLOR[a.status], fontWeight: 600, fontSize: 12, cursor: 'pointer' }}
+                    >
+                      {STATUS.map(s => <option key={s} value={s}>{s}</option>)}
+                    </select>
+                    <button onClick={() => deleteAssignment(a.id)} style={{ background: 'none', border: 'none', color: 'var(--text-muted)', cursor: 'pointer', display: 'flex', padding: 4 }}>
+                      <Trash2 size={14} />
+                    </button>
+                  </div>
+                )
+              })}
+          </div>
+        )}
 
       </div>
     </>
