@@ -1,43 +1,71 @@
 import { useState, useRef, useCallback } from 'react'
+import { createPortal } from 'react-dom'
 
 export default function Tooltip({ text, children, position = 'top' }) {
-  const [visible, setVisible]   = useState(false)
-  const [coords,  setCoords]    = useState({ top: 0, left: 0, placement: position })
+  const [visible, setVisible] = useState(false)
+  const [coords,  setCoords]  = useState({ top: 0, left: 0 })
   const wrapRef = useRef(null)
-  const tipRef  = useRef(null)
+  const timerRef = useRef(null)
 
   const show = useCallback(() => {
-    if (!wrapRef.current) return
-    const rect = wrapRef.current.getBoundingClientRect()
-    const TIP_W = 220
-    const TIP_H = 44
-    const GAP   = 8
-    const vw    = window.innerWidth
-    const vh    = window.innerHeight
+    timerRef.current = setTimeout(() => {
+      if (!wrapRef.current) return
+      const rect  = wrapRef.current.getBoundingClientRect()
+      const TIP_W = 220
+      const TIP_H = 48
+      const GAP   = 8
+      const vw    = window.innerWidth
+      const vh    = window.innerHeight
 
-    let left = rect.left + rect.width / 2 - TIP_W / 2
-    let top, placement
+      // Horizontal: center on element, clamp to screen
+      let left = rect.left + rect.width / 2 - TIP_W / 2
+      left = Math.max(8, Math.min(left, vw - TIP_W - 8))
 
-    // Try preferred position, fall back if off screen
-    if (position === 'top' && rect.top - TIP_H - GAP > 0) {
-      top = rect.top - TIP_H - GAP
-      placement = 'top'
-    } else if (rect.bottom + TIP_H + GAP < vh) {
-      top = rect.bottom + GAP
-      placement = 'bottom'
-    } else {
-      top = rect.top - TIP_H - GAP
-      placement = 'top'
-    }
+      // Vertical: prefer position prop, fallback
+      let top
+      if (position === 'bottom' || rect.top - TIP_H - GAP < 0) {
+        top = Math.min(rect.bottom + GAP, vh - TIP_H - 8)
+      } else if (position === 'left' || position === 'right') {
+        top = rect.top + rect.height / 2 - TIP_H / 2
+        left = position === 'left'
+          ? Math.max(8, rect.left - TIP_W - GAP)
+          : Math.min(rect.right + GAP, vw - TIP_W - 8)
+      } else {
+        top = rect.top - TIP_H - GAP
+      }
 
-    // Clamp horizontal so it stays on screen
-    left = Math.max(8, Math.min(left, vw - TIP_W - 8))
-
-    setCoords({ top, left, placement })
-    setVisible(true)
+      setCoords({ top, left })
+      setVisible(true)
+    }, 400)
   }, [position])
 
-  const hide = useCallback(() => setVisible(false), [])
+  const hide = useCallback(() => {
+    clearTimeout(timerRef.current)
+    setVisible(false)
+  }, [])
+
+  const tooltip = visible ? createPortal(
+    <div style={{
+      position:     'fixed',
+      top:          coords.top,
+      left:         coords.left,
+      width:        220,
+      background:   'var(--tooltip-bg, #0f0f1e)',
+      border:       '1px solid var(--tooltip-border, rgba(255,255,255,0.15))',
+      borderRadius: 8,
+      padding:      '7px 12px',
+      fontSize:     12,
+      lineHeight:   1.5,
+      color:        'var(--tooltip-text, #e0e0ff)',
+      zIndex:       99999,
+      pointerEvents:'none',
+      boxShadow:    '0 4px 20px rgba(0,0,0,0.4)',
+      animation:    'fadeIn .1s ease',
+    }}>
+      {text}
+    </div>,
+    document.body
+  ) : null
 
   return (
     <>
@@ -45,30 +73,7 @@ export default function Tooltip({ text, children, position = 'top' }) {
         style={{ display: 'contents' }}>
         {children}
       </span>
-      {visible && (
-        <div ref={tipRef} style={{
-          position:     'fixed',
-          top:          coords.top,
-          left:         coords.left,
-          width:        220,
-          background:   'var(--tooltip-bg)',
-          border:       '1px solid var(--tooltip-border)',
-          borderRadius: 'var(--radius-md)',
-          padding:      '7px 11px',
-          fontSize:     12,
-          fontWeight:   400,
-          lineHeight:   1.5,
-          color:        'var(--tooltip-text)',
-          zIndex:       9999,
-          pointerEvents:'none',
-          boxShadow:    'var(--shadow)',
-          backdropFilter: 'blur(12px)',
-          WebkitBackdropFilter: 'blur(12px)',
-          animation:    'fadeIn .12s ease',
-        }}>
-          {text}
-        </div>
-      )}
+      {tooltip}
     </>
   )
 }

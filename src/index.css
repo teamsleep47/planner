@@ -768,7 +768,7 @@ select option {
   animation: flipTop .3s ease-in forwards;
 }
 
-@keyframes flipTop {
+@keyframes flipDown {
   0%   { transform: rotateX(0deg); }
   100% { transform: rotateX(-180deg); }
 }

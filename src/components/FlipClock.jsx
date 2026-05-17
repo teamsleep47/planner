@@ -1,55 +1,126 @@
 import { useState, useEffect, useRef } from 'react'
 
 function FlipDigit({ value }) {
-  const [current,  setCurrent]  = useState(value)
-  const [previous, setPrevious] = useState(value)
+  const [display,  setDisplay]  = useState(value)
+  const [prev,     setPrev]     = useState(value)
   const [flipping, setFlipping] = useState(false)
-  const prevVal = useRef(value)
+  const lastVal = useRef(value)
 
   useEffect(() => {
-    if (value !== prevVal.current) {
-      setPrevious(prevVal.current)
-      setFlipping(true)
-      const t = setTimeout(() => {
-        setCurrent(value)
-        setFlipping(false)
-        prevVal.current = value
-      }, 300)
-      return () => clearTimeout(t)
-    }
+    if (value === lastVal.current) return
+    setPrev(lastVal.current)
+    lastVal.current = value
+    setFlipping(true)
+    const t = setTimeout(() => {
+      setDisplay(value)
+      setFlipping(false)
+    }, 320)
+    return () => clearTimeout(t)
   }, [value])
 
   return (
-    <div className="flip-digit-wrap">
-      {/* Static bottom half showing current */}
-      <div className="flip-card flip-card-lower">
-        <span>{current}</span>
+    <div style={{
+      position: 'relative',
+      width: 36, height: 52,
+      perspective: 160,
+    }}>
+      {/* Bottom half — shows new value */}
+      <div style={{
+        position: 'absolute', bottom: 0, left: 0, right: 0, height: '50%',
+        background: 'var(--flip-bg)',
+        borderRadius: '0 0 6px 6px',
+        borderTop: '1px solid var(--flip-border)',
+        display: 'flex', alignItems: 'flex-start', justifyContent: 'center',
+        overflow: 'hidden',
+        fontFamily: 'var(--font-mono)', fontSize: 24, fontWeight: 700,
+        color: 'var(--text-1)',
+      }}>
+        <span style={{ marginTop: -2 }}>{display}</span>
       </div>
-      {/* Static top half showing current */}
-      <div className="flip-card flip-card-upper">
-        <span>{current}</span>
+
+      {/* Top half — shows current value */}
+      <div style={{
+        position: 'absolute', top: 0, left: 0, right: 0, height: '50%',
+        background: 'var(--flip-bg)',
+        borderRadius: '6px 6px 0 0',
+        borderBottom: '1px solid var(--flip-border)',
+        display: 'flex', alignItems: 'flex-end', justifyContent: 'center',
+        overflow: 'hidden',
+        fontFamily: 'var(--font-mono)', fontSize: 24, fontWeight: 700,
+        color: 'var(--text-1)',
+      }}>
+        <span style={{ marginBottom: -2 }}>{display}</span>
       </div>
-      {/* Animated flap */}
+
+      {/* Flap — animates when digit changes */}
       {flipping && (
-        <>
-          {/* Top flap flips down (shows previous on front, current on back) */}
-          <div className="flip-card flip-card-flap-top flip-anim-top">
-            <span className="flip-front">{previous}</span>
-            <span className="flip-back">{current}</span>
+        <div style={{
+          position: 'absolute', top: 0, left: 0, right: 0, height: '50%',
+          transformOrigin: 'bottom center',
+          transformStyle: 'preserve-3d',
+          animation: 'flipDown 320ms ease-in forwards',
+          borderRadius: '6px 6px 0 0',
+          zIndex: 10,
+        }}>
+          {/* Front of flap — shows old value */}
+          <div style={{
+            position: 'absolute', inset: 0,
+            background: 'var(--flip-bg)',
+            borderRadius: '6px 6px 0 0',
+            display: 'flex', alignItems: 'flex-end', justifyContent: 'center',
+            overflow: 'hidden',
+            fontFamily: 'var(--font-mono)', fontSize: 24, fontWeight: 700,
+            color: 'var(--text-1)',
+            backfaceVisibility: 'hidden',
+          }}>
+            <span style={{ marginBottom: -2 }}>{prev}</span>
           </div>
-        </>
+          {/* Back of flap — shows new value, rotated 180deg */}
+          <div style={{
+            position: 'absolute', inset: 0,
+            background: 'var(--flip-bg)',
+            borderRadius: '6px 6px 0 0',
+            display: 'flex', alignItems: 'flex-end', justifyContent: 'center',
+            overflow: 'hidden',
+            fontFamily: 'var(--font-mono)', fontSize: 24, fontWeight: 700,
+            color: 'var(--text-1)',
+            transform: 'rotateX(180deg)',
+            backfaceVisibility: 'hidden',
+          }}>
+            <span style={{ marginBottom: -2, transform: 'scaleY(-1)' }}>{display}</span>
+          </div>
+        </div>
       )}
+
+      {/* Outer border/glow */}
+      <div style={{
+        position: 'absolute', inset: 0,
+        borderRadius: 6,
+        border: '1px solid var(--flip-border)',
+        boxShadow: '0 0 8px var(--accent-glow)',
+        pointerEvents: 'none',
+      }} />
     </div>
   )
 }
 
 function FlipSep() {
-  const [bright, setBright] = useState(true)
+  const [on, setOn] = useState(true)
   useEffect(() => {
-    const id = setInterval(() => setBright(b => !b), 1000)
+    const id = setInterval(() => setOn(v => !v), 1000)
     return () => clearInterval(id)
   }, [])
-  return <span className="flip-sep" style={{ opacity: bright ? 1 : 0.3, transition: 'opacity .2s' }}>:</span>
+  return (
+    <span style={{
+      fontSize: 22, fontWeight: 900,
+      color: 'var(--accent)',
+      opacity: on ? 1 : 0.25,
+      transition: 'opacity .25s',
+      margin: '0 2px',
+      paddingBottom: 4,
+      textShadow: '0 0 8px var(--accent-glow)',
+    }}>:</span>
+  )
 }
 
 export default function FlipClock() {
@@ -66,7 +137,7 @@ export default function FlipClock() {
   const ap = h >= 12 ? 'PM' : 'AM'
 
   return (
-    <div className="flip-clock" aria-label="Current time">
+    <div style={{ display: 'flex', alignItems: 'center', gap: 3 }} aria-label="Current time">
       <FlipDigit value={hh[0]} />
       <FlipDigit value={hh[1]} />
       <FlipSep />
@@ -75,7 +146,7 @@ export default function FlipClock() {
       <FlipSep />
       <FlipDigit value={ss[0]} />
       <FlipDigit value={ss[1]} />
-      <span className="flip-ampm">{ap}</span>
+      <span style={{ fontSize: 11, color: 'var(--text-3)', fontWeight: 700, marginLeft: 5 }}>{ap}</span>
     </div>
   )
 }
