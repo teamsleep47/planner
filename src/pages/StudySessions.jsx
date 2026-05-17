@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from 'react'
 import { Play, Pause, RotateCcw, Brain } from 'lucide-react'
+import Tooltip from '../components/Tooltip.jsx'
 import { load, save } from '../utils/storage.js'
 
 const DURATIONS = { focus: 25 * 60, short: 5 * 60, long: 15 * 60 }
@@ -11,11 +12,15 @@ export default function StudySessions({ onDataChange }) {
   const [running,  setRunning]  = useState(false)
   const [course,   setCourse]   = useState(COURSES[0])
   const [sessions, setSessions] = useState(() => load('study_sessions', []))
+  const [weekGoal,  setWeekGoal]  = useState(() => load('study_week_goal', 10))
+  const [editGoal,  setEditGoal]  = useState(false)
+  const [draftGoal, setDraftGoal] = useState(weekGoal)
   const [recall,   setRecall]   = useState(null)   // {sessionId, text, submitted}
   const [recallInput, setRecallInput] = useState('')
   const intervalRef = useRef(null)
 
   useEffect(() => { save('study_sessions', sessions); onDataChange?.() }, [sessions])
+  useEffect(() => { save('study_week_goal', weekGoal) }, [weekGoal])
 
   useEffect(() => {
     setSecs(DURATIONS[mode])
@@ -69,6 +74,10 @@ export default function StudySessions({ onDataChange }) {
   const pct = ((DURATIONS[mode] - secs) / DURATIONS[mode]) * 100
 
   const todayStr   = new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
+  const weekStart  = new Date(); weekStart.setDate(weekStart.getDate() - weekStart.getDay())
+  const weekMins   = sessions.filter(s => { try { return new Date(s.date) >= weekStart } catch(e){ return false } }).reduce((a,s)=>a+s.mins,0)
+  const weekGoalMins = weekGoal * 60
+  const weekPct    = Math.min((weekMins / weekGoalMins) * 100, 100)
   const todayMins  = sessions.filter(s => s.date === todayStr).reduce((a, s) => a + s.mins, 0)
   const totalSessions = sessions.length
   const withRecall    = sessions.filter(s => s.recall).length
@@ -188,6 +197,38 @@ export default function StudySessions({ onDataChange }) {
               </div>
             </div>
           </div>
+
+          {/* Weekly goal */}
+            <div className="card">
+              <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:12 }}>
+                <span className="card-title" style={{margin:0}}>Weekly study goal</span>
+                <Tooltip text="Set your weekly study hour target — click to edit">
+                  {editGoal ? (
+                    <div style={{display:'flex',gap:6,alignItems:'center'}}>
+                      <input type="number" min="1" max="100" value={draftGoal} onChange={e=>setDraftGoal(Number(e.target.value))} className="inline-input" style={{width:56,textAlign:'center',fontSize:12}}/>
+                      <span style={{fontSize:12,color:'var(--text-3)'}}>hrs</span>
+                      <button className="btn-icon" onClick={()=>{setWeekGoal(draftGoal);setEditGoal(false)}} style={{padding:4}}>✓</button>
+                    </div>
+                  ) : (
+                    <button onClick={()=>{setEditGoal(true);setDraftGoal(weekGoal)}} style={{background:'none',border:'none',fontSize:12,color:'var(--text-3)',cursor:'pointer'}}>
+                      {weekGoal}h goal ✎
+                    </button>
+                  )}
+                </Tooltip>
+              </div>
+              <div style={{marginBottom:8}}>
+                <div style={{display:'flex',justifyContent:'space-between',fontSize:12,color:'var(--text-2)',marginBottom:6}}>
+                  <span>{Math.round(weekMins/60*10)/10}h studied this week</span>
+                  <span style={{color:weekPct>=100?'var(--green)':weekPct>=50?'var(--amber)':'var(--text-3)',fontWeight:600}}>{Math.round(weekPct)}%</span>
+                </div>
+                <div className="progress-bar" style={{height:8}}>
+                  <div className="progress-fill" style={{width:`${weekPct}%`,background:weekPct>=100?'var(--green)':weekPct>=50?'var(--amber)':'var(--accent)'}}/>
+                </div>
+              </div>
+              <div style={{fontSize:11,color:'var(--text-3)'}}>
+                {weekPct>=100 ? '🎉 Goal reached this week!' : `${Math.round((weekGoalMins-weekMins)/60*10)/10}h remaining to hit your ${weekGoal}h goal`}
+              </div>
+            </div>
 
           {/* Session log */}
           <div className="card" style={{ padding: 0, overflow: 'hidden' }}>

@@ -1,79 +1,102 @@
-import { useState, useRef, useCallback } from 'react'
+import { useState, useRef, useCallback, useEffect } from 'react'
 import { createPortal } from 'react-dom'
 
 export default function Tooltip({ text, children, position = 'top' }) {
   const [visible, setVisible] = useState(false)
-  const [coords,  setCoords]  = useState({ top: 0, left: 0 })
-  const wrapRef = useRef(null)
-  const timerRef = useRef(null)
+  const [pos,     setPos]     = useState({ x: 0, y: 0 })
+  const [smooth,  setSmooth]  = useState({ x: 0, y: 0 })
+  const wrapRef   = useRef(null)
+  const showTimer = useRef(null)
+  const rafRef    = useRef(null)
+  const target    = useRef({ x: 0, y: 0 })
 
-  const show = useCallback(() => {
-    timerRef.current = setTimeout(() => {
-      if (!wrapRef.current) return
-      const rect  = wrapRef.current.getBoundingClientRect()
-      const TIP_W = 220
-      const TIP_H = 48
-      const GAP   = 8
-      const vw    = window.innerWidth
-      const vh    = window.innerHeight
+  // Smoothly lerp tooltip position toward mouse
+  const animate = useCallback(() => {
+    setSmooth(prev => {
+      const nx = prev.x + (target.current.x - prev.x) * 0.18
+      const ny = prev.y + (target.current.y - prev.y) * 0.18
+      return { x: nx, y: ny }
+    })
+    rafRef.current = requestAnimationFrame(animate)
+  }, [])
 
-      // Horizontal: center on element, clamp to screen
-      let left = rect.left + rect.width / 2 - TIP_W / 2
-      left = Math.max(8, Math.min(left, vw - TIP_W - 8))
+  const onMouseMove = useCallback((e) => {
+    const TIP_W = 230
+    const TIP_H = 50
+    const GAP   = 14
+    const vw    = window.innerWidth
+    const vh    = window.innerHeight
 
-      // Vertical: prefer position prop, fallback
-      let top
-      if (position === 'bottom' || rect.top - TIP_H - GAP < 0) {
-        top = Math.min(rect.bottom + GAP, vh - TIP_H - 8)
-      } else if (position === 'left' || position === 'right') {
-        top = rect.top + rect.height / 2 - TIP_H / 2
-        left = position === 'left'
-          ? Math.max(8, rect.left - TIP_W - GAP)
-          : Math.min(rect.right + GAP, vw - TIP_W - 8)
-      } else {
-        top = rect.top - TIP_H - GAP
-      }
+    let x = e.clientX + GAP
+    let y = e.clientY - TIP_H / 2
 
-      setCoords({ top, left })
+    // Clamp to viewport
+    if (x + TIP_W > vw - 8) x = e.clientX - TIP_W - GAP
+    if (y < 8) y = 8
+    if (y + TIP_H > vh - 8) y = vh - TIP_H - 8
+
+    target.current = { x, y }
+    if (!visible) {
+      setSmooth({ x, y })
+      setPos({ x, y })
+    }
+  }, [visible])
+
+  const onMouseEnter = useCallback((e) => {
+    onMouseMove(e)
+    showTimer.current = setTimeout(() => {
       setVisible(true)
-    }, 400)
-  }, [position])
+      rafRef.current = requestAnimationFrame(animate)
+    }, 350)
+  }, [animate, onMouseMove])
 
-  const hide = useCallback(() => {
-    clearTimeout(timerRef.current)
+  const onMouseLeave = useCallback(() => {
+    clearTimeout(showTimer.current)
+    cancelAnimationFrame(rafRef.current)
     setVisible(false)
   }, [])
 
-  const tooltip = visible ? createPortal(
-    <div style={{
-      position:     'fixed',
-      top:          coords.top,
-      left:         coords.left,
-      width:        220,
-      background:   'var(--tooltip-bg, #0f0f1e)',
-      border:       '1px solid var(--tooltip-border, rgba(255,255,255,0.15))',
-      borderRadius: 8,
-      padding:      '7px 12px',
-      fontSize:     12,
-      lineHeight:   1.5,
-      color:        'var(--tooltip-text, #e0e0ff)',
-      zIndex:       99999,
-      pointerEvents:'none',
-      boxShadow:    '0 4px 20px rgba(0,0,0,0.4)',
-      animation:    'fadeIn .1s ease',
-    }}>
-      {text}
-    </div>,
-    document.body
-  ) : null
+  useEffect(() => () => {
+    clearTimeout(showTimer.current)
+    cancelAnimationFrame(rafRef.current)
+  }, [])
+
+  if (!text) return <>{children}</>
 
   return (
     <>
-      <span ref={wrapRef} onMouseEnter={show} onMouseLeave={hide}
-        style={{ display: 'contents' }}>
+      <div ref={wrapRef}
+        onMouseEnter={onMouseEnter}
+        onMouseLeave={onMouseLeave}
+        onMouseMove={onMouseMove}
+        style={{ display: 'contents' }}
+      >
         {children}
-      </span>
-      {tooltip}
+      </div>
+      {visible && createPortal(
+        <div style={{
+          position:   'fixed',
+          left:       smooth.x,
+          top:        smooth.y,
+          width:      230,
+          background: 'var(--tooltip-bg, rgba(10,10,28,0.97))',
+          border:     '1px solid var(--tooltip-border, rgba(255,255,255,0.15))',
+          borderRadius: 10,
+          padding:    '7px 12px',
+          fontSize:   12,
+          lineHeight: 1.55,
+          color:      'var(--tooltip-text, #e0e0ff)',
+          zIndex:     99999,
+          pointerEvents: 'none',
+          boxShadow:  '0 4px 24px rgba(0,0,0,0.45)',
+          backdropFilter: 'blur(8px)',
+          animation:  'fadeIn .15s ease',
+          willChange: 'transform',
+        }}>
+          {text}
+        </div>,
+        document.body
+      )}
     </>
   )
 }

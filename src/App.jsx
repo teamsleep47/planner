@@ -1,6 +1,6 @@
 import { useState, useCallback, useEffect } from 'react'
 import { HashRouter, Routes, Route, NavLink } from 'react-router-dom'
-import { LayoutDashboard, BookOpen, Clock, Target, Link, Menu, X, HardDrive, LogOut, Trash2 } from 'lucide-react'
+import { LayoutDashboard, BookOpen, Clock, Target, Link, Menu, X, HardDrive, LogOut, Trash2, BookText } from 'lucide-react'
 
 import { useAuth }      from './hooks/useAuth.jsx'
 import { useTheme }     from './hooks/useTheme.js'
@@ -13,6 +13,7 @@ import Courses       from './pages/Courses.jsx'
 import StudySessions from './pages/StudySessions.jsx'
 import Goals         from './pages/Goals.jsx'
 import Notes         from './pages/Notes.jsx'
+import NotesPage     from './pages/NotesPage.jsx'
 import TopBar        from './components/TopBar.jsx'
 
 const NAV = [
@@ -25,7 +26,8 @@ const NAV = [
     { to: '/goals', icon: Target, text: 'Habits' },
   ]},
   { label: 'Resources', items: [
-    { to: '/links', icon: Link, text: 'Quick links' },
+    { to: '/links', icon: Link,     text: 'Quick links' },
+    { to: '/notes', icon: BookText, text: 'Course notes' },
   ]},
 ]
 
