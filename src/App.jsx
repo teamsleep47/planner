@@ -174,11 +174,14 @@ export default function App() {
           />
 
           <Routes>
-            <Route path="/"        element={<WeeklyHome    key={driveKey} onDataChange={handleDataChange}/>}/>
-            <Route path="/courses" element={<Courses       key={driveKey} onDataChange={handleDataChange}/>}/>
-            <Route path="/study"   element={<StudySessions key={driveKey} onDataChange={handleDataChange}/>}/>
-            <Route path="/goals"   element={<Goals         key={driveKey} onDataChange={handleDataChange}/>}/>
-            <Route path="/links"   element={<Notes         key={driveKey} onDataChange={handleDataChange}/>}/>
+            <Route path="/"         element={<WeeklyHome    key={driveKey} onDataChange={handleDataChange}/>}/>
+            <Route path="/courses"  element={<Courses       key={driveKey} onDataChange={handleDataChange}/>}/>
+            <Route path="/study"    element={<StudySessions key={driveKey} onDataChange={handleDataChange}/>}/>
+            <Route path="/goals"    element={<Goals         key={driveKey} onDataChange={handleDataChange}/>}/>
+            <Route path="/links"    element={<Notes         key={driveKey} onDataChange={handleDataChange}/>}/>
+            <Route path="/notes"    element={<NotesPage     key={driveKey} onDataChange={handleDataChange}/>}/>
+            <Route path="/canvas"   element={<CanvasPage    key={driveKey}/>}/>
+            <Route path="/settings" element={<SettingsPage  key={driveKey} onDataChange={handleDataChange}/>}/>
           </Routes>
 
           {/* Mobile bottom nav */}
