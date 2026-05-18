@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { Plus, Trash2, Edit2, Check, X, ChevronDown, ChevronUp, BookOpen, GripVertical } from 'lucide-react'
+import { Plus, Trash2, Edit2, Check, X, ChevronDown, ChevronUp, BookOpen } from 'lucide-react'
 import { loadTerms, saveTerms, uid, ASSIGNMENT_TYPES, STATUS_OPTS } from '../utils/termData.js'
 import InlineNotes from '../components/InlineNotes.jsx'
 import Tooltip from '../components/Tooltip.jsx'
@@ -50,6 +50,8 @@ export default function Courses({ onDataChange }) {
   // Assignment management
   const [showAddAssign,setShowAddAssign]= useState(null) // courseId
   const [newAssign,    setNewAssign]    = useState(BLANK_ASSIGN)
+  const [editAssignId, setEditAssignId] = useState(null) // assignId being edited
+  const [editAssign,   setEditAssign]   = useState({})
 
 
   useEffect(() => { saveTerms(terms); onDataChange?.() }, [terms])
@@ -114,6 +116,12 @@ export default function Courses({ onDataChange }) {
       })
     }))
   }
+  const startEditAssign = (a) => { setEditAssignId(a.id); setEditAssign({ title:a.title, type:a.type, due:a.due, status:a.status, priority:a.priority||'none', notes:a.notes||'' }) }
+  const saveAssign = (termId, courseId, assignId) => {
+    updateAssign(termId, courseId, assignId, editAssign)
+    setEditAssignId(null)
+  }
+
   const deleteAssign = (termId, courseId, assignId) => {
     updateTerms(ts => ts.map(t => t.id!==termId ? t : {
       ...t, courses: t.courses.map(c => c.id!==courseId ? c : {
@@ -158,12 +166,12 @@ export default function Courses({ onDataChange }) {
                 </div>
               ) : (
                 <button onClick={()=>setActiveTerm(term.id)} style={{
-                  padding:'8px 16px', borderRadius:'var(--radius-md)', border:'none',
+                  padding:'8px 16px', borderRadius:'var(--radius-md)',
+                  border: `1px solid ${activeTermId===term.id ? 'var(--accent)' : 'var(--glass-border)'}`,
                   background: activeTermId===term.id ? 'var(--accent)' : 'var(--glass-bg-2)',
                   color: activeTermId===term.id ? 'white' : 'var(--text-2)',
                   fontWeight:600, fontSize:13, cursor:'pointer', transition:'all .15s',
                   boxShadow: activeTermId===term.id ? '0 0 12px var(--accent-glow)' : 'none',
-                  border: `1px solid ${activeTermId===term.id ? 'var(--accent)' : 'var(--glass-border)'}`,
                 }}>
                   {term.name}
                   {term.active && <span style={{fontSize:9,marginLeft:5,opacity:.7}}>●</span>}
@@ -292,50 +300,83 @@ export default function Courses({ onDataChange }) {
                         const due = daysUntil(a.due)
                         const pri = PRIORITY.find(p=>p.key===(a.priority||'none'))
           
+                        const isEditing = editAssignId === a.id
                         return (
                           <div key={a.id} style={{borderBottom:'1px solid var(--glass-border)'}}>
-                            <div className="assign-row" style={{display:'flex',alignItems:'center',gap:10,padding:'11px 16px',flexWrap:'wrap'}}>
-                              <div style={{flex:1,minWidth:0}}>
-                                <div style={{display:'flex',alignItems:'center',gap:8,flexWrap:'wrap',marginBottom:3}}>
-                                  <span style={{fontWeight:600,fontSize:13}}>{a.title}</span>
-                                  <span style={{fontSize:10,padding:'2px 6px',borderRadius:20,background:'var(--glass-bg-2)',color:'var(--text-3)',border:'1px solid var(--glass-border)',flexShrink:0}}>{a.type}</span>
-                                  {a.priority!=='none'&&<span style={{fontSize:10,padding:'2px 7px',borderRadius:20,background:pri.bg,color:pri.color,fontWeight:700,border:`1px solid ${pri.color}`,flexShrink:0}}>{pri.label}</span>}
+                            {isEditing ? (
+                              /* ── Inline edit form ── */
+                              <div style={{padding:'12px 16px',background:'var(--glass-bg-2)'}}>
+                                <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:8,marginBottom:8}}>
+                                  <input style={{...smallInput,gridColumn:'1/-1'}} value={editAssign.title} onChange={e=>setEditAssign(f=>({...f,title:e.target.value}))} placeholder="Title" autoFocus/>
+                                  <select style={smallInput} value={editAssign.type} onChange={e=>setEditAssign(f=>({...f,type:e.target.value}))}>
+                                    {ASSIGNMENT_TYPES.map(t=><option key={t} value={t}>{t}</option>)}
+                                  </select>
+                                  <input type="date" style={smallInput} value={editAssign.due} onChange={e=>setEditAssign(f=>({...f,due:e.target.value}))}/>
                                 </div>
-                                <div style={{fontSize:11,color:'var(--text-3)'}}>
-                                  Due {new Date(a.due+'T12:00:00').toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'})} · <span style={{color:due.color,fontWeight:700}}>{due.label}</span>
+                                {/* Priority */}
+                                <div style={{display:'flex',gap:4,marginBottom:8,flexWrap:'wrap'}}>
+                                  <span style={{fontSize:11,color:'var(--text-3)',alignSelf:'center',marginRight:4}}>Priority:</span>
+                                  {PRIORITY.filter(p=>p.key!=='none').map(p=>(
+                                    <button key={p.key} onClick={()=>setEditAssign(f=>({...f,priority:f.priority===p.key?'none':p.key}))} style={{padding:'3px 9px',borderRadius:20,border:`1.5px solid ${editAssign.priority===p.key?p.color:'var(--glass-border)'}`,background:editAssign.priority===p.key?p.bg:'transparent',color:editAssign.priority===p.key?p.color:'var(--text-3)',fontSize:11,fontWeight:600,cursor:'pointer'}}>{p.label}</button>
+                                  ))}
+                                </div>
+                                {/* Status */}
+                                <div style={{display:'flex',gap:4,marginBottom:8,flexWrap:'wrap'}}>
+                                  <span style={{fontSize:11,color:'var(--text-3)',alignSelf:'center',marginRight:4}}>Status:</span>
+                                  {STATUS.map(s=>(
+                                    <button key={s.key} onClick={()=>setEditAssign(f=>({...f,status:s.key}))} style={{padding:'3px 9px',borderRadius:20,border:`1.5px solid ${editAssign.status===s.key?s.dot:'var(--glass-border)'}`,background:editAssign.status===s.key?s.bg:'transparent',color:editAssign.status===s.key?s.color:'var(--text-3)',fontSize:11,fontWeight:600,cursor:'pointer'}}>{s.key}</button>
+                                  ))}
+                                </div>
+                                {/* Notes */}
+                                <textarea style={{...smallInput,width:'100%',resize:'vertical',lineHeight:1.6,marginBottom:10}} rows={3} value={editAssign.notes} onChange={e=>setEditAssign(f=>({...f,notes:e.target.value}))} placeholder="Notes…"/>
+                                <div style={{display:'flex',gap:6}}>
+                                  <button className="btn btn-primary" style={{fontSize:12}} onClick={()=>saveAssign(activeTerm.id,course.id,a.id)}>Save</button>
+                                  <button className="btn btn-ghost" style={{fontSize:12}} onClick={()=>setEditAssignId(null)}>Cancel</button>
                                 </div>
                               </div>
-
-                              {/* Priority buttons */}
-                              <div className="pill-row" style={{display:'flex',gap:3,flexShrink:0}}>
-                                {PRIORITY.filter(p=>p.key!=='none').map(p=>(
-                                  <button key={p.key} onClick={()=>updateAssign(activeTerm.id,course.id,a.id,{priority:a.priority===p.key?'none':p.key})} style={{padding:'3px 7px',borderRadius:20,border:`1.5px solid ${a.priority===p.key?p.color:'var(--glass-border)'}`,background:a.priority===p.key?p.bg:'transparent',color:a.priority===p.key?p.color:'var(--text-3)',fontSize:10,fontWeight:600,cursor:'pointer',transition:'all .15s'}}>{p.label}</button>
-                                ))}
-                              </div>
-
-                              {/* Status buttons */}
-                              <div className="pill-row" style={{display:'flex',gap:3,flexShrink:0}}>
-                                {STATUS.map(s=>(
-                                  <button key={s.key} onClick={()=>updateAssign(activeTerm.id,course.id,a.id,{status:s.key})} style={{padding:'3px 8px',borderRadius:20,border:`1.5px solid ${a.status===s.key?s.dot:'var(--glass-border)'}`,background:a.status===s.key?s.bg:'transparent',color:a.status===s.key?s.color:'var(--text-3)',fontSize:10,fontWeight:600,cursor:'pointer',transition:'all .15s',boxShadow:a.status===s.key?`0 0 6px ${s.dot}44`:'none'}}>{s.key}</button>
-                                ))}
-                              </div>
-
-                              <div style={{display:'flex',gap:3,flexShrink:0}}>
-                                <Tooltip text="Delete assignment">
-                                  <button className="btn-icon" style={{padding:4,color:'var(--coral)'}} onClick={()=>deleteAssign(activeTerm.id,course.id,a.id)}><Trash2 size={12}/></button>
-                                </Tooltip>
-                              </div>
-                            </div>
-
-                            {/* Inline notes — always visible below assignment row */}
-                            <div style={{padding:'0 16px 10px'}}>
-                              <InlineNotes
-                                value={a.notes||''}
-                                onChange={notes=>updateAssign(activeTerm.id,course.id,a.id,{notes})}
-                                placeholder="Add notes for this assignment…"
-                                title={a.title}
-                              />
-                            </div>
+                            ) : (
+                              /* ── View mode ── */
+                              <>
+                                <div className="assign-row" style={{display:'flex',alignItems:'center',gap:10,padding:'11px 16px',flexWrap:'wrap'}}>
+                                  <div style={{flex:1,minWidth:0}}>
+                                    <div style={{display:'flex',alignItems:'center',gap:8,flexWrap:'wrap',marginBottom:3}}>
+                                      <span style={{fontWeight:600,fontSize:13}}>{a.title}</span>
+                                      <span style={{fontSize:10,padding:'2px 6px',borderRadius:20,background:'var(--glass-bg-2)',color:'var(--text-3)',border:'1px solid var(--glass-border)',flexShrink:0}}>{a.type}</span>
+                                      {a.priority!=='none'&&<span style={{fontSize:10,padding:'2px 7px',borderRadius:20,background:pri.bg,color:pri.color,fontWeight:700,border:`1px solid ${pri.color}`,flexShrink:0}}>{pri.label}</span>}
+                                    </div>
+                                    <div style={{fontSize:11,color:'var(--text-3)'}}>
+                                      Due {new Date(a.due+'T12:00:00').toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'})} · <span style={{color:due.color,fontWeight:700}}>{due.label}</span>
+                                    </div>
+                                  </div>
+                                  <div className="pill-row" style={{display:'flex',gap:3,flexShrink:0}}>
+                                    {PRIORITY.filter(p=>p.key!=='none').map(p=>(
+                                      <button key={p.key} onClick={()=>updateAssign(activeTerm.id,course.id,a.id,{priority:a.priority===p.key?'none':p.key})} style={{padding:'3px 7px',borderRadius:20,border:`1.5px solid ${a.priority===p.key?p.color:'var(--glass-border)'}`,background:a.priority===p.key?p.bg:'transparent',color:a.priority===p.key?p.color:'var(--text-3)',fontSize:10,fontWeight:600,cursor:'pointer',transition:'all .15s'}}>{p.label}</button>
+                                    ))}
+                                  </div>
+                                  <div className="pill-row" style={{display:'flex',gap:3,flexShrink:0}}>
+                                    {STATUS.map(s=>(
+                                      <button key={s.key} onClick={()=>updateAssign(activeTerm.id,course.id,a.id,{status:s.key})} style={{padding:'3px 8px',borderRadius:20,border:`1.5px solid ${a.status===s.key?s.dot:'var(--glass-border)'}`,background:a.status===s.key?s.bg:'transparent',color:a.status===s.key?s.color:'var(--text-3)',fontSize:10,fontWeight:600,cursor:'pointer',transition:'all .15s',boxShadow:a.status===s.key?`0 0 6px ${s.dot}44`:'none'}}>{s.key}</button>
+                                    ))}
+                                  </div>
+                                  <div style={{display:'flex',gap:3,flexShrink:0}}>
+                                    <Tooltip text="Edit assignment">
+                                      <button className="btn-icon" style={{padding:4}} onClick={()=>startEditAssign(a)}><Edit2 size={12}/></button>
+                                    </Tooltip>
+                                    <Tooltip text="Delete assignment">
+                                      <button className="btn-icon" style={{padding:4,color:'var(--coral)'}} onClick={()=>deleteAssign(activeTerm.id,course.id,a.id)}><Trash2 size={12}/></button>
+                                    </Tooltip>
+                                  </div>
+                                </div>
+                                <div style={{padding:'0 16px 10px'}}>
+                                  <InlineNotes
+                                    value={a.notes||''}
+                                    onChange={notes=>updateAssign(activeTerm.id,course.id,a.id,{notes})}
+                                    placeholder="Add notes for this assignment…"
+                                    title={a.title}
+                                  />
+                                </div>
+                              </>
+                            )}
                           </div>
                         )
                       })}
