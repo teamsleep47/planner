@@ -497,36 +497,7 @@ textarea.inline-input { resize: vertical; line-height: 1.5; }
   overflow: hidden; flex-shrink: 0;
 }
 
-/* ── Bottom nav (mobile only) ───────────────────── */
-.bottom-nav {
-  display: none;
-  position: fixed;
-  bottom: 0; left: 0; right: 0;
-  height: var(--bottomnav-h);
-  background: var(--glass-bg-2);
-  backdrop-filter: var(--blur);
-  -webkit-backdrop-filter: var(--blur);
-  border-top: 1px solid var(--glass-border);
-  z-index: 200;
-  padding: 0 8px env(safe-area-inset-bottom, 0);
-  display: none;
-  align-items: center;
-  justify-content: space-around;
-}
-.bottom-nav-item {
-  display: flex; flex-direction: column; align-items: center; gap: 3px;
-  padding: 8px 16px;
-  border-radius: var(--radius-md);
-  font-size: 10px; font-weight: 600;
-  color: var(--text-3);
-  background: none; border: none;
-  transition: all .15s;
-  flex: 1;
-  text-decoration: none;
-}
-.bottom-nav-item.active { color: var(--accent); }
-.bottom-nav-item svg { transition: transform .15s; }
-.bottom-nav-item.active svg { transform: scale(1.15); }
+/* Bottom nav removed */
 
 /* ── Mobile header ───────────────────────────────── */
 .mobile-header {
@@ -565,13 +536,12 @@ textarea.inline-input { resize: vertical; line-height: 1.5; }
 
   .main-content {
     margin-left: 0;
-    padding-bottom: var(--bottomnav-h);
   }
 
   .mobile-header { display: flex; }
   .top-bar { display: none; }
 
-  .bottom-nav { display: flex; }
+
 
   .page-header { padding: 20px 16px 0; }
   .page-body   { padding: 16px 16px 24px; }
@@ -810,3 +780,25 @@ select option {
 
 @keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
 
+
+/* ── Mobile home card order ─────────────────────── */
+@media (max-width: 768px) {
+  .home-grid-main {
+    display: flex !important;
+    flex-direction: column !important;
+    gap: 14px !important;
+  }
+  .home-timer-col {
+    order: 99 !important;
+  }
+  .home-tasks-col {
+    order: 1 !important;
+  }
+  .weather-strip {
+    overflow-x: auto;
+    flex-wrap: nowrap !important;
+    -webkit-overflow-scrolling: touch;
+    padding-bottom: 4px;
+  }
+  .weather-strip::-webkit-scrollbar { height: 3px; }
+}

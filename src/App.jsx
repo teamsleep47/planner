@@ -1,5 +1,5 @@
-import { useState, useCallback, useEffect } from 'react'
-import { HashRouter, Routes, Route, NavLink } from 'react-router-dom'
+import { useState, useCallback, useEffect, useRef } from 'react'
+import { HashRouter, Routes, Route, NavLink, useNavigate } from 'react-router-dom'
 import { LayoutDashboard, BookOpen, Clock, Target, Link, Menu, X, HardDrive, LogOut, Trash2, BookText, GraduationCap, Settings } from 'lucide-react'
 
 import { useAuth }      from './hooks/useAuth.jsx'
@@ -59,6 +59,72 @@ function Avatar({ profile }) {
 }
 
 const chipBorder = { border: '1.5px solid rgba(0,0,0,0.55)', boxShadow: '0 1px 4px rgba(0,0,0,0.18)' }
+
+function MobileHeader({ profile, signOut, wipeAllSettings, sidebarOpen, setSidebarOpen, theme, toggleTheme }) {
+  const [showDropdown, setShowDropdown] = useState(false)
+  const dropRef = useRef(null)
+  const navigate = useNavigate()
+
+  useEffect(() => {
+    const handler = e => { if (dropRef.current && !dropRef.current.contains(e.target)) setShowDropdown(false) }
+    document.addEventListener('mousedown', handler)
+    return () => document.removeEventListener('mousedown', handler)
+  }, [])
+
+  const ini = n => { const p=(n||'?').trim().split(/\s+/); return (p[0][0]+(p[1]?p[1][0]:'')).toUpperCase() }
+
+  return (
+    <header className="mobile-header">
+      <button style={{background:'none',border:'none',color:'var(--text-1)',display:'flex',padding:4,cursor:'pointer'}} onClick={()=>setSidebarOpen(o=>!o)}>
+        {sidebarOpen ? <X size={20}/> : <Menu size={20}/>}
+      </button>
+      <span style={{fontWeight:700,fontSize:15,letterSpacing:'-0.3px',flex:1}}>Planner</span>
+      <div ref={dropRef} style={{position:'relative'}}>
+        <button onClick={()=>setShowDropdown(s=>!s)} style={{background:'none',border:'none',cursor:'pointer',padding:0,display:'flex'}}>
+          <div className="avatar">
+            {profile?.picture
+              ? <img src={profile.picture} referrerPolicy="no-referrer" style={{width:'100%',height:'100%',objectFit:'cover'}} onError={e=>{e.target.style.display='none'}}/>
+              : ini(profile?.name||'?')}
+          </div>
+        </button>
+        {showDropdown && (
+          <div style={{
+            position:'absolute', top:'calc(100% + 8px)', right:0,
+            width:200, background:'var(--panel-bg,#1a1a2e)',
+            border:'1px solid var(--glass-border)', borderRadius:'var(--radius-lg)',
+            boxShadow:'var(--shadow)', zIndex:500, overflow:'hidden',
+          }}>
+            {/* User info */}
+            <div style={{padding:'12px 14px',borderBottom:'1px solid var(--glass-border)'}}>
+              <div style={{fontSize:13,fontWeight:600,color:'var(--text-1)',overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{profile?.name||'User'}</div>
+              <div style={{fontSize:11,color:'var(--text-3)',overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{profile?.email||''}</div>
+            </div>
+            {/* Actions */}
+            {[
+              { icon:'🌙', label: theme==='dark'?'Switch to light':'Switch to dark', action:toggleTheme },
+              { icon:'⚙️', label:'Settings', action:()=>{ navigate('/settings'); setShowDropdown(false) } },
+              { icon:'🚪', label:'Sign out',  action:signOut },
+              { icon:'🗑', label:'Wipe all data', action:()=>{ setShowDropdown(false); wipeAllSettings() }, danger:true },
+            ].map((item,i)=>(
+              <button key={i} onClick={item.action} style={{
+                width:'100%', display:'flex', alignItems:'center', gap:10,
+                padding:'11px 14px', background:'none', border:'none',
+                borderBottom: i<3 ? '1px solid var(--glass-border)' : 'none',
+                color: item.danger ? 'var(--coral)' : 'var(--text-1)',
+                fontSize:13, cursor:'pointer', textAlign:'left',
+                transition:'background .15s',
+              }}
+              onMouseEnter={e=>e.currentTarget.style.background='var(--glass-hover)'}
+              onMouseLeave={e=>e.currentTarget.style.background='none'}>
+                <span>{item.icon}</span>{item.label}
+              </button>
+            ))}
+          </div>
+        )}
+      </div>
+    </header>
+  )
+}
 
 export default function App() {
   const { token, profile, loading, error, signIn, signOut, isAuthed } = useAuth()
@@ -147,22 +213,7 @@ export default function App() {
         {/* Main */}
         <div className="main-content">
           {/* Mobile header */}
-          <header className="mobile-header">
-            <button style={{background:'none',border:'none',color:'var(--text-1)',display:'flex',padding:4,cursor:'pointer'}} onClick={()=>setSidebarOpen(o=>!o)}>
-              {sidebarOpen?<X size={20}/>:<Menu size={20}/>}
-            </button>
-            <span style={{fontWeight:700,fontSize:15,letterSpacing:'-0.3px',flex:1}}>Planner</span>
-            {/* Mobile top-right actions */}
-            <div style={{display:'flex',alignItems:'center',gap:8}}>
-              <button onClick={wipeAllSettings} style={{background:'none',border:'none',color:'var(--text-3)',cursor:'pointer',display:'flex',padding:4}} title="Wipe data">
-                <Trash2 size={16}/>
-              </button>
-              <button onClick={signOut} style={{background:'none',border:'none',color:'var(--text-3)',cursor:'pointer',display:'flex',padding:4}} title="Sign out">
-                <LogOut size={16}/>
-              </button>
-              <Avatar profile={profile}/>
-            </div>
-          </header>
+          <MobileHeader profile={profile} signOut={signOut} wipeAllSettings={wipeAllSettings} sidebarOpen={sidebarOpen} setSidebarOpen={setSidebarOpen} theme={theme} toggleTheme={toggleTheme}/>
 
           {/* Desktop top bar */}
           <TopBar
@@ -184,15 +235,7 @@ export default function App() {
             <Route path="/settings" element={<SettingsPage  key={driveKey} onDataChange={handleDataChange}/>}/>
           </Routes>
 
-          {/* Mobile bottom nav */}
-          <nav className="bottom-nav">
-            {NAV.flatMap(g=>g.items).map(({to,icon:Icon,text})=>(
-              <NavLink key={to} to={to} end={to==='/'} className={({isActive})=>`bottom-nav-item ${isActive?'active':''}`}>
-                <Icon size={20}/>
-                <span>{text}</span>
-              </NavLink>
-            ))}
-          </nav>
+
         </div>
       </div>
     </HashRouter>
