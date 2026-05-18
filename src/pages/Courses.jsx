@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import { Plus, Trash2, Edit2, Check, X, ChevronDown, ChevronUp, BookOpen, GripVertical } from 'lucide-react'
 import { loadTerms, saveTerms, uid, ASSIGNMENT_TYPES, STATUS_OPTS } from '../utils/termData.js'
+import InlineNotes from '../components/InlineNotes.jsx'
 import Tooltip from '../components/Tooltip.jsx'
 
 const PRIORITY = [
@@ -49,7 +50,7 @@ export default function Courses({ onDataChange }) {
   // Assignment management
   const [showAddAssign,setShowAddAssign]= useState(null) // courseId
   const [newAssign,    setNewAssign]    = useState(BLANK_ASSIGN)
-  const [expandAssign, setExpandAssign] = useState({}) // assignId -> bool
+
 
   useEffect(() => { saveTerms(terms); onDataChange?.() }, [terms])
 
@@ -290,10 +291,10 @@ export default function Courses({ onDataChange }) {
                       {sorted.map(a => {
                         const due = daysUntil(a.due)
                         const pri = PRIORITY.find(p=>p.key===(a.priority||'none'))
-                        const isOpen = expandAssign[a.id]
+          
                         return (
                           <div key={a.id} style={{borderBottom:'1px solid var(--glass-border)'}}>
-                            <div style={{display:'flex',alignItems:'center',gap:10,padding:'11px 16px',flexWrap:'wrap'}}>
+                            <div className="assign-row" style={{display:'flex',alignItems:'center',gap:10,padding:'11px 16px',flexWrap:'wrap'}}>
                               <div style={{flex:1,minWidth:0}}>
                                 <div style={{display:'flex',alignItems:'center',gap:8,flexWrap:'wrap',marginBottom:3}}>
                                   <span style={{fontWeight:600,fontSize:13}}>{a.title}</span>
@@ -306,36 +307,35 @@ export default function Courses({ onDataChange }) {
                               </div>
 
                               {/* Priority buttons */}
-                              <div style={{display:'flex',gap:3,flexShrink:0}}>
+                              <div className="pill-row" style={{display:'flex',gap:3,flexShrink:0}}>
                                 {PRIORITY.filter(p=>p.key!=='none').map(p=>(
                                   <button key={p.key} onClick={()=>updateAssign(activeTerm.id,course.id,a.id,{priority:a.priority===p.key?'none':p.key})} style={{padding:'3px 7px',borderRadius:20,border:`1.5px solid ${a.priority===p.key?p.color:'var(--glass-border)'}`,background:a.priority===p.key?p.bg:'transparent',color:a.priority===p.key?p.color:'var(--text-3)',fontSize:10,fontWeight:600,cursor:'pointer',transition:'all .15s'}}>{p.label}</button>
                                 ))}
                               </div>
 
                               {/* Status buttons */}
-                              <div style={{display:'flex',gap:3,flexShrink:0}}>
+                              <div className="pill-row" style={{display:'flex',gap:3,flexShrink:0}}>
                                 {STATUS.map(s=>(
                                   <button key={s.key} onClick={()=>updateAssign(activeTerm.id,course.id,a.id,{status:s.key})} style={{padding:'3px 8px',borderRadius:20,border:`1.5px solid ${a.status===s.key?s.dot:'var(--glass-border)'}`,background:a.status===s.key?s.bg:'transparent',color:a.status===s.key?s.color:'var(--text-3)',fontSize:10,fontWeight:600,cursor:'pointer',transition:'all .15s',boxShadow:a.status===s.key?`0 0 6px ${s.dot}44`:'none'}}>{s.key}</button>
                                 ))}
                               </div>
 
                               <div style={{display:'flex',gap:3,flexShrink:0}}>
-                                <Tooltip text="Toggle notes">
-                                  <button className="btn-icon" style={{padding:4}} onClick={()=>setExpandAssign(e=>({...e,[a.id]:!isOpen}))}>
-                                    {isOpen?<ChevronUp size={12}/>:<ChevronDown size={12}/>}
-                                  </button>
-                                </Tooltip>
                                 <Tooltip text="Delete assignment">
                                   <button className="btn-icon" style={{padding:4,color:'var(--coral)'}} onClick={()=>deleteAssign(activeTerm.id,course.id,a.id)}><Trash2 size={12}/></button>
                                 </Tooltip>
                               </div>
                             </div>
 
-                            {isOpen&&(
-                              <div style={{padding:'0 16px 12px'}}>
-                                <textarea className="inline-input" rows={2} placeholder="Notes…" value={a.notes||''} onChange={e=>updateAssign(activeTerm.id,course.id,a.id,{notes:e.target.value})} style={{fontSize:12,resize:'vertical'}}/>
-                              </div>
-                            )}
+                            {/* Inline notes — always visible below assignment row */}
+                            <div style={{padding:'0 16px 10px'}}>
+                              <InlineNotes
+                                value={a.notes||''}
+                                onChange={notes=>updateAssign(activeTerm.id,course.id,a.id,{notes})}
+                                placeholder="Add notes for this assignment…"
+                                title={a.title}
+                              />
+                            </div>
                           </div>
                         )
                       })}
