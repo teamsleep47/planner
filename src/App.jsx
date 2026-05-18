@@ -35,7 +35,11 @@ const NAV = [
   ]},
 ]
 
-const ALL_KEYS = ['home_tasks','assignments','study_sessions','habit_grid','timer_settings','quick_links','streak','weather_city']
+const ALL_KEYS = [
+  'home_tasks','assignments','study_sessions','habit_grid','timer_settings',
+  'quick_links','streak','weather_city','terms_v1','course_notes','full_course_notes',
+  'page_links','habit_history','study_week_goal','sem_end_date','scheme','theme',
+]
 function getAllData() { return ALL_KEYS.reduce((a,k) => { a[k]=load(k,null); return a }, {}) }
 
 function wipeAllSettings() {
