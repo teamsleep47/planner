@@ -4,13 +4,21 @@ import Tooltip from '../components/Tooltip.jsx'
 import { load, save } from '../utils/storage.js'
 
 const DURATIONS = { focus: 25 * 60, short: 5 * 60, long: 15 * 60 }
-const COURSES   = ['Humanities', 'Written Communication', 'Anatomy & Physiology', 'A&P Lab', 'American Government']
+import { getAllCourseNames } from '../utils/termData.js'
+
+function getDynamicCourses() {
+  try {
+    const terms = JSON.parse(localStorage.getItem('planner_v1_terms_v1')||'[]')
+    const names = terms.flatMap(t=>t.courses.map(c=>c.name))
+    return names.length > 0 ? names : ['Humanities','Written Communication','Anatomy & Physiology','A&P Lab','American Government']
+  } catch(e) { return ['Humanities','Written Communication'] }
+}
 
 export default function StudySessions({ onDataChange }) {
   const [mode,     setMode]     = useState('focus')
   const [secs,     setSecs]     = useState(DURATIONS.focus)
   const [running,  setRunning]  = useState(false)
-  const [course,   setCourse]   = useState(COURSES[0])
+  const [course,   setCourse]   = useState(()=>getDynamicCourses()[0]||'Humanities')
   const [sessions, setSessions] = useState(() => load('study_sessions', []))
   const [weekGoal,  setWeekGoal]  = useState(() => load('study_week_goal', 10))
   const [editGoal,  setEditGoal]  = useState(false)
@@ -148,7 +156,7 @@ export default function StudySessions({ onDataChange }) {
                 background: 'var(--bg-secondary)', border: '1px solid var(--border)',
                 borderRadius: 'var(--radius-md)', color: 'var(--text-primary)', fontSize: 13,
               }}>
-                {COURSES.map(c => <option key={c} value={c}>{c}</option>)}
+                {getDynamicCourses().map(c => <option key={c} value={c}>{c}</option>)}
               </select>
 
               {/* Circle */}

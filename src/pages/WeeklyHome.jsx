@@ -1,9 +1,16 @@
 import { useState, useEffect, useRef } from 'react'
 import { CheckCircle2, Circle, Plus, X, Edit2, ArrowUp, ArrowDown, History, ChevronDown, ChevronUp } from 'lucide-react'
 import { load, save } from '../utils/storage.js'
+import { getActiveTermCourses, getAllCourseNames } from '../utils/termData.js'
 import Tooltip from '../components/Tooltip.jsx'
 
-const COURSE_COLORS = { HUM:'var(--accent)', WCOM:'var(--teal)', ANP:'var(--amber)', GOV:'var(--coral)', OTHER:'var(--green)' }
+// Course colors are now dynamic — built from active term courses
+function buildCourseColorMap() {
+  const courses = getActiveTermCourses()
+  const map = { OTHER: 'var(--green)' }
+  courses.forEach(c => { map[c.name] = c.color })
+  return map
+}
 const URGENCY = {
   high:   { color:'#ef4444', label:'🔴 Urgent' },
   medium: { color:'#f59e0b', label:'🟡 Soon'   },
@@ -33,18 +40,22 @@ const DAYS_SHORT = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat']
 
 function daysUntil(d) { return d ? Math.ceil((new Date(d+'T12:00:00')-new Date())/86400000) : null }
 
-// Get upcoming assignments — urgent first, then by due date, exclude done
+// Get upcoming assignments from termData structure
 function getUpcoming(count=3) {
-  const assignments = load('assignments',[])
-  const semCourses  = ['Humanities','Written Communication'] // active semester
-  return assignments
-    .filter(a => a.status!=='Done' && a.due && semCourses.includes(a.course))
-    .sort((a,b) => {
-      const pd = (PRIORITY_W[b.priority||'none']||0)-(PRIORITY_W[a.priority||'none']||0)
-      if (pd!==0) return pd
-      return new Date(a.due)-new Date(b.due)
-    })
-    .slice(0,count)
+  try {
+    const terms = JSON.parse(localStorage.getItem('planner_v1_terms_v1')||'[]')
+    const active = terms.find(t=>t.active)||terms[0]
+    if (!active) return []
+    return active.courses
+      .flatMap(c => c.assignments.map(a=>({...a, courseName:c.name})))
+      .filter(a => a.status!=='Done' && a.due)
+      .sort((a,b)=>{
+        const pw={urgent:4,high:3,medium:2,low:1,none:0}
+        const pd=(pw[b.priority||'none']||0)-(pw[a.priority||'none']||0)
+        return pd!==0?pd:new Date(a.due)-new Date(b.due)
+      })
+      .slice(0,count)
+  } catch(e) { return [] }
 }
 
 export default function WeeklyHome({ onDataChange }) {
@@ -108,6 +119,8 @@ export default function WeeklyHome({ onDataChange }) {
   const ss = String(secs%60).padStart(2,'0')
   const pct = ((timerMins[mode]*60-secs)/(timerMins[mode]*60))*100
   const inputSm = {padding:'7px 10px',background:'var(--glass-bg-2)',border:'1px solid var(--glass-border)',borderRadius:'var(--radius-sm)',color:'var(--text-1)',fontSize:12,fontFamily:'inherit'}
+
+  const COURSE_COLORS = buildCourseColorMap()
 
   const TaskRow = ({task})=>{
     const urgColor = URGENCY[task.urgency||'none'].color
