@@ -320,7 +320,15 @@ export default function SettingsPage({ onDataChange }) {
               }}>📤 Import backup</button>
             </Tooltip>
             <Tooltip text="Wipe all planner data from this browser — cannot be undone">
-              <button className="btn btn-ghost" onClick={()=>{ if(!confirm('Wipe ALL data? Cannot be undone.')) return; const prefix='planner_v1_'; Object.keys(localStorage).filter(k=>k.startsWith(prefix)).forEach(k=>localStorage.removeItem(k)); window.location.reload() }} style={{color:'var(--coral)'}}>
+              <button className="btn btn-ghost" onClick={()=>{
+                if(!confirm('Wipe ALL data and return to a clean template? This removes all tasks, assignments, habits, notes, settings, and credentials. Cannot be undone.')) return
+                const prefixes = ['planner_v1_']
+                const exactKeys = ['planner_profile_v1','planner_hint_v1','planner_token_v1','canvas_token_v1','canvas_url_v1','canvas_ical_v1','canvas_warned_v1']
+                Object.keys(localStorage).filter(k=>prefixes.some(p=>k.startsWith(p))).forEach(k=>localStorage.removeItem(k))
+                exactKeys.forEach(k=>localStorage.removeItem(k))
+                sessionStorage.clear()
+                window.location.reload()
+              }} style={{color:'var(--coral)'}}>
                 🗑 Wipe all data
               </button>
             </Tooltip>

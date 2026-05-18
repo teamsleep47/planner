@@ -39,11 +39,27 @@ const ALL_KEYS = ['home_tasks','assignments','study_sessions','habit_grid','time
 function getAllData() { return ALL_KEYS.reduce((a,k) => { a[k]=load(k,null); return a }, {}) }
 
 function wipeAllSettings() {
-  if (!confirm('Wipe ALL planner data? This cannot be undone.')) return
-  const prefix = 'planner_v1_'
+  if (!confirm('Wipe ALL data and return to a clean template? This removes all tasks, assignments, habits, notes, settings, and credentials. Cannot be undone.')) return
+  // Clear all planner data keys
+  const prefixes = ['planner_v1_']
+  const exactKeys = [
+    'planner_profile_v1',
+    'planner_hint_v1',
+    'planner_token_v1',
+    'canvas_token_v1',
+    'canvas_url_v1',
+    'canvas_ical_v1',
+    'canvas_warned_v1',
+  ]
+  // Remove prefix-based keys
   Object.keys(localStorage)
-    .filter(k => k.startsWith(prefix))
+    .filter(k => prefixes.some(p => k.startsWith(p)))
     .forEach(k => localStorage.removeItem(k))
+  // Remove exact keys
+  exactKeys.forEach(k => localStorage.removeItem(k))
+  // Clear session storage
+  sessionStorage.clear()
+  // Reload to clean state — will show login page since token is gone
   window.location.reload()
 }
 
