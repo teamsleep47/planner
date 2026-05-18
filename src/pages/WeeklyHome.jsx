@@ -2,6 +2,8 @@ import { useState, useEffect, useRef } from 'react'
 import { CheckCircle2, Circle, Plus, X, Edit2, Check, ArrowUp, ArrowDown, ChevronDown, ChevronUp } from 'lucide-react'
 import { load, save } from '../utils/storage.js'
 import Tooltip from '../components/Tooltip.jsx'
+import { getCanvasToken } from '../hooks/useCanvas.js'
+import { load as loadStorage } from '../utils/storage.js'
 
 const COURSE_COLORS = { HUM:'var(--accent)', WCOM:'var(--teal)', ANP:'var(--amber)', GOV:'var(--coral)', OTHER:'var(--green)' }
 const URGENCY_COLORS = { high:'#ef4444', medium:'#f59e0b', low:'#22c55e', none: null }
