@@ -137,8 +137,8 @@ export default function WeeklyHome({ onDataChange }) {
         <div style={{display:'flex',gap:8}}><button className="btn btn-primary" onClick={saveEdit} style={{flex:1,fontSize:12}}>Save</button><button className="btn btn-ghost" onClick={()=>setEditId(null)} style={{fontSize:12}}>Cancel</button></div>
       </div>
     ) : (
-      <div style={{
-        display:'flex', alignItems:'center', gap:10,
+      <div className="task-row-mobile" style={{
+        display:'flex', alignItems:'flex-start', gap:10,
         padding:'10px 10px 10px 14px', marginBottom:4,
         borderRadius:10, position:'relative',
         background:'var(--glass-bg)',
@@ -147,14 +147,15 @@ export default function WeeklyHome({ onDataChange }) {
         outlineOffset: 3,
         boxShadow: urgColor ? `0 0 12px ${urgColor}33` : 'none',
         transition:'all .2s',
+        flexWrap:'wrap',
       }}>
         <button onClick={()=>toggleTask(task.id)} style={{background:'none',border:'none',color:task.done?'var(--accent)':'var(--text-3)',display:'flex',padding:0,cursor:'pointer',flexShrink:0}}>
           {task.done?<CheckCircle2 size={15}/>:<Circle size={15}/>}
         </button>
-        <span style={{flex:1,fontSize:13}}>{task.text}</span>
+        <span style={{flex:'1 1 60%',fontSize:13,wordBreak:'break-word',minWidth:0}}>{task.text}</span>
         {task.due&&<span style={{fontSize:10,fontWeight:700,color:daysUntil(task.due)?.color||'var(--text-3)',flexShrink:0}}>{daysUntil(task.due)?.label||''}</span>}
         <span style={{fontSize:10,fontWeight:700,padding:'2px 6px',borderRadius:20,background:'var(--glass-bg-2)',color:COURSE_COLORS[task.course]||'var(--text-3)',border:'1px solid var(--glass-border)',flexShrink:0}}>{task.course}</span>
-        <div style={{display:'flex',gap:2,flexShrink:0}}>
+        <div className="task-actions-mobile" style={{display:'flex',gap:2,flexShrink:0,marginLeft:'auto'}}>
           <button onClick={()=>startEdit(task)} style={{background:'none',border:'none',color:'var(--text-3)',cursor:'pointer',display:'flex',padding:2}}><Edit2 size={11}/></button>
           <button onClick={()=>moveUp(task.id)} style={{background:'none',border:'none',color:'var(--text-3)',cursor:'pointer',display:'flex',padding:2}}><ArrowUp size={11}/></button>
           <button onClick={()=>moveDown(task.id)} style={{background:'none',border:'none',color:'var(--text-3)',cursor:'pointer',display:'flex',padding:2}}><ArrowDown size={11}/></button>
@@ -255,8 +256,8 @@ export default function WeeklyHome({ onDataChange }) {
           </div>
         </div>
 
-        {/* Main — wider tasks */}
-        <div style={{display:'grid',gridTemplateColumns:'1.6fr 1fr',gap:16,alignItems:'start'}}>
+        {/* Main — wider tasks, stacks on mobile */}
+        <div className="home-main-grid" style={{display:'grid',gridTemplateColumns:'1.6fr 1fr',gap:16,alignItems:'start'}}>
 
           {/* Tasks card */}
           <div className="card">

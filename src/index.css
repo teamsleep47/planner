@@ -802,3 +802,66 @@ select option {
   }
   .weather-strip::-webkit-scrollbar { height: 3px; }
 }
+
+/* ── Mobile home fixed order ─────────────────────── */
+@media (max-width: 768px) {
+  /* Home page main grid stacks */
+  .home-main-grid {
+    display: flex !important;
+    flex-direction: column !important;
+    gap: 14px !important;
+  }
+
+  /* Task row wraps on mobile */
+  .task-row-mobile {
+    flex-wrap: wrap !important;
+    align-items: flex-start !important;
+  }
+
+  /* Task text gets full width on mobile */
+  .task-row-mobile > span {
+    flex: 1 1 100% !important;
+    order: 1;
+  }
+
+  /* Task badges and buttons go on second line */
+  .task-row-mobile > .task-actions-mobile {
+    order: 3;
+    width: 100%;
+    justify-content: flex-end;
+    margin-top: 4px;
+  }
+
+  /* Course/urgency badges stay inline */
+  .task-row-mobile > span:last-of-type {
+    order: 2;
+  }
+
+  /* Stats row stays 2-col on mobile */
+  .stats-row-mobile {
+    display: grid !important;
+    grid-template-columns: 1fr 1fr !important;
+    gap: 10px !important;
+  }
+
+  /* Upcoming assignments span full width */
+  .upcoming-full-mobile {
+    grid-column: 1 / -1 !important;
+  }
+
+  /* Timer card on mobile */
+  .timer-col-mobile {
+    order: 10 !important;
+  }
+
+  /* Sidebar mini widgets */
+  @keyframes slideDown {
+    from { opacity: 0; transform: translateY(-6px); }
+    to   { opacity: 1; transform: translateY(0); }
+  }
+}
+
+@keyframes slideDown {
+  from { opacity: 0; transform: translateY(-6px); }
+  to   { opacity: 1; transform: translateY(0); }
+}

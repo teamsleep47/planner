@@ -17,7 +17,8 @@ import NotesPage     from './pages/NotesPage.jsx'
 import CanvasPage    from './pages/CanvasPage.jsx'
 import SettingsPage  from './pages/SettingsPage.jsx'
 import TopBar           from './components/TopBar.jsx'
-import SidebarMiniTasks from './components/SidebarMiniTasks.jsx'
+import SidebarMiniTasks       from './components/SidebarMiniTasks.jsx'
+import SidebarMiniAssignments from './components/SidebarMiniAssignments.jsx'
 
 const NAV = [
   { label: 'Daily', items: [
@@ -89,11 +90,17 @@ function Avatar({ profile }) {
 
 const chipBorder = { border: '1.5px solid rgba(0,0,0,0.55)', boxShadow: '0 1px 4px rgba(0,0,0,0.18)' }
 
-// Shows mini task widget in sidebar when NOT on home page
-function MiniTasksIfNotHome() {
+// Shows mini widgets in sidebar based on current page
+function SidebarMiniWidgets() {
   const loc = useLocation()
-  if (loc.pathname === '/') return null
-  return <SidebarMiniTasks/>
+  const isHome      = loc.pathname === '/'
+  const isCourses   = loc.pathname === '/courses'
+  return (
+    <>
+      {!isHome && <SidebarMiniTasks/>}
+      {!isHome && !isCourses && <SidebarMiniAssignments/>}
+    </>
+  )
 }
 
 function MobileHeader({ profile, signOut, wipeAllSettings, sidebarOpen, setSidebarOpen, theme, toggleTheme }) {
@@ -217,7 +224,7 @@ export default function App() {
                 ))}
               </div>
             ))}
-            <MiniTasksIfNotHome/>
+            <SidebarMiniWidgets/>
           </nav>
 
           <div className="sidebar-footer">
