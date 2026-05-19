@@ -87,6 +87,11 @@ export function useDriveSync() {
             body: JSON.stringify(allData)
           }
         )
+        if (res.status === 401) {
+          // Token expired — trigger silent re-auth
+          window.dispatchEvent(new Event('token-expired'))
+          throw new Error('TOKEN_EXPIRED')
+        }
         if (!res.ok) throw new Error('HTTP ' + res.status)
         console.log('[drive] saved ok')
         setSaveState('saved')

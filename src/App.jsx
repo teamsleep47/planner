@@ -1,5 +1,5 @@
 import { useState, useCallback, useEffect, useRef } from 'react'
-import { HashRouter, Routes, Route, NavLink, useNavigate } from 'react-router-dom'
+import { HashRouter, Routes, Route, NavLink, useNavigate, useLocation } from 'react-router-dom'
 import { LayoutDashboard, BookOpen, Clock, Target, Link, Menu, X, HardDrive, LogOut, Trash2, BookText, GraduationCap, Settings } from 'lucide-react'
 
 import { useAuth }      from './hooks/useAuth.jsx'
@@ -16,7 +16,8 @@ import Notes         from './pages/Notes.jsx'
 import NotesPage     from './pages/NotesPage.jsx'
 import CanvasPage    from './pages/CanvasPage.jsx'
 import SettingsPage  from './pages/SettingsPage.jsx'
-import TopBar        from './components/TopBar.jsx'
+import TopBar           from './components/TopBar.jsx'
+import SidebarMiniTasks from './components/SidebarMiniTasks.jsx'
 
 const NAV = [
   { label: 'Daily', items: [
@@ -36,9 +37,17 @@ const NAV = [
 ]
 
 const ALL_KEYS = [
-  'home_tasks','assignments','study_sessions','habit_grid','timer_settings',
-  'quick_links','streak','weather_city','terms_v1','course_notes','full_course_notes',
-  'page_links','habit_history','study_week_goal','sem_end_date','scheme','theme',
+  // Core data
+  'home_tasks','study_sessions','habit_grid','habit_history',
+  'timer_settings','streak','study_week_goal','sem_end_date',
+  // Terms/courses/assignments (new structure)
+  'terms_v1',
+  // Legacy assignments (kept for compatibility)
+  'assignments',
+  // Notes
+  'course_notes','full_course_notes',
+  // UI / preferences
+  'quick_links','page_links','weather_city','scheme','theme',
 ]
 function getAllData() { return ALL_KEYS.reduce((a,k) => { a[k]=load(k,null); return a }, {}) }
 
@@ -79,6 +88,13 @@ function Avatar({ profile }) {
 }
 
 const chipBorder = { border: '1.5px solid rgba(0,0,0,0.55)', boxShadow: '0 1px 4px rgba(0,0,0,0.18)' }
+
+// Shows mini task widget in sidebar when NOT on home page
+function MiniTasksIfNotHome() {
+  const loc = useLocation()
+  if (loc.pathname === '/') return null
+  return <SidebarMiniTasks/>
+}
 
 function MobileHeader({ profile, signOut, wipeAllSettings, sidebarOpen, setSidebarOpen, theme, toggleTheme }) {
   const [showDropdown, setShowDropdown] = useState(false)
@@ -201,6 +217,7 @@ export default function App() {
                 ))}
               </div>
             ))}
+            <MiniTasksIfNotHome/>
           </nav>
 
           <div className="sidebar-footer">

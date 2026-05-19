@@ -82,12 +82,29 @@ export function AuthProvider({ children }) {
     setToken(tok); saveToken(tok)
     setLoading(false); setError(null)
     clearTimeout(refreshRef.current)
+    // Auto-refresh at 55 minutes
     refreshRef.current = setTimeout(() => {
       const hint = loadHint()
       window.location.href = buildOauthUrl(hint || null)
     }, 55 * 60 * 1000)
     fetchProfile(tok)
   }, [fetchProfile])
+
+  // Listen for 401s from Drive sync — re-auth silently
+  useEffect(() => {
+    const handler = () => {
+      const hint = loadHint()
+      if (hint) {
+        window.location.href = buildOauthUrl(hint)
+      } else {
+        // No hint — clear token and show login
+        clearSession()
+        setToken(null); setProfile(null); setLoading(false)
+      }
+    }
+    window.addEventListener('token-expired', handler)
+    return () => window.removeEventListener('token-expired', handler)
+  }, [])
 
   const signIn  = useCallback(() => { setError(null); window.location.href = buildOauthUrl(null) }, [])
   const signOut = useCallback(() => {

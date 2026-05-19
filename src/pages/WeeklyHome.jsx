@@ -212,7 +212,7 @@ export default function WeeklyHome({ onDataChange }) {
           {/* Semester countdown */}
           <div className="stat-card">
             <div className="stat-label">Semester ends</div>
-            <div className="stat-value" style={{color:'var(--teal)',fontSize:22}}>{semDays!==null?`${semDays}d`:'—'}</div>
+            <div className="stat-value" style={{color: semDays?.urgent ? 'var(--coral)' : 'var(--teal)', fontSize:22}}>{semDays?.label||'—'}</div>
             <div style={{display:'flex',alignItems:'center',gap:4,marginTop:4}}>
               {editSemDate?(
                 <><input type="date" value={semDate} onChange={e=>setSemDate(e.target.value)} style={{...inputSm,fontSize:10,padding:'3px 6px'}}/><button className="btn-icon" style={{padding:3}} onClick={()=>setEditSemDate(false)}>✓</button></>
