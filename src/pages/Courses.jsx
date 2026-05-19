@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react'
 import { Plus, Trash2, Edit2, Check, X, ChevronDown, ChevronUp, BookOpen } from 'lucide-react'
 import { loadTerms, saveTerms, uid, ASSIGNMENT_TYPES, STATUS_OPTS } from '../utils/termData.js'
 import InlineNotes from '../components/InlineNotes.jsx'
+import { formatRelativeDue } from '../utils/timeFormat.js'
 import Tooltip from '../components/Tooltip.jsx'
 
 const PRIORITY = [
@@ -18,17 +19,10 @@ const STATUS = [
 ]
 const COURSE_COLORS = ['#6366f1','#14b8a6','#f59e0b','#f43f5e','#22c55e','#8b5cf6','#06b6d4','#ec4899']
 
-function daysUntil(due) {
-  const d = Math.ceil((new Date(due) - new Date()) / 86400000)
-  if (d < 0)   return { label:'Overdue',   color:'var(--coral)' }
-  if (d === 0) return { label:'Due today',  color:'var(--coral)' }
-  if (d === 1) return { label:'Tomorrow',   color:'var(--amber)' }
-  if (d <= 7)  return { label:`${d}d left`, color:'var(--amber)' }
-  return               { label:`${d}d left`, color:'var(--text-3)' }
-}
+// daysUntil replaced by formatRelativeDue
 
 const BLANK_COURSE = { name:'', instructor:'', days:'', time:'', room:'', credits:3, gradeTarget:90, color:COURSE_COLORS[0], notes:'' }
-const BLANK_ASSIGN = { title:'', type:ASSIGNMENT_TYPES[0], due:'', status:'To do', priority:'none', notes:'' }
+const BLANK_ASSIGN = { title:'', type:ASSIGNMENT_TYPES[0], due:'', dueTime:'', status:'To do', priority:'none', notes:'' }
 
 export default function Courses({ onDataChange }) {
   const [terms,       setTerms]       = useState(() => loadTerms())
@@ -116,7 +110,7 @@ export default function Courses({ onDataChange }) {
       })
     }))
   }
-  const startEditAssign = (a) => { setEditAssignId(a.id); setEditAssign({ title:a.title, type:a.type, due:a.due, status:a.status, priority:a.priority||'none', notes:a.notes||'' }) }
+  const startEditAssign = (a) => { setEditAssignId(a.id); setEditAssign({ title:a.title, type:a.type, due:a.due, dueTime:a.dueTime||'', status:a.status, priority:a.priority||'none', notes:a.notes||'' }) }
   const saveAssign = (termId, courseId, assignId) => {
     updateAssign(termId, courseId, assignId, editAssign)
     setEditAssignId(null)
@@ -297,7 +291,7 @@ export default function Courses({ onDataChange }) {
                       )}
 
                       {sorted.map(a => {
-                        const due = daysUntil(a.due)
+                        const due = formatRelativeDue(a.due, a.dueTime) || { label:'No due date', color:'var(--text-3)' }
                         const pri = PRIORITY.find(p=>p.key===(a.priority||'none'))
           
                         const isEditing = editAssignId === a.id
@@ -312,6 +306,7 @@ export default function Courses({ onDataChange }) {
                                     {ASSIGNMENT_TYPES.map(t=><option key={t} value={t}>{t}</option>)}
                                   </select>
                                   <input type="date" style={smallInput} value={editAssign.due} onChange={e=>setEditAssign(f=>({...f,due:e.target.value}))}/>
+                                  <input type="time" style={smallInput} value={editAssign.dueTime||''} onChange={e=>setEditAssign(f=>({...f,dueTime:e.target.value}))} placeholder="Time (optional)"/>
                                 </div>
                                 {/* Priority */}
                                 <div style={{display:'flex',gap:4,marginBottom:8,flexWrap:'wrap'}}>
@@ -345,7 +340,7 @@ export default function Courses({ onDataChange }) {
                                       {a.priority!=='none'&&<span style={{fontSize:10,padding:'2px 7px',borderRadius:20,background:pri.bg,color:pri.color,fontWeight:700,border:`1px solid ${pri.color}`,flexShrink:0}}>{pri.label}</span>}
                                     </div>
                                     <div style={{fontSize:11,color:'var(--text-3)'}}>
-                                      Due {new Date(a.due+'T12:00:00').toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'})} · <span style={{color:due.color,fontWeight:700}}>{due.label}</span>
+                                      <span style={{color:due.color,fontWeight:700}}>{due.label}</span>
                                     </div>
                                   </div>
                                   <div className="pill-row" style={{display:'flex',gap:3,flexShrink:0}}>
@@ -390,6 +385,7 @@ export default function Courses({ onDataChange }) {
                               {ASSIGNMENT_TYPES.map(t=><option key={t} value={t}>{t}</option>)}
                             </select>
                             <input type="date" style={smallInput} value={newAssign.due} onChange={e=>setNewAssign(n=>({...n,due:e.target.value}))}/>
+                          <input type="time" style={smallInput} value={newAssign.dueTime||''} onChange={e=>setNewAssign(n=>({...n,dueTime:e.target.value}))} placeholder="Time (optional)"/>
                           </div>
                           <div style={{display:'flex',gap:6}}>
                             <button className="btn btn-primary" style={{fontSize:12}} onClick={()=>addAssignment(activeTerm.id,course.id)}>Add</button>

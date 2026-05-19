@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from 'react'
 import { CheckCircle2, Circle, Plus, X, Edit2, ArrowUp, ArrowDown, History, ChevronDown, ChevronUp } from 'lucide-react'
 import { load, save } from '../utils/storage.js'
+import { formatRelativeDue } from '../utils/timeFormat.js'
 import { getActiveTermCourses, getAllCourseNames } from '../utils/termData.js'
 import Tooltip from '../components/Tooltip.jsx'
 
@@ -38,7 +39,7 @@ const IS_CLASS   = DAY_IDX===1||DAY_IDX===3
 const DATE_STR   = new Date().toLocaleDateString('en-US',{weekday:'long',month:'long',day:'numeric',year:'numeric'})
 const DAYS_SHORT = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat']
 
-function daysUntil(d) { return d ? Math.ceil((new Date(d+'T12:00:00')-new Date())/86400000) : null }
+function daysUntil(d, t) { return d ? formatRelativeDue(d, t||'') : null }
 
 // Get upcoming assignments from termData structure
 function getUpcoming(count=3) {
@@ -124,7 +125,7 @@ export default function WeeklyHome({ onDataChange }) {
 
   const TaskRow = ({task})=>{
     const urgColor = URGENCY[task.urgency||'none'].color
-    const taskDue  = daysUntil(task.due)
+
     return editId===task.id ? (
       <div style={{padding:'10px 0',borderBottom:'1px solid var(--glass-border)',display:'flex',flexDirection:'column',gap:8}}>
         <input className="inline-input" value={editForm.text} onChange={e=>setEditForm(f=>({...f,text:e.target.value}))} autoFocus/>
@@ -151,7 +152,7 @@ export default function WeeklyHome({ onDataChange }) {
           {task.done?<CheckCircle2 size={15}/>:<Circle size={15}/>}
         </button>
         <span style={{flex:1,fontSize:13}}>{task.text}</span>
-        {taskDue!==null&&<span style={{fontSize:10,fontWeight:700,color:taskDue<=1?'var(--coral)':taskDue<=3?'var(--amber)':'var(--text-3)',flexShrink:0}}>{taskDue}d</span>}
+        {task.due&&<span style={{fontSize:10,fontWeight:700,color:daysUntil(task.due)?.color||'var(--text-3)',flexShrink:0}}>{daysUntil(task.due)?.label||''}</span>}
         <span style={{fontSize:10,fontWeight:700,padding:'2px 6px',borderRadius:20,background:'var(--glass-bg-2)',color:COURSE_COLORS[task.course]||'var(--text-3)',border:'1px solid var(--glass-border)',flexShrink:0}}>{task.course}</span>
         <div style={{display:'flex',gap:2,flexShrink:0}}>
           <button onClick={()=>startEdit(task)} style={{background:'none',border:'none',color:'var(--text-3)',cursor:'pointer',display:'flex',padding:2}}><Edit2 size={11}/></button>
@@ -245,7 +246,7 @@ export default function WeeklyHome({ onDataChange }) {
                     }}>
                       <span style={{fontSize:isFirst?13:11,fontWeight:isFirst?700:500,flex:1,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{a.title}</span>
                       {pri&&<span style={{fontSize:10,padding:'1px 6px',borderRadius:20,background:'rgba(239,68,68,.15)',color:'#ef4444',fontWeight:700,flexShrink:0}}>{a.priority}</span>}
-                      <span style={{fontSize:isFirst?12:10,fontWeight:700,color:d<=1?'var(--coral)':d<=7?'var(--amber)':'var(--text-3)',flexShrink:0}}>{d!==null?`${d}d`:'—'}</span>
+                      <span style={{fontSize:isFirst?12:10,fontWeight:700,color:d?.color||'var(--text-3)',flexShrink:0}}>{d?.label||'—'}</span>
                     </div>
                   )
                 })}
