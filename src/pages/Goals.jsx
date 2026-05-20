@@ -34,7 +34,7 @@ function makeEmptyGrid(habits) {
 }
 
 function makeEmptyRecGrid(recurring) {
-  return recurring.reduce((a,r) => { a[r.id]={}; return r }, {})
+  return recurring.reduce((a,r) => { a[r.id]={}; return a }, {})
 }
 
 function buildHeatmap(grid, history, habits) {
