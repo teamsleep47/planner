@@ -1,6 +1,6 @@
 import { useState, useCallback, useEffect, useRef } from 'react'
 import { HashRouter, Routes, Route, NavLink, useNavigate, useLocation } from 'react-router-dom'
-import { LayoutDashboard, BookOpen, Clock, Target, Link, Menu, X, HardDrive, LogOut, Trash2, BookText, GraduationCap, Settings, Layers, Calendar } from 'lucide-react'
+import { LayoutDashboard, BookOpen, Clock, Target, Link, Menu, X, HardDrive, LogOut, Trash2, BookText, GraduationCap, Settings, Layers, Calendar, FolderOpen } from 'lucide-react'
 
 import { useAuth }      from './hooks/useAuth.jsx'
 import { useTheme }     from './hooks/useTheme.js'
@@ -18,6 +18,7 @@ import CanvasPage    from './pages/CanvasPage.jsx'
 import SettingsPage    from './pages/SettingsPage.jsx'
 import FlashcardsPage  from './pages/FlashcardsPage.jsx'
 import CalendarPage    from './pages/CalendarPage.jsx'
+import ResourcesPage   from './pages/ResourcesPage.jsx'
 import NotificationBell from './components/NotificationBell.jsx'
 import { useNotifications } from './hooks/useNotifications.js'
 import TopBar           from './components/TopBar.jsx'
@@ -37,6 +38,7 @@ const NAV = [
     { to: '/links',    icon: Link,          text: 'Quick links'   },
     { to: '/notes',    icon: BookText,      text: 'Course notes'  },
     { to: '/canvas',      icon: GraduationCap, text: 'Canvas'        },
+    { to: '/resources',   icon: FolderOpen,    text: 'Resources'     },
     { to: '/flashcards', icon: Layers,         text: 'Flashcards'    },
     { to: '/calendar',   icon: Calendar,       text: 'Calendar'      },
     { to: '/settings', icon: Settings,      text: 'Settings'      },
@@ -55,6 +57,8 @@ const ALL_KEYS = [
   'calendar_blocks',
   // Notifications
   'notification_settings',
+  // Resources
+  'saved_resources',
   // Habits config + recurring
   'habits_config','recurring_tasks','rec_history','goals_config',
   // Legacy assignments (kept for compatibility)
@@ -111,10 +115,11 @@ function SidebarMiniWidgets() {
   const isCourses    = loc.pathname === '/courses'
   const isFlashcards = loc.pathname === '/flashcards'
   const isCalendar   = loc.pathname === '/calendar'
+  const isResources  = loc.pathname === '/resources'
   return (
     <>
       {!isHome && <SidebarMiniTasks/>}
-      {!isHome && !isCourses && !isFlashcards && !isCalendar && <SidebarMiniAssignments/>}
+      {!isHome && !isCourses && !isFlashcards && !isCalendar && !isResources && <SidebarMiniAssignments/>}
     </>
   )
 }
@@ -189,7 +194,6 @@ export default function App() {
   const { token, profile, loading, error, signIn, signOut, isAuthed } = useAuth()
   const { theme, scheme, toggleTheme, setScheme, SCHEMES, SCHEME_COLORS } = useTheme()
   const { syncToDrive, saveState, synced } = useDriveSync()
-  const { notifs, unread, markAllRead, clearNotif } = useNotifications()
   const [driveKey, setDriveKey] = useState(0)
 
   useEffect(() => {
@@ -300,6 +304,7 @@ export default function App() {
             <Route path="/canvas"   element={<CanvasPage    key={driveKey}/>}/>
             <Route path="/flashcards" element={<FlashcardsPage key={driveKey} onDataChange={handleDataChange}/>}/>
             <Route path="/calendar"   element={<CalendarPage   key={driveKey} onDataChange={handleDataChange}/>}/>
+            <Route path="/resources"  element={<ResourcesPage  key={driveKey} onDataChange={handleDataChange}/>}/>
             <Route path="/settings" element={<SettingsPage  key={driveKey} onDataChange={handleDataChange}/>}/>
           </Routes>
 
