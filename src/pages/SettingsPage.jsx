@@ -5,6 +5,58 @@ import {
   saveCanvasToken, saveCanvasUrl, saveCanvasIcal, setWarned,
   clearCanvasToken, testCanvasConnection, parseIcal
 } from '../hooks/useCanvas.js'
+import { useNotifications } from '../hooks/useNotifications.js'
+
+function NotificationSettings() {
+  const { settings, saveSettings, permission, requestPermission } = useNotifications()
+
+  const toggle = (key) => saveSettings({...settings, [key]: !settings[key]})
+
+  const TOGGLES = [
+    { key:'dueSoon3d',     label:'Assignment due in 3 days',      desc:'Get notified 3 days before a deadline' },
+    { key:'dueSoon1d',     label:'Assignment due tomorrow',        desc:'Get notified the day before a deadline' },
+    { key:'dueToday',      label:'Assignment due today',           desc:'Alert on the day an assignment is due' },
+    { key:"streakBreak",   label:"Study streak at risk",           desc:"Remind me at 6pm if you have not studied today" },
+    { key:'habitReminder', label:'Daily habit reminder',           desc:'Evening reminder to check off habits' },
+  ]
+
+  return (
+    <div>
+      <div style={{display:'flex',alignItems:'center',gap:10,marginBottom:16,padding:'10px 12px',borderRadius:'var(--radius-md)',background: permission==='granted'?'var(--green-dim)':permission==='denied'?'var(--coral-dim)':'var(--amber-dim)',border:`1px solid ${permission==='granted'?'var(--green)':permission==='denied'?'var(--coral)':'var(--amber)'}`}}>
+        <span style={{fontSize:12,color: permission==='granted'?'var(--green)':permission==='denied'?'var(--coral)':'var(--amber)',flex:1,fontWeight:500}}>
+          Browser notifications: {permission==='granted'?'Enabled':permission==='denied'?'Blocked — check browser settings':'Not yet requested'}
+        </span>
+        {permission!=='granted'&&permission!=='denied'&&(
+          <button className="btn btn-primary" onClick={requestPermission} style={{fontSize:12,padding:'5px 12px'}}>Enable</button>
+        )}
+      </div>
+
+      <div style={{display:'flex',alignItems:'center',gap:12,marginBottom:16,padding:'10px 12px',borderRadius:'var(--radius-md)',background:'var(--glass-bg-2)',border:'1px solid var(--glass-border)'}}>
+        <div style={{flex:1}}>
+          <div style={{fontWeight:600,fontSize:13}}>Browser popup notifications</div>
+          <div style={{fontSize:12,color:'var(--text-3)'}}>Show notifications outside the browser tab</div>
+        </div>
+        <button onClick={()=>toggle('browserPush')} style={{width:44,height:24,borderRadius:20,background:settings.browserPush&&permission==='granted'?'var(--accent)':'var(--glass-border)',border:'none',position:'relative',cursor:'pointer',transition:'background .25s',opacity:permission!=='granted'?.4:1}}>
+          <div style={{position:'absolute',top:2,left:settings.browserPush&&permission==='granted'?20:2,width:18,height:18,borderRadius:'50%',background:'white',transition:'left .25s',boxShadow:'0 1px 4px rgba(0,0,0,.3)'}}/>
+        </button>
+      </div>
+
+      <div style={{display:'flex',flexDirection:'column',gap:8}}>
+        {TOGGLES.map(t=>(
+          <div key={t.key} style={{display:'flex',alignItems:'center',gap:12,padding:'10px 12px',borderRadius:'var(--radius-md)',background:'var(--glass-bg-2)',border:'1px solid var(--glass-border)'}}>
+            <div style={{flex:1}}>
+              <div style={{fontWeight:600,fontSize:13}}>{t.label}</div>
+              <div style={{fontSize:12,color:'var(--text-3)'}}>{t.desc}</div>
+            </div>
+            <button onClick={()=>toggle(t.key)} style={{width:44,height:24,borderRadius:20,background:settings[t.key]?'var(--accent)':'var(--glass-border)',border:'none',position:'relative',cursor:'pointer',transition:'background .25s',boxShadow:settings[t.key]?'0 0 8px var(--accent-glow)':'none'}}>
+              <div style={{position:'absolute',top:2,left:settings[t.key]?20:2,width:18,height:18,borderRadius:'50%',background:'white',transition:'left .25s',boxShadow:'0 1px 4px rgba(0,0,0,.3)'}}/>
+            </button>
+          </div>
+        ))}
+      </div>
+    </div>
+  )
+}
 import { load, save } from '../utils/storage.js'
 import { useTheme } from '../hooks/useTheme.js'
 import Tooltip from '../components/Tooltip.jsx'
@@ -291,6 +343,12 @@ export default function SettingsPage({ onDataChange }) {
               )
             })}
           </div>
+        </div>
+
+        {/* Notifications */}
+        <div className="card">
+          <div className="card-title">Notifications</div>
+          <NotificationSettings/>
         </div>
 
         {/* Data */}

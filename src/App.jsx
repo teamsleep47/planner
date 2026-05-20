@@ -1,6 +1,6 @@
 import { useState, useCallback, useEffect, useRef } from 'react'
 import { HashRouter, Routes, Route, NavLink, useNavigate, useLocation } from 'react-router-dom'
-import { LayoutDashboard, BookOpen, Clock, Target, Link, Menu, X, HardDrive, LogOut, Trash2, BookText, GraduationCap, Settings, Layers } from 'lucide-react'
+import { LayoutDashboard, BookOpen, Clock, Target, Link, Menu, X, HardDrive, LogOut, Trash2, BookText, GraduationCap, Settings, Layers, Calendar } from 'lucide-react'
 
 import { useAuth }      from './hooks/useAuth.jsx'
 import { useTheme }     from './hooks/useTheme.js'
@@ -17,6 +17,9 @@ import NotesPage     from './pages/NotesPage.jsx'
 import CanvasPage    from './pages/CanvasPage.jsx'
 import SettingsPage    from './pages/SettingsPage.jsx'
 import FlashcardsPage  from './pages/FlashcardsPage.jsx'
+import CalendarPage    from './pages/CalendarPage.jsx'
+import NotificationBell from './components/NotificationBell.jsx'
+import { useNotifications } from './hooks/useNotifications.js'
 import TopBar           from './components/TopBar.jsx'
 import SidebarMiniTasks       from './components/SidebarMiniTasks.jsx'
 import SidebarMiniAssignments from './components/SidebarMiniAssignments.jsx'
@@ -35,6 +38,7 @@ const NAV = [
     { to: '/notes',    icon: BookText,      text: 'Course notes'  },
     { to: '/canvas',      icon: GraduationCap, text: 'Canvas'        },
     { to: '/flashcards', icon: Layers,         text: 'Flashcards'    },
+    { to: '/calendar',   icon: Calendar,       text: 'Calendar'      },
     { to: '/settings', icon: Settings,      text: 'Settings'      },
   ]},
 ]
@@ -47,6 +51,10 @@ const ALL_KEYS = [
   'terms_v1',
   // Flashcards
   'flashcard_decks','flashcard_cards',
+  // Calendar
+  'calendar_blocks',
+  // Notifications
+  'notification_settings',
   // Habits config + recurring
   'habits_config','recurring_tasks','rec_history','goals_config',
   // Legacy assignments (kept for compatibility)
@@ -102,10 +110,11 @@ function SidebarMiniWidgets() {
   const isHome      = loc.pathname === '/'
   const isCourses    = loc.pathname === '/courses'
   const isFlashcards = loc.pathname === '/flashcards'
+  const isCalendar   = loc.pathname === '/calendar'
   return (
     <>
       {!isHome && <SidebarMiniTasks/>}
-      {!isHome && !isCourses && !isFlashcards && <SidebarMiniAssignments/>}
+      {!isHome && !isCourses && !isFlashcards && !isCalendar && <SidebarMiniAssignments/>}
     </>
   )
 }
@@ -267,13 +276,18 @@ export default function App() {
           <MobileHeader profile={profile} signOut={signOut} wipeAllSettings={wipeAllSettings} sidebarOpen={sidebarOpen} setSidebarOpen={setSidebarOpen} theme={theme} toggleTheme={toggleTheme}/>
 
           {/* Desktop top bar */}
-          <TopBar
-            theme={theme} scheme={scheme}
-            toggleTheme={toggleTheme} setScheme={setScheme}
-            SCHEMES={SCHEMES} SCHEME_COLORS={SCHEME_COLORS}
-            saveState={saveState}
-            onLinksChange={handleDataChange}
-          />
+          <div style={{display:'flex',alignItems:'center'}}>
+            <TopBar
+              theme={theme} scheme={scheme}
+              toggleTheme={toggleTheme} setScheme={setScheme}
+              SCHEMES={SCHEMES} SCHEME_COLORS={SCHEME_COLORS}
+              saveState={saveState}
+              onLinksChange={handleDataChange}
+            />
+            <div style={{paddingRight:12,flexShrink:0}}>
+              <NotificationBell notifs={notifs} unread={unread} markAllRead={markAllRead} clearNotif={clearNotif}/>
+            </div>
+          </div>
 
           <Routes>
             <Route path="/"         element={<WeeklyHome    key={driveKey} onDataChange={handleDataChange}/>}/>
@@ -284,6 +298,7 @@ export default function App() {
             <Route path="/notes"    element={<NotesPage     key={driveKey} onDataChange={handleDataChange}/>}/>
             <Route path="/canvas"   element={<CanvasPage    key={driveKey}/>}/>
             <Route path="/flashcards" element={<FlashcardsPage key={driveKey} onDataChange={handleDataChange}/>}/>
+            <Route path="/calendar"   element={<CalendarPage   key={driveKey} onDataChange={handleDataChange}/>}/>
             <Route path="/settings" element={<SettingsPage  key={driveKey} onDataChange={handleDataChange}/>}/>
           </Routes>
 
