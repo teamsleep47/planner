@@ -194,6 +194,7 @@ export default function App() {
   const { token, profile, loading, error, signIn, signOut, isAuthed } = useAuth()
   const { theme, scheme, toggleTheme, setScheme, SCHEMES, SCHEME_COLORS } = useTheme()
   const { syncToDrive, saveState, synced } = useDriveSync()
+  const { notifs, unread, markAllRead, clearNotif } = useNotifications()
   const [driveKey, setDriveKey] = useState(0)
 
   useEffect(() => {
