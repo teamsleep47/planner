@@ -283,6 +283,7 @@ export default function App() {
             <Route path="/links"    element={<Notes         key={driveKey} onDataChange={handleDataChange}/>}/>
             <Route path="/notes"    element={<NotesPage     key={driveKey} onDataChange={handleDataChange}/>}/>
             <Route path="/canvas"   element={<CanvasPage    key={driveKey}/>}/>
+            <Route path="/flashcards" element={<FlashcardsPage key={driveKey} onDataChange={handleDataChange}/>}/>
             <Route path="/settings" element={<SettingsPage  key={driveKey} onDataChange={handleDataChange}/>}/>
           </Routes>
 
