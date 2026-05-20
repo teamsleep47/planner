@@ -1,6 +1,6 @@
 import { useState, useCallback, useEffect, useRef } from 'react'
 import { HashRouter, Routes, Route, NavLink, useNavigate, useLocation } from 'react-router-dom'
-import { LayoutDashboard, BookOpen, Clock, Target, Link, Menu, X, HardDrive, LogOut, Trash2, BookText, GraduationCap, Settings } from 'lucide-react'
+import { LayoutDashboard, BookOpen, Clock, Target, Link, Menu, X, HardDrive, LogOut, Trash2, BookText, GraduationCap, Settings, Layers } from 'lucide-react'
 
 import { useAuth }      from './hooks/useAuth.jsx'
 import { useTheme }     from './hooks/useTheme.js'
@@ -15,7 +15,8 @@ import Goals         from './pages/Goals.jsx'
 import Notes         from './pages/Notes.jsx'
 import NotesPage     from './pages/NotesPage.jsx'
 import CanvasPage    from './pages/CanvasPage.jsx'
-import SettingsPage  from './pages/SettingsPage.jsx'
+import SettingsPage    from './pages/SettingsPage.jsx'
+import FlashcardsPage  from './pages/FlashcardsPage.jsx'
 import TopBar           from './components/TopBar.jsx'
 import SidebarMiniTasks       from './components/SidebarMiniTasks.jsx'
 import SidebarMiniAssignments from './components/SidebarMiniAssignments.jsx'
@@ -32,7 +33,8 @@ const NAV = [
   { label: 'Resources', items: [
     { to: '/links',    icon: Link,          text: 'Quick links'   },
     { to: '/notes',    icon: BookText,      text: 'Course notes'  },
-    { to: '/canvas',   icon: GraduationCap, text: 'Canvas'        },
+    { to: '/canvas',      icon: GraduationCap, text: 'Canvas'        },
+    { to: '/flashcards', icon: Layers,         text: 'Flashcards'    },
     { to: '/settings', icon: Settings,      text: 'Settings'      },
   ]},
 ]
@@ -43,6 +45,10 @@ const ALL_KEYS = [
   'timer_settings','streak','study_week_goal','sem_end_date',
   // Terms/courses/assignments (new structure)
   'terms_v1',
+  // Flashcards
+  'flashcard_decks','flashcard_cards',
+  // Habits config + recurring
+  'habits_config','recurring_tasks','rec_history','goals_config',
   // Legacy assignments (kept for compatibility)
   'assignments',
   // Notes
@@ -94,11 +100,12 @@ const chipBorder = { border: '1.5px solid rgba(0,0,0,0.55)', boxShadow: '0 1px 4
 function SidebarMiniWidgets() {
   const loc = useLocation()
   const isHome      = loc.pathname === '/'
-  const isCourses   = loc.pathname === '/courses'
+  const isCourses    = loc.pathname === '/courses'
+  const isFlashcards = loc.pathname === '/flashcards'
   return (
     <>
       {!isHome && <SidebarMiniTasks/>}
-      {!isHome && !isCourses && <SidebarMiniAssignments/>}
+      {!isHome && !isCourses && !isFlashcards && <SidebarMiniAssignments/>}
     </>
   )
 }
