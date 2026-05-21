@@ -32,10 +32,13 @@ export default function FlashcardsPage({ onDataChange }) {
   const [importMsg,  setImportMsg]  = useState('')
   const [newDeckName,setNewDeckName]= useState('')
   const [newDeckCourse,setNewDeckCourse]=useState('')
+  const [editDeckId,   setEditDeckId]   = useState(null)
+  const [editDeckForm, setEditDeckForm]  = useState({name:'',course:''})
   const [addingCard, setAddingCard] = useState(false)
   const [newFront,   setNewFront]   = useState('')
   const [newBack,    setNewBack]    = useState('')
-  const [editCardId, setEditCardId] = useState(null)
+  const [editCardId,  setEditCardId]  = useState(null)
+  const [editDeckName,setEditDeckName]= useState('')
   const [editFront,  setEditFront]  = useState('')
   const [editBack,   setEditBack]   = useState('')
   const courses = getCourseNames()
@@ -53,6 +56,10 @@ export default function FlashcardsPage({ onDataChange }) {
     const deck = { id: Math.random().toString(36).slice(2,9), name: newDeckName.trim(), course: newDeckCourse || courses[0], created: new Date().toISOString() }
     setDecks(ds => [...ds, deck])
     setNewDeckName(''); setNewDeckCourse(''); setMode('browse')
+  }
+  const saveDeck = () => {
+    setDecks(ds => ds.map(d => d.id===editDeckId ? {...d, name:editDeckForm.name, course:editDeckForm.course} : d))
+    setEditDeckId(null)
   }
   const deleteDeck = id => {
     if (!confirm('Delete this deck and all its cards?')) return
@@ -83,6 +90,11 @@ export default function FlashcardsPage({ onDataChange }) {
     setImportMsg(`✓ Imported ${newCards.length} cards`)
     setImportText('')
     setTimeout(() => { setImportMsg(''); setShowImport(false) }, 2000)
+  }
+
+  const saveDeckName = (id) => {
+    setDecks(ds => ds.map(d => d.id===id ? {...d, name:editDeckName} : d))
+    setEditDeckId(null)
   }
 
   const exportCards = () => {
@@ -122,6 +134,16 @@ export default function FlashcardsPage({ onDataChange }) {
   const isStudying = mode==='study-srs' || mode==='study-shuffle'
   const currentCard = isStudying ? studyQueue[queueIdx] : null
   const progress    = isStudying ? `${queueIdx+1} / ${studyQueue.length}` : ''
+
+  // Debug: if we get here, component mounted successfully
+  if (typeof window !== 'undefined') {
+    try {
+      // Test that all dependencies loaded
+      void getDueCards; void parseCardText; void exportCardText
+    } catch(e) {
+      return <div style={{padding:32,color:'red'}}>Import error: {e.message}</div>
+    }
+  }
 
   return (
     <>
@@ -241,7 +263,19 @@ export default function FlashcardsPage({ onDataChange }) {
                     boxShadow: isAct?'0 0 10px var(--accent-glow)':'none',
                   }}>
                     <div style={{display:'flex',justifyContent:'space-between',alignItems:'center'}}>
-                      <span style={{fontWeight:600,fontSize:13,color:isAct?'var(--accent)':'var(--text-1)'}}>{deck.name}</span>
+                      {editDeckId===deck.id ? (
+                        <div style={{display:'flex',gap:4,flex:1}} onClick={e=>e.stopPropagation()}>
+                          <input value={editDeckName} onChange={e=>setEditDeckName(e.target.value)} onKeyDown={e=>{if(e.key==='Enter')saveDeckName(deck.id);if(e.key==='Escape')setEditDeckId(null)}} style={{flex:1,padding:'3px 7px',background:'var(--glass-bg-2)',border:'1px solid var(--accent)',borderRadius:'var(--radius-sm)',color:'var(--text-1)',fontSize:12,fontFamily:'inherit'}} autoFocus/>
+                          <button onClick={e=>{e.stopPropagation();saveDeckName(deck.id)}} style={{background:'none',border:'none',color:'var(--accent)',cursor:'pointer',fontSize:13,padding:'0 3px'}}>✓</button>
+                        </div>
+                      ) : (
+                        <span style={{fontWeight:600,fontSize:13,color:isAct?'var(--accent)':'var(--text-1)',flex:1}}>{deck.name}</span>
+                      )}
+                      {editDeckId!==deck.id && (
+                        <button onClick={e=>{e.stopPropagation();setEditDeckId(deck.id);setEditDeckName(deck.name)}} style={{background:'none',border:'none',color:'var(--text-3)',cursor:'pointer',padding:2,opacity:.6}}>
+                          <Edit2 size={10}/>
+                        </button>
+                      )}
                       <button onClick={e=>{e.stopPropagation();deleteDeck(deck.id)}} style={{background:'none',border:'none',color:'var(--text-3)',cursor:'pointer',padding:2,opacity:.6}}>
                         <Trash2 size={11}/>
                       </button>

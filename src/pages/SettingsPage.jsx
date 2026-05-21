@@ -41,6 +41,19 @@ function NotificationSettings() {
         </button>
       </div>
 
+      <div style={{marginBottom:14}}>
+        <button className="btn btn-ghost" onClick={()=>{
+          if(typeof Notification==='undefined') return alert('Browser does not support notifications')
+          if(Notification.permission==='granted') {
+            new Notification('🔔 Test notification', { body: 'Your planner notifications are working!', icon: '/planner/favicon.svg' })
+          } else {
+            alert('Enable browser notifications above first, then test.')
+          }
+        }} style={{fontSize:12,gap:6}}>
+          🔔 Send test notification
+        </button>
+      </div>
+
       <div style={{display:'flex',flexDirection:'column',gap:8}}>
         {TOGGLES.map(t=>(
           <div key={t.key} style={{display:'flex',alignItems:'center',gap:12,padding:'10px 12px',borderRadius:'var(--radius-md)',background:'var(--glass-bg-2)',border:'1px solid var(--glass-border)'}}>
@@ -54,9 +67,19 @@ function NotificationSettings() {
           </div>
         ))}
       </div>
+      <button className="btn btn-ghost" style={{marginTop:14,fontSize:12,gap:6}} onClick={()=>{
+        if(typeof Notification!=='undefined'&&Notification.permission==='granted') {
+          new Notification('🔔 Test notification', {body:'Notifications are working correctly!',icon:'/planner/favicon.svg'})
+        } else {
+          alert('Enable browser notifications first, then test again.')
+        }
+      }}>
+        🔔 Send test notification
+      </button>
     </div>
   )
 }
+
 import { load, save } from '../utils/storage.js'
 import { useTheme } from '../hooks/useTheme.js'
 import Tooltip from '../components/Tooltip.jsx'

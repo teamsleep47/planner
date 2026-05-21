@@ -208,7 +208,7 @@ export default function WeeklyHome({ onDataChange }) {
       <div className="page-body" style={{display:'flex',flexDirection:'column',gap:16}}>
         {/* Stats */}
         <div className="grid-4">
-          <div className="stat-card"><div className="stat-label">Tasks</div><div className="stat-value" style={{color:'var(--accent)'}}>{activeTasks.filter(t=>t.done===false).length}/{tasks.length}</div><div className="stat-sub">active today</div></div>
+          <div className="stat-card"><div className="stat-label">Tasks</div><div className="stat-value" style={{color:'var(--accent)'}}>{activeTasks.length}</div><div className="stat-sub">{doneTasks.length} done · {tasks.length} total</div></div>
 
           {/* Semester countdown */}
           <div className="stat-card">

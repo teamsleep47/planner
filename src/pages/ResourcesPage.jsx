@@ -22,9 +22,10 @@ function getCourseNames() {
 
 // Search Drive for files by name
 async function searchDriveFiles(query, token) {
+  const MIME_FILTER = "and (mimeType='application/pdf' or mimeType='application/vnd.openxmlformats-officedocument.presentationml.presentation' or mimeType='application/vnd.openxmlformats-officedocument.wordprocessingml.document' or name contains '.pdf' or name contains '.pptx' or name contains '.docx')"
   const q = query
-    ? `name contains '${query.replace(/'/g,"\\'")}' and trashed=false`
-    : `trashed=false and (mimeType='application/pdf' or name contains '.pdf')`
+    ? `name contains '${query.replace(/'/g,"\\'")}' and trashed=false ${MIME_FILTER}`
+    : `trashed=false ${MIME_FILTER}`
   const url = `https://www.googleapis.com/drive/v3/files?q=${encodeURIComponent(q)}&fields=files(id,name,mimeType,size,modifiedTime,webViewLink,thumbnailLink)&pageSize=30&orderBy=modifiedTime desc`
   const res  = await fetch(url, { headers:{ Authorization:`Bearer ${token}` } })
   if (res.status===401) throw new Error('TOKEN_EXPIRED')
@@ -52,11 +53,13 @@ export default function ResourcesPage({ onDataChange }) {
   const [saved,     setSaved]     = useState(getSavedResources)
   const [filter,    setFilter]    = useState('all') // all | course name
   const [uploading, setUploading] = useState(false)
+  const [sortBy,    setSortBy]    = useState(()=>load('resource_sort','term'))
   const [uploadCourse, setUploadCourse] = useState('')
   const courses = getCourseNames()
   const hasToken = !!getToken()
 
   useEffect(() => { save('saved_resources', saved); onDataChange?.() }, [saved])
+  useEffect(() => { save('resource_sort', sortBy) }, [sortBy])
 
   // Auto-search PDFs on mount if token available
   useEffect(() => { if (hasToken) doSearch('') }, [hasToken])
@@ -135,9 +138,28 @@ export default function ResourcesPage({ onDataChange }) {
     e.target.value = ''
   }
 
+
+  // Sort saved resources
+  const sortedSaved = [...saved].sort((a,b) => {
+    if (sortBy==='term') {
+      // Active term courses first
+      const terms = JSON.parse(localStorage.getItem('planner_v1_terms_v1')||'[]')
+      const active = terms.find(t=>t.active)||terms[0]
+      const activeCourses = active?.courses.map(c=>c.name)||[]
+      const aActive = activeCourses.includes(a.course) ? 0 : 1
+      const bActive = activeCourses.includes(b.course) ? 0 : 1
+      if (aActive!==bActive) return aActive-bActive
+      return new Date(b.pinned)-new Date(a.pinned)
+    }
+    if (sortBy==='course') return a.course.localeCompare(b.course)
+    if (sortBy==='date')   return new Date(b.pinned)-new Date(a.pinned)
+    if (sortBy==='name')   return a.name.localeCompare(b.name)
+    return 0
+  })
+
   const savedByCourse = courses.map(c => ({
     ...c,
-    resources: saved.filter(r => r.course === c.name)
+    resources: sortedSaved.filter(r => r.course === c.name)
   })).filter(c => filter==='all' || filter===c.name)
 
   const fmtSize = bytes => {
@@ -211,10 +233,19 @@ export default function ResourcesPage({ onDataChange }) {
           <div style={{display:'flex',flexDirection:'column',gap:12}}>
             <div style={{display:'flex',justifyContent:'space-between',alignItems:'center'}}>
               <span style={{fontSize:11,fontWeight:700,color:'var(--text-3)',textTransform:'uppercase',letterSpacing:'.08em'}}>Pinned by course</span>
-              <select style={{...inputStyle,fontSize:11,padding:'4px 8px'}} value={filter} onChange={e=>setFilter(e.target.value)}>
+              <div style={{display:'flex',gap:6}}>
+                <select style={{...inputStyle,fontSize:11,padding:'4px 8px'}} value={sortBy} onChange={e=>setSortBy(e.target.value)}>
+                  <option value="term">Sort by term</option>
+                  <option value="course">Sort by course</option>
+                  <option value="date">Sort by date</option>
+                  <option value="name">Sort by name</option>
+                  <option value="size">Sort by size</option>
+                </select>
+                <select style={{...inputStyle,fontSize:11,padding:'4px 8px'}} value={filter} onChange={e=>setFilter(e.target.value)}>
                 <option value="all">All courses</option>
                 {courses.map(c=><option key={c.name} value={c.name}>{c.name}</option>)}
-              </select>
+                </select>
+              </div>
             </div>
 
             {savedByCourse.map(c=>(
@@ -225,7 +256,7 @@ export default function ResourcesPage({ onDataChange }) {
                   <Tooltip text={`Upload a PDF to Drive and pin to ${c.name}`}>
                     <label style={{cursor:'pointer',display:'flex',alignItems:'center',gap:4,fontSize:11,color:'var(--accent)',fontWeight:600,padding:'3px 8px',borderRadius:'var(--radius-sm)',border:'1px solid var(--accent)',background:'var(--accent-dim)'}}>
                       <Upload size={11}/> Upload
-                      <input type="file" accept=".pdf,application/pdf" style={{display:'none'}} onChange={e=>handleFileInput(e,c.name)} disabled={uploading}/>
+                      <input type="file" accept=".pdf,.pptx,.docx,application/pdf,application/vnd.openxmlformats-officedocument.presentationml.presentation,application/vnd.openxmlformats-officedocument.wordprocessingml.document" style={{display:'none'}} onChange={e=>handleFileInput(e,c.name)} disabled={uploading}/>
                     </label>
                   </Tooltip>
                 </div>
@@ -233,7 +264,9 @@ export default function ResourcesPage({ onDataChange }) {
                   <div style={{fontSize:11,color:'var(--text-3)'}}>No pinned files — search and pin from Drive</div>
                 ) : c.resources.map(r=>(
                   <div key={r.fileId} style={{display:'flex',alignItems:'center',gap:8,padding:'6px 0',borderBottom:'1px solid var(--glass-border)'}}>
-                    <FileText size={12} style={{color:'var(--text-3)',flexShrink:0}}/>
+                    <span style={{fontSize:14,flexShrink:0}}>
+                  {r.name.endsWith('.pdf')?'📄':r.name.endsWith('.pptx')?'📊':r.name.endsWith('.docx')?'📝':'📎'}
+                </span>
                     <div style={{flex:1,minWidth:0}}>
                       <div style={{fontSize:12,fontWeight:500,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{r.name}</div>
                       {r.size&&<div style={{fontSize:10,color:'var(--text-3)'}}>{fmtSize(Number(r.size))}</div>}
@@ -268,7 +301,11 @@ export default function ResourcesPage({ onDataChange }) {
 
             {results.map(file=>(
               <div key={file.id} className="card" style={{padding:'12px 14px',display:'flex',alignItems:'center',gap:12}}>
-                <FileText size={18} style={{color:'var(--accent)',flexShrink:0}}/>
+                {(() => {
+                  const name = file.name.toLowerCase()
+                  const color = name.endsWith('.pdf') ? 'var(--coral)' : name.endsWith('.pptx') || name.endsWith('.ppt') ? 'var(--amber)' : 'var(--accent)'
+                  return <FileText size={18} style={{color,flexShrink:0}}/>
+                })()}
                 <div style={{flex:1,minWidth:0}}>
                   <div style={{fontWeight:600,fontSize:13,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{file.name}</div>
                   <div style={{fontSize:11,color:'var(--text-3)',marginTop:2,display:'flex',gap:8}}>

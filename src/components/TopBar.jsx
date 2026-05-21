@@ -3,6 +3,7 @@ import { Palette, Sun, Moon, Plus, X, Check, Edit2, Download, Upload, FlaskConic
 import FlipClock from './FlipClock.jsx'
 import Tooltip from './Tooltip.jsx'
 import { load, save } from '../utils/storage.js'
+import NotificationBell from './NotificationBell.jsx'
 import { TEST_DATA } from '../utils/testData.js'
 
 const DEFAULT_LINKS = [
@@ -13,7 +14,7 @@ const DEFAULT_LINKS = [
 
 const ALL_KEYS = ['home_tasks','assignments','study_sessions','habit_grid','timer_settings','quick_links','streak','weather_city']
 
-export default function TopBar({ theme, scheme, toggleTheme, setScheme, SCHEMES, SCHEME_COLORS, saveState, onLinksChange }) {
+export default function TopBar({ theme, scheme, toggleTheme, setScheme, SCHEMES, SCHEME_COLORS, saveState, onLinksChange, notifs=[], unread=0, markAllRead=()=>{}, clearNotif=()=>{} }) {
   const [showTheme,  setShowTheme]  = useState(false)
   const [editMode,   setEditMode]   = useState(false)
   const [links,      setLinks]      = useState(() => load('quick_links', DEFAULT_LINKS))
@@ -96,6 +97,7 @@ export default function TopBar({ theme, scheme, toggleTheme, setScheme, SCHEMES,
       </div>
 
       <div className="top-bar-right">
+        <NotificationBell notifs={notifs} unread={unread} markAllRead={markAllRead} clearNotif={clearNotif}/>
         {/* Quick links */}
         {!editMode ? (
           <div className="ql-bar">
