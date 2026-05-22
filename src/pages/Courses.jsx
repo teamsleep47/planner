@@ -1,5 +1,5 @@
-import { useState, useEffect } from 'react'
-import { Plus, Trash2, Edit2, Check, X, ChevronDown, ChevronUp, BookOpen, ArrowUp, ArrowDown } from 'lucide-react'
+import { useState, useEffect, useRef } from 'react'
+import { Plus, Trash2, Edit2, Check, X, ChevronDown, ChevronUp, ArrowUp, ArrowDown } from 'lucide-react'
 import { loadTerms, saveTerms, uid, ASSIGNMENT_TYPES, STATUS_OPTS } from '../utils/termData.js'
 import InlineNotes from '../components/InlineNotes.jsx'
 import { formatRelativeDue } from '../utils/timeFormat.js'
@@ -26,23 +26,51 @@ export default function Courses({ onDataChange }) {
   const [terms,        setTerms]        = useState(() => loadTerms())
   const [activeTermId, setActiveTermId] = useState(() => { const t=loadTerms().find(t=>t.active); return t?.id||loadTerms()[0]?.id })
   const [expandedCourses, setExpandedCourses] = useState({})
+  const [jumpAssignId, setJumpAssignId] = useState(null)
+  const jumpRef = useRef(null)
 
-  const [showAddTerm,   setShowAddTerm]   = useState(false)
-  const [newTermName,   setNewTermName]   = useState('')
-  const [editTermId,    setEditTermId]    = useState(null)
-  const [editTermName,  setEditTermName]  = useState('')
+  const [showAddTerm,    setShowAddTerm]    = useState(false)
+  const [newTermName,    setNewTermName]    = useState('')
+  const [editTermId,     setEditTermId]     = useState(null)
+  const [editTermName,   setEditTermName]   = useState('')
 
-  const [showAddCourse, setShowAddCourse] = useState(null)
-  const [newCourse,     setNewCourse]     = useState(BLANK_COURSE)
-  const [editCourseId,  setEditCourseId]  = useState(null)
-  const [editCourseForm,setEditCourseForm]= useState(BLANK_COURSE)
+  const [showAddCourse,  setShowAddCourse]  = useState(null)
+  const [newCourse,      setNewCourse]      = useState(BLANK_COURSE)
+  const [editCourseId,   setEditCourseId]   = useState(null)
+  const [editCourseForm, setEditCourseForm] = useState(BLANK_COURSE)
 
-  const [showAddAssign, setShowAddAssign] = useState(null)
-  const [newAssign,     setNewAssign]     = useState(BLANK_ASSIGN)
-  const [editAssignId,  setEditAssignId]  = useState(null)
-  const [editAssign,    setEditAssign]    = useState({})
+  const [showAddAssign,  setShowAddAssign]  = useState(null)
+  const [newAssign,      setNewAssign]      = useState(BLANK_ASSIGN)
+  const [editAssignId,   setEditAssignId]   = useState(null)
+  const [editAssign,     setEditAssign]     = useState({})
 
   useEffect(() => { saveTerms(terms); onDataChange?.() }, [terms])
+
+  // ── Calendar jump: auto-expand course containing the target assignment ──
+  useEffect(() => {
+    try {
+      const raw = sessionStorage.getItem('planner_cal_jump')
+      if (!raw) return
+      sessionStorage.removeItem('planner_cal_jump')
+      const { courseId, assignId } = JSON.parse(raw)
+      if (!courseId || !assignId) return
+      // Expand the target course
+      setExpandedCourses(e => ({ ...e, [courseId]: true }))
+      setJumpAssignId(assignId)
+      // Scroll after a short delay so the accordion has time to open
+      setTimeout(() => {
+        const el = document.getElementById(`assign-${assignId}`)
+        if (el) el.scrollIntoView({ behavior:'smooth', block:'center' })
+      }, 300)
+    } catch(e) {}
+  }, [])
+
+  // Clear highlight after 2s
+  useEffect(() => {
+    if (!jumpAssignId) return
+    const t = setTimeout(() => setJumpAssignId(null), 2000)
+    return () => clearTimeout(t)
+  }, [jumpAssignId])
 
   const updateTerms = fn => setTerms(ts => fn([...ts]))
 
@@ -86,7 +114,6 @@ export default function Courses({ onDataChange }) {
     }))
     setEditCourseId(null)
   }
-  // Move course up/down within a term
   const moveCourse = (termId, courseId, dir) => {
     updateTerms(ts => ts.map(t => {
       if (t.id !== termId) return t
@@ -174,18 +201,13 @@ export default function Courses({ onDataChange }) {
                   fontWeight:600, fontSize:13, cursor:'pointer', transition:'all .15s',
                   boxShadow: activeTermId===term.id ? '0 0 12px var(--accent-glow)' : 'none',
                 }}>
-                  {term.name}
-                  {term.active && <span style={{fontSize:9,marginLeft:5,opacity:.7}}>●</span>}
+                  {term.name}{term.active&&<span style={{fontSize:9,marginLeft:5,opacity:.7}}>●</span>}
                 </button>
               )}
               {activeTermId===term.id && editTermId!==term.id && (
                 <div style={{display:'flex',gap:2}}>
-                  <Tooltip text="Rename term">
-                    <button className="btn-icon" style={{padding:3}} onClick={()=>{setEditTermId(term.id);setEditTermName(term.name)}}><Edit2 size={10}/></button>
-                  </Tooltip>
-                  <Tooltip text="Delete term">
-                    <button className="btn-icon" style={{padding:3,color:'var(--coral)'}} onClick={()=>deleteTerm(term.id)}><Trash2 size={10}/></button>
-                  </Tooltip>
+                  <Tooltip text="Rename term"><button className="btn-icon" style={{padding:3}} onClick={()=>{setEditTermId(term.id);setEditTermName(term.name)}}><Edit2 size={10}/></button></Tooltip>
+                  <Tooltip text="Delete term"><button className="btn-icon" style={{padding:3,color:'var(--coral)'}} onClick={()=>deleteTerm(term.id)}><Trash2 size={10}/></button></Tooltip>
                 </div>
               )}
             </div>
@@ -209,12 +231,11 @@ export default function Courses({ onDataChange }) {
               </div>
             )}
 
-            {/* Course accordions */}
             {activeTerm.courses.map((course, courseIdx) => {
-              const isExpanded  = expandedCourses[course.id] !== false
-              const doneCount   = course.assignments.filter(a=>a.status==='Done').length
-              const totalCount  = course.assignments.length
-              // Sort by due date only — urgency does NOT affect order here
+              const isExpanded = expandedCourses[course.id] !== false
+              const doneCount  = course.assignments.filter(a=>a.status==='Done').length
+              const totalCount = course.assignments.length
+              // Sort by due date only — urgency only affects the home widget
               const sorted = [...course.assignments].sort((a,b) => {
                 if (!a.due && !b.due) return 0
                 if (!a.due) return 1
@@ -231,15 +252,13 @@ export default function Courses({ onDataChange }) {
 
                     {/* Reorder arrows */}
                     <div style={{display:'flex',flexDirection:'column',gap:1,flexShrink:0}} onClick={e=>e.stopPropagation()}>
-                      <Tooltip text="Move course up">
-                        <button className="btn-icon" style={{padding:2,opacity:courseIdx===0?0.25:1}}
-                          onClick={()=>moveCourse(activeTerm.id,course.id,-1)} disabled={courseIdx===0}>
+                      <Tooltip text="Move up">
+                        <button className="btn-icon" style={{padding:2,opacity:courseIdx===0?.25:1}} onClick={()=>moveCourse(activeTerm.id,course.id,-1)} disabled={courseIdx===0}>
                           <ArrowUp size={10}/>
                         </button>
                       </Tooltip>
-                      <Tooltip text="Move course down">
-                        <button className="btn-icon" style={{padding:2,opacity:courseIdx===activeTerm.courses.length-1?0.25:1}}
-                          onClick={()=>moveCourse(activeTerm.id,course.id,1)} disabled={courseIdx===activeTerm.courses.length-1}>
+                      <Tooltip text="Move down">
+                        <button className="btn-icon" style={{padding:2,opacity:courseIdx===activeTerm.courses.length-1?.25:1}} onClick={()=>moveCourse(activeTerm.id,course.id,1)} disabled={courseIdx===activeTerm.courses.length-1}>
                           <ArrowDown size={10}/>
                         </button>
                       </Tooltip>
@@ -255,7 +274,7 @@ export default function Courses({ onDataChange }) {
                     </div>
 
                     <div style={{display:'flex',gap:4,flexShrink:0}} onClick={e=>e.stopPropagation()}>
-                      <Tooltip text="Edit course details">
+                      <Tooltip text="Edit course">
                         <button className="btn-icon" style={{padding:4}} onClick={()=>{setEditCourseId(course.id);setEditCourseForm({name:course.name,instructor:course.instructor||'',days:course.days||'',time:course.time||'',room:course.room||'',credits:course.credits||3,gradeTarget:course.gradeTarget||90,color:course.color,notes:course.notes||''})}}>
                           <Edit2 size={12}/>
                         </button>
@@ -271,11 +290,9 @@ export default function Courses({ onDataChange }) {
                         </button>
                       </Tooltip>
                     </div>
-
                     {isExpanded ? <ChevronUp size={14} style={{color:'var(--text-3)',flexShrink:0}}/> : <ChevronDown size={14} style={{color:'var(--text-3)',flexShrink:0}}/>}
                   </div>
 
-                  {/* Progress bar */}
                   {totalCount>0 && (
                     <div style={{height:2,background:'var(--glass-border)',margin:'0 16px 12px'}}>
                       <div style={{height:'100%',background:course.color,borderRadius:2,width:`${(doneCount/totalCount)*100}%`,transition:'width .4s'}}/>
@@ -288,7 +305,7 @@ export default function Courses({ onDataChange }) {
                       <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:8}}>
                         <input style={{...smallInput,gridColumn:'1/-1'}} placeholder="Course name" value={editCourseForm.name} onChange={e=>setEditCourseForm(f=>({...f,name:e.target.value}))}/>
                         <input style={smallInput} placeholder="Instructor" value={editCourseForm.instructor} onChange={e=>setEditCourseForm(f=>({...f,instructor:e.target.value}))}/>
-                        <input style={smallInput} placeholder="Days (e.g. Mon/Wed)" value={editCourseForm.days} onChange={e=>setEditCourseForm(f=>({...f,days:e.target.value}))}/>
+                        <input style={smallInput} placeholder="Days (Mon/Wed)" value={editCourseForm.days} onChange={e=>setEditCourseForm(f=>({...f,days:e.target.value}))}/>
                         <input style={smallInput} placeholder="Time" value={editCourseForm.time} onChange={e=>setEditCourseForm(f=>({...f,time:e.target.value}))}/>
                         <input style={smallInput} placeholder="Room" value={editCourseForm.room} onChange={e=>setEditCourseForm(f=>({...f,room:e.target.value}))}/>
                         <input style={smallInput} type="number" placeholder="Credits" value={editCourseForm.credits} onChange={e=>setEditCourseForm(f=>({...f,credits:Number(e.target.value)}))}/>
@@ -307,21 +324,25 @@ export default function Courses({ onDataChange }) {
                     </div>
                   )}
 
-                  {/* Assignments list */}
+                  {/* Assignments */}
                   {isExpanded && (
                     <div style={{borderTop:'1px solid var(--glass-border)'}}>
-
                       {sorted.length===0 && showAddAssign!==course.id && (
                         <div style={{padding:'16px',textAlign:'center',color:'var(--text-3)',fontSize:13}}>No assignments yet</div>
                       )}
 
                       {sorted.map(a => {
-                        const due = formatRelativeDue(a.due, a.dueTime) || { label:'No due date', color:'var(--text-3)' }
-                        const pri = PRIORITY.find(p=>p.key===(a.priority||'none'))
+                        const due       = formatRelativeDue(a.due, a.dueTime) || { label:'No due date', color:'var(--text-3)' }
+                        const pri       = PRIORITY.find(p=>p.key===(a.priority||'none'))
                         const isEditing = editAssignId === a.id
+                        const isJump    = a.id === jumpAssignId
 
                         return (
-                          <div key={a.id} style={{borderBottom:'1px solid var(--glass-border)'}}>
+                          <div key={a.id} id={`assign-${a.id}`} style={{
+                            borderBottom:'1px solid var(--glass-border)',
+                            transition:'background .4s',
+                            background: isJump ? 'var(--accent-dim)' : 'transparent',
+                          }}>
                             {isEditing ? (
                               <div style={{padding:'12px 16px',background:'var(--glass-bg-2)'}}>
                                 <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:8,marginBottom:8}}>
@@ -383,12 +404,7 @@ export default function Courses({ onDataChange }) {
                                   </div>
                                 </div>
                                 <div style={{padding:'0 16px 10px'}}>
-                                  <InlineNotes
-                                    value={a.notes||''}
-                                    onChange={notes=>updateAssign(activeTerm.id,course.id,a.id,{notes})}
-                                    placeholder="Add notes for this assignment…"
-                                    title={a.title}
-                                  />
+                                  <InlineNotes value={a.notes||''} onChange={notes=>updateAssign(activeTerm.id,course.id,a.id,{notes})} placeholder="Add notes…" title={a.title}/>
                                 </div>
                               </>
                             )}
@@ -396,7 +412,6 @@ export default function Courses({ onDataChange }) {
                         )
                       })}
 
-                      {/* Add assignment form */}
                       {showAddAssign===course.id ? (
                         <div style={{padding:'12px 16px',background:'var(--glass-bg-2)',borderTop:'1px solid var(--glass-border)'}}>
                           <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:8,marginBottom:8}}>
@@ -431,14 +446,13 @@ export default function Courses({ onDataChange }) {
               )
             })}
 
-            {/* Add course */}
             {showAddCourse===activeTerm.id ? (
               <div className="card">
                 <div style={{fontWeight:700,fontSize:13,marginBottom:12}}>New course</div>
                 <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:8,marginBottom:8}}>
                   <input style={{...inputStyle,gridColumn:'1/-1'}} placeholder="Course name*" value={newCourse.name} onChange={e=>setNewCourse(f=>({...f,name:e.target.value}))} autoFocus/>
                   <input style={inputStyle} placeholder="Instructor" value={newCourse.instructor} onChange={e=>setNewCourse(f=>({...f,instructor:e.target.value}))}/>
-                  <input style={inputStyle} placeholder="Days (e.g. Mon/Wed)" value={newCourse.days} onChange={e=>setNewCourse(f=>({...f,days:e.target.value}))}/>
+                  <input style={inputStyle} placeholder="Days (Mon/Wed)" value={newCourse.days} onChange={e=>setNewCourse(f=>({...f,days:e.target.value}))}/>
                   <input style={inputStyle} placeholder="Time" value={newCourse.time} onChange={e=>setNewCourse(f=>({...f,time:e.target.value}))}/>
                   <input style={inputStyle} placeholder="Room" value={newCourse.room} onChange={e=>setNewCourse(f=>({...f,room:e.target.value}))}/>
                 </div>

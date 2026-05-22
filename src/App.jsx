@@ -6,29 +6,31 @@ import {
   Layers, Calendar, FolderOpen
 } from 'lucide-react'
 
-import { useAuth }             from './hooks/useAuth.jsx'
-import { useTheme }            from './hooks/useTheme.js'
-import { useDriveSync }        from './hooks/useDriveSync.js'
-import { useNotifications }    from './hooks/useNotifications.js'
-import { load, save }          from './utils/storage.js'
+import { useAuth }          from './hooks/useAuth.jsx'
+import { useTheme }         from './hooks/useTheme.js'
+import { useDriveSync }     from './hooks/useDriveSync.js'
+import { useNotifications } from './hooks/useNotifications.js'
+import { useBingWallpaper } from './hooks/useBingWallpaper.js'
+import { load, save }       from './utils/storage.js'
 
-import LoginPage          from './pages/LoginPage.jsx'
-import WeeklyHome         from './pages/WeeklyHome.jsx'
-import Courses            from './pages/Courses.jsx'
-import StudySessions      from './pages/StudySessions.jsx'
-import Goals              from './pages/Goals.jsx'
-import Notes              from './pages/Notes.jsx'
-import NotesPage          from './pages/NotesPage.jsx'
-import CanvasPage         from './pages/CanvasPage.jsx'
-import SettingsPage       from './pages/SettingsPage.jsx'
-import FlashcardsPage     from './pages/FlashcardsPage.jsx'
-import CalendarPage       from './pages/CalendarPage.jsx'
-import ResourcesPage      from './pages/ResourcesPage.jsx'
+import LoginPage      from './pages/LoginPage.jsx'
+import WeeklyHome     from './pages/WeeklyHome.jsx'
+import Courses        from './pages/Courses.jsx'
+import StudySessions  from './pages/StudySessions.jsx'
+import Goals          from './pages/Goals.jsx'
+import Notes          from './pages/Notes.jsx'
+import NotesPage      from './pages/NotesPage.jsx'
+import CanvasPage     from './pages/CanvasPage.jsx'
+import SettingsPage   from './pages/SettingsPage.jsx'
+import FlashcardsPage from './pages/FlashcardsPage.jsx'
+import CalendarPage   from './pages/CalendarPage.jsx'
+import ResourcesPage  from './pages/ResourcesPage.jsx'
 
-import TopBar             from './components/TopBar.jsx'
-import SidebarMiniTasks   from './components/SidebarMiniTasks.jsx'
+import TopBar                 from './components/TopBar.jsx'
+import BingHeader             from './components/BingHeader.jsx'
+import SidebarMiniTasks       from './components/SidebarMiniTasks.jsx'
 import SidebarMiniAssignments from './components/SidebarMiniAssignments.jsx'
-import NotificationBell   from './components/NotificationBell.jsx'
+import NotificationBell       from './components/NotificationBell.jsx'
 
 const NAV = [
   { label: 'Daily', items: [
@@ -50,18 +52,19 @@ const NAV = [
   ]},
 ]
 
-// Complete list of ALL data keys — auto-synced to Drive and included in export/import
+// All localStorage keys synced to Drive + included in export/import
 const ALL_KEYS = [
   'home_tasks', 'study_sessions', 'habit_grid', 'habit_history',
   'timer_settings', 'streak', 'study_week_goal', 'sem_end_date',
   'terms_v1', 'assignments',
   'habits_config', 'recurring_tasks', 'rec_history', 'goals_config',
-  'course_notes', 'full_course_notes',
+  'course_notes', 'full_course_notes', 'full_course_notes_v2',
   'quick_links', 'page_links', 'weather_city', 'scheme', 'theme',
   'flashcard_decks', 'flashcard_cards',
   'calendar_blocks',
   'notification_settings',
-  'saved_resources', 'resource_sort',
+  'saved_resources', 'resource_sort', 'resource_last_course',
+  'bing_wallpaper_cache',
 ]
 
 function getAllData() {
@@ -109,9 +112,13 @@ function SidebarMiniWidgets() {
   )
 }
 
+// Theme label/icon for mobile dropdown
+const THEME_CYCLE_LABEL = { dark: 'Switch to light', light: 'Bing wallpaper', bing: 'Switch to dark' }
+const THEME_CYCLE_ICON  = { dark: '☀️', light: '🌄', bing: '🌙' }
+
 function MobileHeader({ profile, signOut, wipeAllSettings, sidebarOpen, setSidebarOpen, theme, toggleTheme }) {
   const [showDropdown, setShowDropdown] = useState(false)
-  const dropRef = useRef(null)
+  const dropRef  = useRef(null)
   const navigate = useNavigate()
 
   useEffect(() => {
@@ -137,18 +144,21 @@ function MobileHeader({ profile, signOut, wipeAllSettings, sidebarOpen, setSideb
           </div>
         </button>
         {showDropdown && (
-          <div style={{position:'absolute',top:'calc(100% + 8px)',right:0,width:200,background:'var(--panel-bg,#1a1a2e)',border:'1px solid var(--glass-border)',borderRadius:'var(--radius-lg)',boxShadow:'var(--shadow)',zIndex:500,overflow:'hidden'}}>
+          <div style={{position:'absolute',top:'calc(100% + 8px)',right:0,width:210,background:'var(--panel-bg,#1a1a2e)',border:'1px solid var(--glass-border)',borderRadius:'var(--radius-lg)',boxShadow:'var(--shadow)',zIndex:500,overflow:'hidden'}}>
             <div style={{padding:'12px 14px',borderBottom:'1px solid var(--glass-border)'}}>
               <div style={{fontSize:13,fontWeight:600,color:'var(--text-1)',overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{profile?.name||'User'}</div>
               <div style={{fontSize:11,color:'var(--text-3)',overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{profile?.email||''}</div>
             </div>
             {[
-              { icon:'🌙', label: theme==='dark'?'Switch to light':'Switch to dark', action: toggleTheme },
+              { icon: THEME_CYCLE_ICON[theme]||'☀️', label: THEME_CYCLE_LABEL[theme]||'Toggle theme', action: toggleTheme },
               { icon:'⚙️', label:'Settings', action:()=>{ navigate('/settings'); setShowDropdown(false) } },
               { icon:'🚪', label:'Sign out', action: signOut },
               { icon:'🗑', label:'Wipe all data', action:()=>{ setShowDropdown(false); wipeAllSettings() }, danger:true },
             ].map((item,i)=>(
-              <button key={i} onClick={item.action} style={{width:'100%',display:'flex',alignItems:'center',gap:10,padding:'11px 14px',background:'none',border:'none',borderBottom:i<3?'1px solid var(--glass-border)':'none',color:item.danger?'var(--coral)':'var(--text-1)',fontSize:13,cursor:'pointer',textAlign:'left',transition:'background .15s'}}
+              <button key={i} onClick={item.action}
+                style={{width:'100%',display:'flex',alignItems:'center',gap:10,padding:'11px 14px',background:'none',border:'none',
+                  borderBottom:i<3?'1px solid var(--glass-border)':'none',
+                  color:item.danger?'var(--coral)':'var(--text-1)',fontSize:13,cursor:'pointer',textAlign:'left',transition:'background .15s'}}
                 onMouseEnter={e=>e.currentTarget.style.background='var(--glass-hover)'}
                 onMouseLeave={e=>e.currentTarget.style.background='none'}>
                 <span>{item.icon}</span>{item.label}
@@ -166,6 +176,7 @@ export default function App() {
   const { theme, scheme, toggleTheme, setScheme, SCHEMES, SCHEME_COLORS } = useTheme()
   const { syncToDrive, saveState }                                         = useDriveSync()
   const { notifs, unread, markAllRead, clearNotif }                        = useNotifications()
+  const { wallpaper }                                                       = useBingWallpaper(theme === 'bing')
   const [sidebarOpen, setSidebarOpen] = useState(false)
   const [driveKey,    setDriveKey]    = useState(0)
 
@@ -190,6 +201,14 @@ export default function App() {
   return (
     <HashRouter>
       <div className="app-shell">
+
+        {/* Bing wallpaper — fixed backdrop behind everything */}
+        {theme === 'bing' && wallpaper?.url && (
+          <div className="bing-wallpaper-backdrop">
+            <img src={wallpaper.url} alt="" aria-hidden="true"/>
+          </div>
+        )}
+
         <div className={`sidebar-overlay ${sidebarOpen?'open':''}`} onClick={()=>setSidebarOpen(false)}/>
 
         <aside className={`sidebar ${sidebarOpen?'open':''}`}>
@@ -216,8 +235,9 @@ export default function App() {
                 ))}
               </div>
             ))}
-            <SidebarMiniWidgets/>
           </nav>
+
+          <SidebarMiniWidgets/>
 
           <div className="sidebar-footer">
             <div className="user-row">
@@ -227,8 +247,8 @@ export default function App() {
                 <div className="user-email">{profile?.email||''}</div>
               </div>
             </div>
-            <div className="drive-pill">
-              <div className={`drive-dot ${token?'connected':''}`}/>
+            <div className={`drive-pill ${saveState==='saved'||saveState==='idle'?'':'error'}`}>
+              <div className={`drive-dot ${saveState==='saved'||saveState==='idle'?'connected':''}`}/>
               <HardDrive size={12}/>
               <span style={{flex:1,fontSize:11}}>
                 {saveState==='saving'?'Saving…':saveState==='saved'?'Saved':saveState==='error'?'Error':'Drive ready'}
@@ -246,16 +266,23 @@ export default function App() {
         </aside>
 
         <div className="main-content">
-          <MobileHeader profile={profile} signOut={signOut} wipeAllSettings={wipeAllSettings} sidebarOpen={sidebarOpen} setSidebarOpen={setSidebarOpen} theme={theme} toggleTheme={toggleTheme}/>
+          <MobileHeader
+            profile={profile} signOut={signOut} wipeAllSettings={wipeAllSettings}
+            sidebarOpen={sidebarOpen} setSidebarOpen={setSidebarOpen}
+            theme={theme} toggleTheme={toggleTheme}
+          />
 
           <TopBar
-              theme={theme} scheme={scheme}
-              toggleTheme={toggleTheme} setScheme={setScheme}
-              SCHEMES={SCHEMES} SCHEME_COLORS={SCHEME_COLORS}
-              saveState={saveState}
-              onLinksChange={handleDataChange}
-              notifs={notifs} unread={unread} markAllRead={markAllRead} clearNotif={clearNotif}
-            />
+            theme={theme} scheme={scheme}
+            toggleTheme={toggleTheme} setScheme={setScheme}
+            SCHEMES={SCHEMES} SCHEME_COLORS={SCHEME_COLORS}
+            saveState={saveState}
+            onLinksChange={handleDataChange}
+            notifs={notifs} unread={unread} markAllRead={markAllRead} clearNotif={clearNotif}
+          />
+
+          {/* Bing photo header banner — between topbar and page content */}
+          <BingHeader enabled={theme === 'bing'} wallpaper={wallpaper}/>
 
           <Routes>
             <Route path="/"           element={<WeeklyHome     key={driveKey} onDataChange={handleDataChange}/>}/>
