@@ -52,7 +52,6 @@ const NAV = [
   ]},
 ]
 
-// All localStorage keys synced to Drive + included in export/import
 const ALL_KEYS = [
   'home_tasks', 'study_sessions', 'habit_grid', 'habit_history',
   'timer_settings', 'streak', 'study_week_goal', 'sem_end_date',
@@ -112,7 +111,6 @@ function SidebarMiniWidgets() {
   )
 }
 
-// Theme label/icon for mobile dropdown
 const THEME_CYCLE_LABEL = { dark: 'Switch to light', light: 'Bing wallpaper', bing: 'Switch to dark' }
 const THEME_CYCLE_ICON  = { dark: '☀️', light: '🌄', bing: '🌙' }
 
@@ -201,14 +199,6 @@ export default function App() {
   return (
     <HashRouter>
       <div className="app-shell">
-
-        {/* Bing wallpaper — fixed backdrop behind everything */}
-        {theme === 'bing' && wallpaper?.url && (
-          <div className="bing-wallpaper-backdrop">
-            <img src={wallpaper.url} alt="" aria-hidden="true"/>
-          </div>
-        )}
-
         <div className={`sidebar-overlay ${sidebarOpen?'open':''}`} onClick={()=>setSidebarOpen(false)}/>
 
         <aside className={`sidebar ${sidebarOpen?'open':''}`}>
@@ -281,7 +271,7 @@ export default function App() {
             notifs={notifs} unread={unread} markAllRead={markAllRead} clearNotif={clearNotif}
           />
 
-          {/* Bing photo header banner — between topbar and page content */}
+          {/* Bing daily photo — slim header banner, only in bing theme */}
           <BingHeader enabled={theme === 'bing'} wallpaper={wallpaper}/>
 
           <Routes>

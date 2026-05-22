@@ -21,7 +21,7 @@ export function useTheme() {
     save('theme', next)
   }
 
-  const setTheme = (t) => { setThemeState(t); save('theme', t) }
+  const setTheme  = (t) => { setThemeState(t); save('theme', t) }
   const setScheme = (s) => { setSchemeState(s); save('scheme', s) }
 
   return { theme, scheme, toggleTheme, setTheme, setScheme, SCHEMES, SCHEME_COLORS }
