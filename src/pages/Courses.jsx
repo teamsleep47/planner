@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { Plus, Trash2, Edit2, Check, X, ChevronDown, ChevronUp, BookOpen } from 'lucide-react'
+import { Plus, Trash2, Edit2, Check, X, ChevronDown, ChevronUp, BookOpen, ArrowUp, ArrowDown } from 'lucide-react'
 import { loadTerms, saveTerms, uid, ASSIGNMENT_TYPES, STATUS_OPTS } from '../utils/termData.js'
 import InlineNotes from '../components/InlineNotes.jsx'
 import { formatRelativeDue } from '../utils/timeFormat.js'
@@ -19,34 +19,28 @@ const STATUS = [
 ]
 const COURSE_COLORS = ['#6366f1','#14b8a6','#f59e0b','#f43f5e','#22c55e','#8b5cf6','#06b6d4','#ec4899']
 
-// daysUntil replaced by formatRelativeDue
-
 const BLANK_COURSE = { name:'', instructor:'', days:'', time:'', room:'', credits:3, gradeTarget:90, color:COURSE_COLORS[0], notes:'' }
 const BLANK_ASSIGN = { title:'', type:ASSIGNMENT_TYPES[0], due:'', dueTime:'', status:'To do', priority:'none', notes:'' }
 
 export default function Courses({ onDataChange }) {
-  const [terms,       setTerms]       = useState(() => loadTerms())
-  const [activeTermId,setActiveTermId]= useState(() => { const t=loadTerms().find(t=>t.active); return t?.id||loadTerms()[0]?.id })
-  const [expandedCourses, setExpandedCourses] = useState({}) // courseId -> bool
+  const [terms,        setTerms]        = useState(() => loadTerms())
+  const [activeTermId, setActiveTermId] = useState(() => { const t=loadTerms().find(t=>t.active); return t?.id||loadTerms()[0]?.id })
+  const [expandedCourses, setExpandedCourses] = useState({})
 
-  // Term management
-  const [showAddTerm,  setShowAddTerm]  = useState(false)
-  const [newTermName,  setNewTermName]  = useState('')
-  const [editTermId,   setEditTermId]   = useState(null)
-  const [editTermName, setEditTermName] = useState('')
+  const [showAddTerm,   setShowAddTerm]   = useState(false)
+  const [newTermName,   setNewTermName]   = useState('')
+  const [editTermId,    setEditTermId]    = useState(null)
+  const [editTermName,  setEditTermName]  = useState('')
 
-  // Course management
-  const [showAddCourse,setShowAddCourse]= useState(null) // termId
-  const [newCourse,    setNewCourse]    = useState(BLANK_COURSE)
-  const [editCourseId, setEditCourseId] = useState(null)
-  const [editCourseForm,setEditCourseForm]=useState(BLANK_COURSE)
+  const [showAddCourse, setShowAddCourse] = useState(null)
+  const [newCourse,     setNewCourse]     = useState(BLANK_COURSE)
+  const [editCourseId,  setEditCourseId]  = useState(null)
+  const [editCourseForm,setEditCourseForm]= useState(BLANK_COURSE)
 
-  // Assignment management
-  const [showAddAssign,setShowAddAssign]= useState(null) // courseId
-  const [newAssign,    setNewAssign]    = useState(BLANK_ASSIGN)
-  const [editAssignId, setEditAssignId] = useState(null) // assignId being edited
-  const [editAssign,   setEditAssign]   = useState({})
-
+  const [showAddAssign, setShowAddAssign] = useState(null)
+  const [newAssign,     setNewAssign]     = useState(BLANK_ASSIGN)
+  const [editAssignId,  setEditAssignId]  = useState(null)
+  const [editAssign,    setEditAssign]    = useState({})
 
   useEffect(() => { saveTerms(terms); onDataChange?.() }, [terms])
 
@@ -92,6 +86,18 @@ export default function Courses({ onDataChange }) {
     }))
     setEditCourseId(null)
   }
+  // Move course up/down within a term
+  const moveCourse = (termId, courseId, dir) => {
+    updateTerms(ts => ts.map(t => {
+      if (t.id !== termId) return t
+      const cs  = [...t.courses]
+      const idx = cs.findIndex(c => c.id === courseId)
+      const to  = idx + dir
+      if (to < 0 || to >= cs.length) return t
+      ;[cs[idx], cs[to]] = [cs[to], cs[idx]]
+      return { ...t, courses: cs }
+    }))
+  }
 
   // ── Assignment ops ────────────────────────────────
   const addAssignment = (termId, courseId) => {
@@ -110,12 +116,14 @@ export default function Courses({ onDataChange }) {
       })
     }))
   }
-  const startEditAssign = (a) => { setEditAssignId(a.id); setEditAssign({ title:a.title, type:a.type, due:a.due, dueTime:a.dueTime||'', status:a.status, priority:a.priority||'none', notes:a.notes||'' }) }
+  const startEditAssign = (a) => {
+    setEditAssignId(a.id)
+    setEditAssign({ title:a.title, type:a.type, due:a.due, dueTime:a.dueTime||'', status:a.status, priority:a.priority||'none', notes:a.notes||'' })
+  }
   const saveAssign = (termId, courseId, assignId) => {
     updateAssign(termId, courseId, assignId, editAssign)
     setEditAssignId(null)
   }
-
   const deleteAssign = (termId, courseId, assignId) => {
     updateTerms(ts => ts.map(t => t.id!==termId ? t : {
       ...t, courses: t.courses.map(c => c.id!==courseId ? c : {
@@ -139,7 +147,6 @@ export default function Courses({ onDataChange }) {
 
       <div className="page-body" style={{display:'flex',flexDirection:'column',gap:20}}>
 
-        {/* Add term form */}
         {showAddTerm && (
           <div className="card" style={{display:'flex',gap:8,alignItems:'center'}}>
             <input style={{...inputStyle,flex:1}} placeholder="Term name (e.g. Fall 2026)" value={newTermName} onChange={e=>setNewTermName(e.target.value)} onKeyDown={e=>e.key==='Enter'&&addTerm()} autoFocus/>
@@ -154,14 +161,14 @@ export default function Courses({ onDataChange }) {
             <div key={term.id} style={{display:'flex',alignItems:'center',gap:4}}>
               {editTermId===term.id ? (
                 <div style={{display:'flex',gap:4,alignItems:'center'}}>
-                  <input style={{...smallInput,width:140}} value={editTermName} onChange={e=>setEditTermName(e.target.value)} onKeyDown={e=>e.key==='Enter'&&saveTermName(term.id)} autoFocus/>
+                  <input style={{...inputStyle,width:160}} value={editTermName} onChange={e=>setEditTermName(e.target.value)} onKeyDown={e=>e.key==='Enter'&&saveTermName(term.id)} autoFocus/>
                   <button className="btn-icon" style={{padding:4}} onClick={()=>saveTermName(term.id)}><Check size={11}/></button>
                   <button className="btn-icon" style={{padding:4}} onClick={()=>setEditTermId(null)}><X size={11}/></button>
                 </div>
               ) : (
                 <button onClick={()=>setActiveTerm(term.id)} style={{
-                  padding:'8px 16px', borderRadius:'var(--radius-md)',
-                  border: `1px solid ${activeTermId===term.id ? 'var(--accent)' : 'var(--glass-border)'}`,
+                  padding:'7px 16px', borderRadius:'var(--radius-md)',
+                  border:`1.5px solid ${activeTermId===term.id?'var(--accent)':'var(--glass-border)'}`,
                   background: activeTermId===term.id ? 'var(--accent)' : 'var(--glass-bg-2)',
                   color: activeTermId===term.id ? 'white' : 'var(--text-2)',
                   fontWeight:600, fontSize:13, cursor:'pointer', transition:'all .15s',
@@ -185,11 +192,9 @@ export default function Courses({ onDataChange }) {
           ))}
         </div>
 
-        {/* Active term courses */}
         {activeTerm && (
           <div style={{display:'flex',flexDirection:'column',gap:12}}>
 
-            {/* Stats row */}
             {activeTerm.courses.length > 0 && (
               <div className="grid-3">
                 {STATUS.map(s=>(
@@ -205,73 +210,95 @@ export default function Courses({ onDataChange }) {
             )}
 
             {/* Course accordions */}
-            {activeTerm.courses.map(course => {
-              const isExpanded = expandedCourses[course.id] !== false // default open
-              const doneCount  = course.assignments.filter(a=>a.status==='Done').length
-              const totalCount = course.assignments.length
-              const sorted     = [...course.assignments].sort((a,b)=>{
-                const pw={urgent:4,high:3,medium:2,low:1,none:0}
-                const pd=(pw[b.priority||'none']||0)-(pw[a.priority||'none']||0)
-                return pd!==0 ? pd : new Date(a.due)-new Date(b.due)
+            {activeTerm.courses.map((course, courseIdx) => {
+              const isExpanded  = expandedCourses[course.id] !== false
+              const doneCount   = course.assignments.filter(a=>a.status==='Done').length
+              const totalCount  = course.assignments.length
+              // Sort by due date only — urgency does NOT affect order here
+              const sorted = [...course.assignments].sort((a,b) => {
+                if (!a.due && !b.due) return 0
+                if (!a.due) return 1
+                if (!b.due) return -1
+                return new Date(a.due) - new Date(b.due)
               })
 
               return (
-                <div key={course.id} className="card" style={{padding:0,overflow:'hidden',borderLeft:`4px solid ${course.color}`}}>
+                <div key={course.id} className="card" style={{padding:0,overflow:'hidden',borderLeft:`3px solid ${course.color}`}}>
 
                   {/* Course header */}
-                  <div style={{display:'flex',alignItems:'center',gap:12,padding:'14px 16px',cursor:'pointer'}} onClick={()=>setExpandedCourses(e=>({...e,[course.id]:!isExpanded}))}>
-                    <div style={{width:10,height:10,borderRadius:'50%',background:course.color,flexShrink:0,boxShadow:`0 0 8px ${course.color}`}}/>
+                  <div style={{display:'flex',alignItems:'center',gap:10,padding:'14px 16px',cursor:'pointer'}}
+                    onClick={()=>setExpandedCourses(e=>({...e,[course.id]:!isExpanded}))}>
+
+                    {/* Reorder arrows */}
+                    <div style={{display:'flex',flexDirection:'column',gap:1,flexShrink:0}} onClick={e=>e.stopPropagation()}>
+                      <Tooltip text="Move course up">
+                        <button className="btn-icon" style={{padding:2,opacity:courseIdx===0?0.25:1}}
+                          onClick={()=>moveCourse(activeTerm.id,course.id,-1)} disabled={courseIdx===0}>
+                          <ArrowUp size={10}/>
+                        </button>
+                      </Tooltip>
+                      <Tooltip text="Move course down">
+                        <button className="btn-icon" style={{padding:2,opacity:courseIdx===activeTerm.courses.length-1?0.25:1}}
+                          onClick={()=>moveCourse(activeTerm.id,course.id,1)} disabled={courseIdx===activeTerm.courses.length-1}>
+                          <ArrowDown size={10}/>
+                        </button>
+                      </Tooltip>
+                    </div>
+
+                    <div style={{width:10,height:10,borderRadius:'50%',background:course.color,boxShadow:`0 0 6px ${course.color}`,flexShrink:0}}/>
                     <div style={{flex:1,minWidth:0}}>
-                      <div style={{fontWeight:700,fontSize:15,color:'var(--text-1)'}}>{course.name}</div>
-                      <div style={{fontSize:11,color:'var(--text-3)',marginTop:2,display:'flex',gap:12,flexWrap:'wrap'}}>
-                        {course.instructor && <span>👤 {course.instructor}</span>}
-                        {course.days && <span>📅 {course.days}</span>}
-                        {course.time && <span>🕐 {course.time}</span>}
-                        {course.room && <span>📍 {course.room}</span>}
-                        {course.credits && <span>🎓 {course.credits} cr</span>}
-                        {course.gradeTarget && <span>🎯 Target: {course.gradeTarget}%</span>}
+                      <div style={{fontWeight:700,fontSize:14}}>{course.name}</div>
+                      <div style={{fontSize:11,color:'var(--text-3)',marginTop:1}}>
+                        {[course.instructor,course.days,course.time,course.room].filter(Boolean).join(' · ')||'No details added'}
+                        {totalCount>0&&<span style={{marginLeft:8}}>{doneCount}/{totalCount} done</span>}
                       </div>
                     </div>
-                    <div style={{display:'flex',alignItems:'center',gap:8,flexShrink:0}}>
-                      <span style={{fontSize:11,color:'var(--text-3)'}}>{doneCount}/{totalCount}</span>
-                      <div style={{width:48,height:5,borderRadius:3,background:'var(--glass-border)',overflow:'hidden'}}>
-                        <div style={{height:'100%',background:course.color,width:`${totalCount>0?(doneCount/totalCount)*100:0}%`,transition:'width .3s'}}/>
-                      </div>
-                      {/* Edit/delete course */}
-                      <div style={{display:'flex',gap:3}} onClick={e=>e.stopPropagation()}>
-                        <Tooltip text="Edit course details">
-                          <button className="btn-icon" style={{padding:4}} onClick={()=>{setEditCourseId(course.id);setEditCourseForm({name:course.name,instructor:course.instructor,days:course.days,time:course.time,room:course.room,credits:course.credits,gradeTarget:course.gradeTarget,color:course.color,notes:course.notes})}}>
-                            <Edit2 size={11}/>
-                          </button>
-                        </Tooltip>
-                        <Tooltip text="Delete course">
-                          <button className="btn-icon" style={{padding:4,color:'var(--coral)'}} onClick={()=>deleteCourse(activeTerm.id,course.id)}>
-                            <Trash2 size={11}/>
-                          </button>
-                        </Tooltip>
-                      </div>
-                      {isExpanded ? <ChevronUp size={14} style={{color:'var(--text-3)'}}/> : <ChevronDown size={14} style={{color:'var(--text-3)'}}/> }
+
+                    <div style={{display:'flex',gap:4,flexShrink:0}} onClick={e=>e.stopPropagation()}>
+                      <Tooltip text="Edit course details">
+                        <button className="btn-icon" style={{padding:4}} onClick={()=>{setEditCourseId(course.id);setEditCourseForm({name:course.name,instructor:course.instructor||'',days:course.days||'',time:course.time||'',room:course.room||'',credits:course.credits||3,gradeTarget:course.gradeTarget||90,color:course.color,notes:course.notes||''})}}>
+                          <Edit2 size={12}/>
+                        </button>
+                      </Tooltip>
+                      <Tooltip text="Delete course">
+                        <button className="btn-icon" style={{padding:4,color:'var(--coral)'}} onClick={()=>deleteCourse(activeTerm.id,course.id)}>
+                          <Trash2 size={12}/>
+                        </button>
+                      </Tooltip>
+                      <Tooltip text="Add assignment">
+                        <button className="btn-icon" style={{padding:4,color:'var(--accent)'}} onClick={()=>setShowAddAssign(course.id)}>
+                          <Plus size={12}/>
+                        </button>
+                      </Tooltip>
                     </div>
+
+                    {isExpanded ? <ChevronUp size={14} style={{color:'var(--text-3)',flexShrink:0}}/> : <ChevronDown size={14} style={{color:'var(--text-3)',flexShrink:0}}/>}
                   </div>
+
+                  {/* Progress bar */}
+                  {totalCount>0 && (
+                    <div style={{height:2,background:'var(--glass-border)',margin:'0 16px 12px'}}>
+                      <div style={{height:'100%',background:course.color,borderRadius:2,width:`${(doneCount/totalCount)*100}%`,transition:'width .4s'}}/>
+                    </div>
+                  )}
 
                   {/* Edit course form */}
                   {editCourseId===course.id && (
-                    <div style={{padding:'0 16px 16px',borderTop:'1px solid var(--glass-border)'}}>
-                      <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:8,marginTop:12,marginBottom:10}}>
-                        <input style={smallInput} placeholder="Course name" value={editCourseForm.name} onChange={e=>setEditCourseForm(f=>({...f,name:e.target.value}))}/>
+                    <div style={{padding:'0 16px 16px',display:'flex',flexDirection:'column',gap:8,borderTop:'1px solid var(--glass-border)',paddingTop:12}}>
+                      <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:8}}>
+                        <input style={{...smallInput,gridColumn:'1/-1'}} placeholder="Course name" value={editCourseForm.name} onChange={e=>setEditCourseForm(f=>({...f,name:e.target.value}))}/>
                         <input style={smallInput} placeholder="Instructor" value={editCourseForm.instructor} onChange={e=>setEditCourseForm(f=>({...f,instructor:e.target.value}))}/>
                         <input style={smallInput} placeholder="Days (e.g. Mon/Wed)" value={editCourseForm.days} onChange={e=>setEditCourseForm(f=>({...f,days:e.target.value}))}/>
-                        <input style={smallInput} placeholder="Time (e.g. 9:00 AM)" value={editCourseForm.time} onChange={e=>setEditCourseForm(f=>({...f,time:e.target.value}))}/>
+                        <input style={smallInput} placeholder="Time" value={editCourseForm.time} onChange={e=>setEditCourseForm(f=>({...f,time:e.target.value}))}/>
                         <input style={smallInput} placeholder="Room" value={editCourseForm.room} onChange={e=>setEditCourseForm(f=>({...f,room:e.target.value}))}/>
-                        <div style={{display:'flex',gap:6,alignItems:'center'}}>
-                          <input type="number" style={{...smallInput,width:60}} placeholder="Credits" value={editCourseForm.credits} onChange={e=>setEditCourseForm(f=>({...f,credits:Number(e.target.value)}))}/>
-                          <input type="number" style={{...smallInput,width:60}} placeholder="Target %" value={editCourseForm.gradeTarget} onChange={e=>setEditCourseForm(f=>({...f,gradeTarget:Number(e.target.value)}))}/>
-                          <div style={{display:'flex',gap:4,flexWrap:'wrap'}}>
-                            {COURSE_COLORS.map(c=>(
-                              <button key={c} onClick={()=>setEditCourseForm(f=>({...f,color:c}))} style={{width:18,height:18,borderRadius:'50%',background:c,border:`2px solid ${editCourseForm.color===c?'white':'transparent'}`,cursor:'pointer'}}/>
-                            ))}
-                          </div>
-                        </div>
+                        <input style={smallInput} type="number" placeholder="Credits" value={editCourseForm.credits} onChange={e=>setEditCourseForm(f=>({...f,credits:Number(e.target.value)}))}/>
+                        <input style={smallInput} type="number" placeholder="Grade target %" value={editCourseForm.gradeTarget} onChange={e=>setEditCourseForm(f=>({...f,gradeTarget:Number(e.target.value)}))}/>
+                      </div>
+                      <div style={{display:'flex',gap:6,alignItems:'center',flexWrap:'wrap'}}>
+                        <span style={{fontSize:11,color:'var(--text-3)'}}>Color:</span>
+                        {COURSE_COLORS.map(c=>(
+                          <button key={c} onClick={()=>setEditCourseForm(f=>({...f,color:c}))} style={{width:20,height:20,borderRadius:'50%',background:c,border:`2px solid ${editCourseForm.color===c?'white':'transparent'}`,cursor:'pointer'}}/>
+                        ))}
                       </div>
                       <div style={{display:'flex',gap:8}}>
                         <button className="btn btn-primary" style={{fontSize:12}} onClick={()=>saveCourse(activeTerm.id,course.id)}>Save</button>
@@ -285,20 +312,17 @@ export default function Courses({ onDataChange }) {
                     <div style={{borderTop:'1px solid var(--glass-border)'}}>
 
                       {sorted.length===0 && showAddAssign!==course.id && (
-                        <div style={{padding:'16px 16px',textAlign:'center',color:'var(--text-3)',fontSize:13}}>
-                          No assignments yet
-                        </div>
+                        <div style={{padding:'16px',textAlign:'center',color:'var(--text-3)',fontSize:13}}>No assignments yet</div>
                       )}
 
                       {sorted.map(a => {
                         const due = formatRelativeDue(a.due, a.dueTime) || { label:'No due date', color:'var(--text-3)' }
                         const pri = PRIORITY.find(p=>p.key===(a.priority||'none'))
-          
                         const isEditing = editAssignId === a.id
+
                         return (
                           <div key={a.id} style={{borderBottom:'1px solid var(--glass-border)'}}>
                             {isEditing ? (
-                              /* ── Inline edit form ── */
                               <div style={{padding:'12px 16px',background:'var(--glass-bg-2)'}}>
                                 <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:8,marginBottom:8}}>
                                   <input style={{...smallInput,gridColumn:'1/-1'}} value={editAssign.title} onChange={e=>setEditAssign(f=>({...f,title:e.target.value}))} placeholder="Title" autoFocus/>
@@ -308,21 +332,18 @@ export default function Courses({ onDataChange }) {
                                   <input type="date" style={smallInput} value={editAssign.due} onChange={e=>setEditAssign(f=>({...f,due:e.target.value}))}/>
                                   <input type="time" style={smallInput} value={editAssign.dueTime||''} onChange={e=>setEditAssign(f=>({...f,dueTime:e.target.value}))} placeholder="Time (optional)"/>
                                 </div>
-                                {/* Priority */}
                                 <div style={{display:'flex',gap:4,marginBottom:8,flexWrap:'wrap'}}>
                                   <span style={{fontSize:11,color:'var(--text-3)',alignSelf:'center',marginRight:4}}>Priority:</span>
                                   {PRIORITY.filter(p=>p.key!=='none').map(p=>(
                                     <button key={p.key} onClick={()=>setEditAssign(f=>({...f,priority:f.priority===p.key?'none':p.key}))} style={{padding:'3px 9px',borderRadius:20,border:`1.5px solid ${editAssign.priority===p.key?p.color:'var(--glass-border)'}`,background:editAssign.priority===p.key?p.bg:'transparent',color:editAssign.priority===p.key?p.color:'var(--text-3)',fontSize:11,fontWeight:600,cursor:'pointer'}}>{p.label}</button>
                                   ))}
                                 </div>
-                                {/* Status */}
                                 <div style={{display:'flex',gap:4,marginBottom:8,flexWrap:'wrap'}}>
                                   <span style={{fontSize:11,color:'var(--text-3)',alignSelf:'center',marginRight:4}}>Status:</span>
                                   {STATUS.map(s=>(
                                     <button key={s.key} onClick={()=>setEditAssign(f=>({...f,status:s.key}))} style={{padding:'3px 9px',borderRadius:20,border:`1.5px solid ${editAssign.status===s.key?s.dot:'var(--glass-border)'}`,background:editAssign.status===s.key?s.bg:'transparent',color:editAssign.status===s.key?s.color:'var(--text-3)',fontSize:11,fontWeight:600,cursor:'pointer'}}>{s.key}</button>
                                   ))}
                                 </div>
-                                {/* Notes */}
                                 <textarea style={{...smallInput,width:'100%',resize:'vertical',lineHeight:1.6,marginBottom:10}} rows={3} value={editAssign.notes} onChange={e=>setEditAssign(f=>({...f,notes:e.target.value}))} placeholder="Notes…"/>
                                 <div style={{display:'flex',gap:6}}>
                                   <button className="btn btn-primary" style={{fontSize:12}} onClick={()=>saveAssign(activeTerm.id,course.id,a.id)}>Save</button>
@@ -330,7 +351,6 @@ export default function Courses({ onDataChange }) {
                                 </div>
                               </div>
                             ) : (
-                              /* ── View mode ── */
                               <>
                                 <div className="assign-row" style={{display:'flex',alignItems:'center',gap:10,padding:'11px 16px',flexWrap:'wrap'}}>
                                   <div style={{flex:1,minWidth:0}}>
@@ -378,18 +398,24 @@ export default function Courses({ onDataChange }) {
 
                       {/* Add assignment form */}
                       {showAddAssign===course.id ? (
-                        <div style={{padding:'12px 16px',background:'var(--glass-bg-2)'}}>
+                        <div style={{padding:'12px 16px',background:'var(--glass-bg-2)',borderTop:'1px solid var(--glass-border)'}}>
                           <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:8,marginBottom:8}}>
-                            <input style={{...smallInput,gridColumn:'1/-1'}} placeholder="Assignment title" value={newAssign.title} onChange={e=>setNewAssign(n=>({...n,title:e.target.value}))} onKeyDown={e=>e.key==='Enter'&&addAssignment(activeTerm.id,course.id)} autoFocus/>
-                            <select style={smallInput} value={newAssign.type} onChange={e=>setNewAssign(n=>({...n,type:e.target.value}))}>
+                            <input style={{...smallInput,gridColumn:'1/-1'}} placeholder="Assignment title" value={newAssign.title} onChange={e=>setNewAssign(f=>({...f,title:e.target.value}))} autoFocus/>
+                            <select style={smallInput} value={newAssign.type} onChange={e=>setNewAssign(f=>({...f,type:e.target.value}))}>
                               {ASSIGNMENT_TYPES.map(t=><option key={t} value={t}>{t}</option>)}
                             </select>
-                            <input type="date" style={smallInput} value={newAssign.due} onChange={e=>setNewAssign(n=>({...n,due:e.target.value}))}/>
-                          <input type="time" style={smallInput} value={newAssign.dueTime||''} onChange={e=>setNewAssign(n=>({...n,dueTime:e.target.value}))} placeholder="Time (optional)"/>
+                            <input type="date" style={smallInput} value={newAssign.due} onChange={e=>setNewAssign(f=>({...f,due:e.target.value}))}/>
+                            <input type="time" style={smallInput} value={newAssign.dueTime||''} onChange={e=>setNewAssign(f=>({...f,dueTime:e.target.value}))} placeholder="Time (optional)"/>
+                          </div>
+                          <div style={{display:'flex',gap:4,marginBottom:8,flexWrap:'wrap'}}>
+                            <span style={{fontSize:11,color:'var(--text-3)',alignSelf:'center',marginRight:4}}>Priority:</span>
+                            {PRIORITY.filter(p=>p.key!=='none').map(p=>(
+                              <button key={p.key} onClick={()=>setNewAssign(f=>({...f,priority:f.priority===p.key?'none':p.key}))} style={{padding:'3px 9px',borderRadius:20,border:`1.5px solid ${newAssign.priority===p.key?p.color:'var(--glass-border)'}`,background:newAssign.priority===p.key?p.bg:'transparent',color:newAssign.priority===p.key?p.color:'var(--text-3)',fontSize:11,fontWeight:600,cursor:'pointer'}}>{p.label}</button>
+                            ))}
                           </div>
                           <div style={{display:'flex',gap:6}}>
                             <button className="btn btn-primary" style={{fontSize:12}} onClick={()=>addAssignment(activeTerm.id,course.id)}>Add</button>
-                            <button className="btn btn-ghost" style={{fontSize:12}} onClick={()=>{setShowAddAssign(null);setNewAssign(BLANK_ASSIGN)}}>Cancel</button>
+                            <button className="btn btn-ghost" style={{fontSize:12}} onClick={()=>setShowAddAssign(null)}>Cancel</button>
                           </div>
                         </div>
                       ) : (
@@ -405,50 +431,35 @@ export default function Courses({ onDataChange }) {
               )
             })}
 
-            {/* Add course button */}
+            {/* Add course */}
             {showAddCourse===activeTerm.id ? (
               <div className="card">
-                <div className="card-title">New course — {activeTerm.name}</div>
-                <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:8,marginBottom:10}}>
-                  <input style={inputStyle} placeholder="Course name *" value={newCourse.name} onChange={e=>setNewCourse(c=>({...c,name:e.target.value}))} autoFocus/>
-                  <input style={inputStyle} placeholder="Instructor" value={newCourse.instructor} onChange={e=>setNewCourse(c=>({...c,instructor:e.target.value}))}/>
-                  <input style={inputStyle} placeholder="Days (e.g. Mon/Wed)" value={newCourse.days} onChange={e=>setNewCourse(c=>({...c,days:e.target.value}))}/>
-                  <input style={inputStyle} placeholder="Time (e.g. 9:00 AM)" value={newCourse.time} onChange={e=>setNewCourse(c=>({...c,time:e.target.value}))}/>
-                  <input style={inputStyle} placeholder="Room / Location" value={newCourse.room} onChange={e=>setNewCourse(c=>({...c,room:e.target.value}))}/>
-                  <div style={{display:'flex',gap:8,alignItems:'center'}}>
-                    <input type="number" style={{...inputStyle,width:80}} placeholder="Credits" value={newCourse.credits} onChange={e=>setNewCourse(c=>({...c,credits:Number(e.target.value)}))}/>
-                    <input type="number" style={{...inputStyle,width:80}} placeholder="Target %" value={newCourse.gradeTarget} onChange={e=>setNewCourse(c=>({...c,gradeTarget:Number(e.target.value)}))}/>
-                  </div>
+                <div style={{fontWeight:700,fontSize:13,marginBottom:12}}>New course</div>
+                <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:8,marginBottom:8}}>
+                  <input style={{...inputStyle,gridColumn:'1/-1'}} placeholder="Course name*" value={newCourse.name} onChange={e=>setNewCourse(f=>({...f,name:e.target.value}))} autoFocus/>
+                  <input style={inputStyle} placeholder="Instructor" value={newCourse.instructor} onChange={e=>setNewCourse(f=>({...f,instructor:e.target.value}))}/>
+                  <input style={inputStyle} placeholder="Days (e.g. Mon/Wed)" value={newCourse.days} onChange={e=>setNewCourse(f=>({...f,days:e.target.value}))}/>
+                  <input style={inputStyle} placeholder="Time" value={newCourse.time} onChange={e=>setNewCourse(f=>({...f,time:e.target.value}))}/>
+                  <input style={inputStyle} placeholder="Room" value={newCourse.room} onChange={e=>setNewCourse(f=>({...f,room:e.target.value}))}/>
                 </div>
-                <div style={{marginBottom:14}}>
-                  <div style={{fontSize:11,color:'var(--text-3)',marginBottom:8,fontWeight:600,textTransform:'uppercase',letterSpacing:'.06em'}}>Course color</div>
-                  <div style={{display:'flex',gap:8}}>
-                    {COURSE_COLORS.map(c=>(
-                      <button key={c} onClick={()=>setNewCourse(n=>({...n,color:c}))} style={{width:24,height:24,borderRadius:'50%',background:c,border:`3px solid ${newCourse.color===c?'white':'transparent'}`,cursor:'pointer',boxShadow:newCourse.color===c?`0 0 8px ${c}`:''}}/>
-                    ))}
-                  </div>
+                <div style={{display:'flex',gap:6,alignItems:'center',marginBottom:12,flexWrap:'wrap'}}>
+                  <span style={{fontSize:11,color:'var(--text-3)'}}>Color:</span>
+                  {COURSE_COLORS.map(c=>(
+                    <button key={c} onClick={()=>setNewCourse(f=>({...f,color:c}))} style={{width:22,height:22,borderRadius:'50%',background:c,border:`2px solid ${newCourse.color===c?'white':'transparent'}`,cursor:'pointer'}}/>
+                  ))}
                 </div>
                 <div style={{display:'flex',gap:8}}>
-                  <button className="btn btn-primary" onClick={()=>addCourse(activeTerm.id)}>Add course</button>
-                  <button className="btn btn-ghost" onClick={()=>{setShowAddCourse(null);setNewCourse(BLANK_COURSE)}}>Cancel</button>
+                  <button className="btn btn-primary" onClick={()=>addCourse(activeTerm.id)} style={{flex:1}}>Add course</button>
+                  <button className="btn btn-ghost" onClick={()=>setShowAddCourse(null)}>Cancel</button>
                 </div>
               </div>
             ) : (
-              <button className="btn btn-ghost" style={{alignSelf:'flex-start',gap:8}} onClick={()=>setShowAddCourse(activeTerm.id)}>
-                <BookOpen size={14}/> Add course to {activeTerm.name}
+              <button className="btn btn-ghost" style={{gap:8,alignSelf:'flex-start'}} onClick={()=>setShowAddCourse(activeTerm.id)}>
+                <Plus size={14}/> Add course
               </button>
             )}
           </div>
         )}
-
-        {terms.length===0&&(
-          <div className="card" style={{textAlign:'center',padding:'48px',color:'var(--text-3)'}}>
-            <BookOpen size={32} style={{margin:'0 auto 12px',opacity:.3}}/>
-            <div style={{fontWeight:600,marginBottom:6}}>No terms yet</div>
-            <div style={{fontSize:13}}>Click "Add term" to get started</div>
-          </div>
-        )}
-
       </div>
     </>
   )
