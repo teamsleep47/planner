@@ -1,355 +1,394 @@
-import { useState, useEffect, useRef, useCallback } from 'react'
-import { ChevronLeft, ChevronRight, Plus, X, Check } from 'lucide-react'
-import { load, save } from '../utils/storage.js'
+import { useState, useEffect, useRef } from 'react'
+import { ChevronLeft, ChevronRight, X, ExternalLink } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
-import Tooltip from '../components/Tooltip.jsx'
+import { formatRelativeDue } from '../utils/timeFormat.js'
 
-const HOURS   = Array.from({length:17}, (_,i) => i+6)
-const DAYS_S  = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat']
-const MONTHS  = ['January','February','March','April','May','June','July','August','September','October','November','December']
+const MONTHS    = ['January','February','March','April','May','June','July','August','September','October','November','December']
+const DAYS_FULL = ['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday']
+const DAYS_S    = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat']
 
-function getCourseColors() {
-  try {
-    const terms = JSON.parse(localStorage.getItem('planner_v1_terms_v1')||'[]')
-    const map = {}
-    terms.forEach(t => t.courses.forEach(c => { map[c.name] = c.color }))
-    return map
-  } catch(e) { return {} }
+const PRIORITY_BADGE = {
+  urgent: { label:'🔴 Urgent', color:'#ef4444' },
+  high:   { label:'🟠 High',   color:'#f97316' },
+  medium: { label:'🟡 Medium', color:'#f59e0b' },
+  low:    { label:'🟢 Low',    color:'#22c55e' },
+  none:   { label:'',          color:null       },
 }
 
-function getAssignmentDots() {
+// ── Read all assignments from termData ──────────────────────────
+function getAllAssignments() {
   try {
-    const terms  = JSON.parse(localStorage.getItem('planner_v1_terms_v1')||'[]')
-    const active = terms.find(t=>t.active)||terms[0]
-    if (!active) return {}
-    const map = {}
-    active.courses.forEach(c => {
-      c.assignments.filter(a=>a.due&&a.status!=='Done').forEach(a => {
-        if (!map[a.due]) map[a.due] = []
-        map[a.due].push({ id:a.id, title:a.title, course:c.name, color:c.color, courseId:c.id })
-      })
-    })
-    return map
-  } catch(e) { return {} }
+    const terms  = JSON.parse(localStorage.getItem('planner_v1_terms_v1') || '[]')
+    const active = terms.find(t => t.active) || terms[0]
+    if (!active) return []
+    return active.courses.flatMap(c =>
+      c.assignments.map(a => ({
+        ...a,
+        courseName: c.name,
+        courseColor: c.color,
+        courseId: c.id,
+      }))
+    )
+  } catch(e) { return [] }
 }
 
-function uid() { return Math.random().toString(36).slice(2,9) }
+// ── Popup component ─────────────────────────────────────────────
+function AssignmentPopup({ assignment, anchor, onClose, onJump }) {
+  const popupRef = useRef(null)
+  const due      = formatRelativeDue(assignment.due, assignment.dueTime)
+  const start    = assignment.startDate
+    ? formatRelativeDue(assignment.startDate, '')
+    : null
+  const badge    = PRIORITY_BADGE[assignment.priority || 'none']
 
-const BLOCK_COLORS = ['#6366f1','#14b8a6','#f59e0b','#f43f5e','#22c55e','#8b5cf6','#06b6d4']
-const BLANK_BLOCK  = { title:'', color: BLOCK_COLORS[0], allDay: false }
+  useEffect(() => {
+    const handler = e => {
+      if (popupRef.current && !popupRef.current.contains(e.target)) onClose()
+    }
+    document.addEventListener('mousedown', handler)
+    return () => document.removeEventListener('mousedown', handler)
+  }, [])
 
+  // Position popup: try to stay inside viewport
+  const style = {
+    position: 'fixed',
+    zIndex: 1000,
+    top: Math.min(anchor.y + 8, window.innerHeight - 280),
+    left: Math.min(Math.max(anchor.x - 140, 8), window.innerWidth - 320),
+    width: 300,
+  }
+
+  return (
+    <>
+      <div style={{ position:'fixed', inset:0, zIndex:999 }} onClick={onClose}/>
+      <div ref={popupRef} className="card" style={{
+        ...style,
+        padding: 0,
+        overflow: 'hidden',
+        boxShadow: '0 16px 48px rgba(0,0,0,0.4)',
+        border: `2px solid ${assignment.courseColor}`,
+      }}>
+        {/* Header bar */}
+        <div style={{
+          background: `${assignment.courseColor}22`,
+          borderBottom: `1px solid ${assignment.courseColor}44`,
+          padding: '12px 14px 10px',
+          display: 'flex', alignItems: 'flex-start', gap: 10,
+        }}>
+          <div style={{
+            width: 10, height: 10, borderRadius: '50%',
+            background: assignment.courseColor,
+            boxShadow: `0 0 8px ${assignment.courseColor}`,
+            flexShrink: 0, marginTop: 3,
+          }}/>
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <div style={{ fontWeight: 700, fontSize: 14, lineHeight: 1.3, marginBottom: 3 }}>
+              {assignment.title}
+            </div>
+            <div style={{ fontSize: 11, color: assignment.courseColor, fontWeight: 600 }}>
+              {assignment.courseName}
+            </div>
+          </div>
+          <button onClick={onClose} style={{ background:'none', border:'none', color:'var(--text-3)', cursor:'pointer', padding:2, flexShrink:0 }}>
+            <X size={14}/>
+          </button>
+        </div>
+
+        {/* Body */}
+        <div style={{ padding: '12px 14px', display:'flex', flexDirection:'column', gap:8 }}>
+          {/* Due */}
+          <div style={{ display:'flex', alignItems:'center', gap:8 }}>
+            <span style={{ fontSize:11, color:'var(--text-3)', width:44 }}>Due</span>
+            <span style={{ fontSize:13, fontWeight:700, color: due?.color || 'var(--text-2)' }}>
+              {due?.label || assignment.due || 'No due date'}
+            </span>
+          </div>
+
+          {/* Start date */}
+          {assignment.startDate && (
+            <div style={{ display:'flex', alignItems:'center', gap:8 }}>
+              <span style={{ fontSize:11, color:'var(--text-3)', width:44 }}>Start</span>
+              <span style={{ fontSize:12, color:'var(--text-2)' }}>
+                {new Date(assignment.startDate + 'T12:00:00').toLocaleDateString('en-US', { month:'short', day:'numeric' })}
+              </span>
+            </div>
+          )}
+
+          {/* Type */}
+          {assignment.type && (
+            <div style={{ display:'flex', alignItems:'center', gap:8 }}>
+              <span style={{ fontSize:11, color:'var(--text-3)', width:44 }}>Type</span>
+              <span style={{ fontSize:12, color:'var(--text-2)' }}>{assignment.type}</span>
+            </div>
+          )}
+
+          {/* Priority */}
+          {badge.label && (
+            <div style={{ display:'flex', alignItems:'center', gap:8 }}>
+              <span style={{ fontSize:11, color:'var(--text-3)', width:44 }}>Priority</span>
+              <span style={{ fontSize:12, color: badge.color, fontWeight:600 }}>{badge.label}</span>
+            </div>
+          )}
+
+          {/* Status */}
+          <div style={{ display:'flex', alignItems:'center', gap:8 }}>
+            <span style={{ fontSize:11, color:'var(--text-3)', width:44 }}>Status</span>
+            <span style={{
+              fontSize:11, padding:'2px 8px', borderRadius:20, fontWeight:600,
+              background: assignment.status==='Done'?'var(--green-dim)':assignment.status==='In progress'?'var(--amber-dim)':'var(--glass-bg-2)',
+              color: assignment.status==='Done'?'var(--green)':assignment.status==='In progress'?'var(--amber)':'var(--text-3)',
+            }}>
+              {assignment.status || 'To do'}
+            </span>
+          </div>
+
+          {/* Notes preview */}
+          {assignment.notes && (
+            <div style={{
+              fontSize: 11, color:'var(--text-3)', lineHeight:1.5,
+              background:'var(--glass-bg)', borderRadius:6, padding:'7px 9px',
+              maxHeight: 60, overflow:'hidden',
+              WebkitMaskImage:'linear-gradient(to bottom, black 60%, transparent 100%)',
+            }}>
+              {assignment.notes}
+            </div>
+          )}
+        </div>
+
+        {/* Jump button */}
+        <div style={{ padding:'0 14px 14px' }}>
+          <button onClick={onJump} className="btn btn-primary" style={{ width:'100%', justifyContent:'center', gap:6, fontSize:13 }}>
+            <ExternalLink size={13}/> Open in Assignments
+          </button>
+        </div>
+      </div>
+    </>
+  )
+}
+
+// ── Main Calendar ───────────────────────────────────────────────
 export default function CalendarPage({ onDataChange }) {
-  const navigate  = useNavigate()
-  const [view,     setView]     = useState('week')
-  const [anchor,   setAnchor]   = useState(new Date())
-  const [blocks,   setBlocks]   = useState(() => load('calendar_blocks', []))
-  const [dragging, setDragging] = useState(null)
-  const [newBlock, setNewBlock] = useState(null)
-  const [editBlock,setEditBlock]= useState(null)
-  const [editForm, setEditForm] = useState(BLANK_BLOCK)
-  const [showAdd,  setShowAdd]  = useState(false)
-  const [addForm,  setAddForm]  = useState({ ...BLANK_BLOCK, date: new Date().toISOString().slice(0,10), startHour:9, endHour:10 })
-  const gridRef = useRef(null)
+  const navigate    = useNavigate()
+  const [anchor,    setAnchor]    = useState(new Date())
+  const [popup,     setPopup]     = useState(null)   // { assignment, x, y }
+  const assignments = getAllAssignments()
 
-  const dotMap  = getAssignmentDots()
-  const cColors = getCourseColors()
+  const today    = new Date().toISOString().slice(0, 10)
+  const year     = anchor.getFullYear()
+  const month    = anchor.getMonth()
 
-  useEffect(() => { save('calendar_blocks', blocks); onDataChange?.() }, [blocks])
+  const prev  = () => setAnchor(d => { const n=new Date(d); n.setMonth(n.getMonth()-1); return n })
+  const next  = () => setAnchor(d => { const n=new Date(d); n.setMonth(n.getMonth()+1); return n })
+  const goToday = () => setAnchor(new Date())
 
-  // Navigate to Courses tab, expansion state stored so the right course is visible
-  const goToAssignment = (dot) => {
-    // Store the target assignment so Courses page can highlight it
-    sessionStorage.setItem('planner_cal_jump', JSON.stringify({ courseId: dot.courseId, assignId: dot.id }))
+  // Build calendar grid
+  const firstDay   = new Date(year, month, 1)
+  const lastDay    = new Date(year, month + 1, 0)
+  const startPad   = firstDay.getDay()
+  const cells      = []
+  for (let i = 0; i < startPad; i++) cells.push(null)
+  for (let d = 1; d <= lastDay.getDate(); d++) cells.push(new Date(year, month, d))
+  while (cells.length % 7 !== 0) cells.push(null)
+
+  // Index assignments by date
+  const byDue   = {}   // dateStr -> [assignment]
+  const byStart = {}   // dateStr -> [assignment]
+  assignments.forEach(a => {
+    if (a.due) {
+      if (!byDue[a.due]) byDue[a.due] = []
+      byDue[a.due].push(a)
+    }
+    if (a.startDate && a.startDate !== a.due) {
+      if (!byStart[a.startDate]) byStart[a.startDate] = []
+      byStart[a.startDate].push(a)
+    }
+  })
+
+  // Determine if a date is inside a start→due range (for bar rendering)
+  const inRangeAssignments = (dateStr) => {
+    return assignments.filter(a => {
+      if (!a.startDate || !a.due) return false
+      return dateStr > a.startDate && dateStr < a.due
+    })
+  }
+
+  const handleDotClick = (e, assignment) => {
+    e.stopPropagation()
+    const rect = e.currentTarget.getBoundingClientRect()
+    setPopup({ assignment, x: rect.left + rect.width / 2, y: rect.bottom })
+  }
+
+  const handleJump = (assignment) => {
+    sessionStorage.setItem('planner_cal_jump', JSON.stringify({
+      courseId: assignment.courseId,
+      assignId: assignment.id,
+    }))
+    setPopup(null)
     navigate('/courses')
   }
 
-  // ── Navigation ────────────────────────────────────
-  const prev = () => {
-    const d = new Date(anchor)
-    if (view==='day')   d.setDate(d.getDate()-1)
-    if (view==='week')  d.setDate(d.getDate()-7)
-    if (view==='month') d.setMonth(d.getMonth()-1)
-    setAnchor(d)
-  }
-  const next = () => {
-    const d = new Date(anchor)
-    if (view==='day')   d.setDate(d.getDate()+1)
-    if (view==='week')  d.setDate(d.getDate()+7)
-    if (view==='month') d.setMonth(d.getMonth()+1)
-    setAnchor(d)
-  }
-  const goToday = () => setAnchor(new Date())
+  const cellH = 110
 
-  const getWeekDays = (d) => {
-    const sun = new Date(d); sun.setDate(d.getDate() - d.getDay())
-    return Array.from({length:7}, (_,i) => { const x=new Date(sun); x.setDate(sun.getDate()+i); return x })
-  }
-  const weekDays = getWeekDays(anchor)
-
-  // ── Drag to create ────────────────────────────────
-  const onMouseDownCell = (date, hour) => {
-    setDragging({ date: date.toISOString().slice(0,10), startHour: hour, endHour: hour+1 })
-  }
-  const onMouseEnterCell = (date, hour) => {
-    if (!dragging) return
-    setDragging(d => ({ ...d, endHour: Math.max(d.startHour+1, hour+1) }))
-  }
-  const onMouseUpCell = () => {
-    if (!dragging) return
-    setNewBlock({ ...dragging })
-    setAddForm(f => ({ ...f, date: dragging.date, startHour: dragging.startHour, endHour: dragging.endHour }))
-    setShowAdd(true)
-    setDragging(null)
-  }
-
-  const saveBlock = () => {
-    if (!addForm.title.trim()) return
-    setBlocks(bs => [...bs, { ...addForm, id: uid() }])
-    setShowAdd(false); setNewBlock(null)
-    setAddForm({ ...BLANK_BLOCK, date: new Date().toISOString().slice(0,10), startHour:9, endHour:10 })
-  }
-
-  const deleteBlock  = id => setBlocks(bs => bs.filter(b => b.id !== id))
-  const updateBlock  = (id, patch) => setBlocks(bs => bs.map(b => b.id===id ? {...b,...patch} : b))
-  const dayBlocks    = (dateStr) => blocks.filter(b => b.date === dateStr)
-
-  const hourH = 52
-
-  const headerTitle = () => {
-    if (view==='day')   return anchor.toLocaleDateString('en-US',{weekday:'long',month:'long',day:'numeric',year:'numeric'})
-    if (view==='week')  return `${MONTHS[weekDays[0].getMonth()]} ${weekDays[0].getDate()} – ${MONTHS[weekDays[6].getMonth()]} ${weekDays[6].getDate()}, ${weekDays[6].getFullYear()}`
-    if (view==='month') return `${MONTHS[anchor.getMonth()]} ${anchor.getFullYear()}`
-    return ''
-  }
-
-  const today = new Date().toISOString().slice(0,10)
-  const nowH  = new Date().getHours() + new Date().getMinutes()/60
-
-  const inputStyle = { padding:'7px 10px', background:'var(--glass-bg-2)', border:'1px solid var(--glass-border)', borderRadius:'var(--radius-md)', color:'var(--text-1)', fontSize:12, fontFamily:'inherit', width:'100%' }
-
-  // ── Time grid ─────────────────────────────────────
-  const TimeGrid = ({ days }) => (
-    <div style={{ display:'flex', overflow:'auto', flex:1 }} ref={gridRef} onMouseUp={onMouseUpCell} onMouseLeave={onMouseUpCell}>
-      {/* Time labels */}
-      <div style={{ width:44, flexShrink:0, paddingTop:28 }}>
-        {HOURS.map(h => (
-          <div key={h} style={{ height:hourH, display:'flex', alignItems:'flex-start', justifyContent:'flex-end', paddingRight:6, paddingTop:4 }}>
-            <span style={{ fontSize:9, color:'var(--text-3)', fontWeight:600 }}>{h===12?'noon':h>12?`${h-12}p`:`${h}a`}</span>
-          </div>
-        ))}
+  return (
+    <>
+      <div className="page-header" style={{ flexWrap:'wrap', gap:10 }}>
+        <div>
+          <div className="page-title">Calendar</div>
+          <div className="page-subtitle">{MONTHS[month]} {year}</div>
+        </div>
+        <div style={{ display:'flex', gap:6, alignItems:'center' }}>
+          <button className="btn btn-ghost" onClick={goToday} style={{ fontSize:12 }}>Today</button>
+          <button className="btn-icon" onClick={prev} style={{ padding:7 }}><ChevronLeft size={14}/></button>
+          <button className="btn-icon" onClick={next} style={{ padding:7 }}><ChevronRight size={14}/></button>
+        </div>
       </div>
 
-      {/* Day columns */}
-      {days.map(day => {
-        const ds      = day.toISOString().slice(0,10)
-        const isToday = ds === today
-        const db      = dayBlocks(ds)
-        const dots    = dotMap[ds] || []
-        return (
-          <div key={ds} style={{ flex:1, minWidth: days.length===1?'100%':80, borderLeft:'1px solid var(--glass-border)', position:'relative' }}>
-            {/* Day header */}
-            <div style={{ height:28, display:'flex', alignItems:'center', justifyContent:'center', gap:4, borderBottom:'1px solid var(--glass-border)', background: isToday?'var(--accent-dim)':'transparent' }}>
-              <span style={{ fontSize:11, fontWeight:700, color: isToday?'var(--accent)':'var(--text-3)' }}>
-                {days.length>1 ? DAYS_S[day.getDay()] : ''} {day.getDate()}
-              </span>
-              {dots.length > 0 && <div style={{ width:5, height:5, borderRadius:'50%', background:'var(--coral)' }}/>}
-            </div>
-
-            {/* Assignment dots strip — clickable */}
-            {dots.length > 0 && (
-              <div style={{ padding:'2px 3px', borderBottom:'1px solid var(--glass-border)', display:'flex', flexDirection:'column', gap:1 }}>
-                {dots.slice(0,3).map((dot,di) => (
-                  <button key={di} onClick={()=>goToAssignment(dot)} style={{
-                    display:'block', width:'100%', textAlign:'left',
-                    fontSize:9, padding:'1px 4px', borderRadius:3,
-                    background:`${dot.color}33`, color:dot.color,
-                    border:'none', cursor:'pointer', overflow:'hidden',
-                    textOverflow:'ellipsis', whiteSpace:'nowrap',
-                    fontWeight:600,
-                  }}>
-                    {dot.title}
-                  </button>
-                ))}
-                {dots.length > 3 && <span style={{fontSize:9,color:'var(--text-3)',paddingLeft:4}}>+{dots.length-3} more</span>}
-              </div>
-            )}
-
-            {/* Hour cells */}
-            {HOURS.map(h => (
-              <div key={h}
-                onMouseDown={()=>onMouseDownCell(day,h)}
-                onMouseEnter={()=>onMouseEnterCell(day,h)}
-                style={{ height:hourH, borderBottom:'1px solid var(--glass-border)', cursor:'crosshair', userSelect:'none', position:'relative',
-                  background: dragging&&dragging.date===ds&&h>=dragging.startHour&&h<dragging.endHour ?'var(--accent-dim)':'transparent' }}
-              >
-                {/* Now line */}
-                {ds===today && h===Math.floor(nowH) && (
-                  <div style={{ position:'absolute', left:0, right:0, top:`${(nowH%1)*hourH}px`, height:2, background:'var(--coral)', zIndex:2, borderRadius:1 }}/>
-                )}
-              </div>
-            ))}
-
-            {/* Blocks */}
-            {db.map(b => {
-              const top  = (b.startHour - 6) * hourH + 28
-              const h    = (b.endHour - b.startHour) * hourH
-              return (
-                <div key={b.id} onClick={()=>{setEditBlock(b);setEditForm({title:b.title,color:b.color})}}
-                  style={{ position:'absolute', top, left:2, right:2, height:h-2, background:`${b.color}cc`,
-                    borderRadius:4, padding:'3px 5px', cursor:'pointer', overflow:'hidden', zIndex:3,
-                    border:`1px solid ${b.color}`, boxShadow:`0 2px 8px ${b.color}44` }}>
-                  <div style={{ fontSize:10, fontWeight:700, color:'#fff', textShadow:'0 1px 2px rgba(0,0,0,.5)', overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>{b.title}</div>
-                  <div style={{ fontSize:9, color:'rgba(255,255,255,.7)' }}>{b.startHour}:00–{b.endHour}:00</div>
-                </div>
-              )
-            })}
-          </div>
-        )
-      })}
-    </div>
-  )
-
-  // ── Month grid ────────────────────────────────────
-  const MonthGrid = () => {
-    const firstDay = new Date(anchor.getFullYear(), anchor.getMonth(), 1)
-    const lastDay  = new Date(anchor.getFullYear(), anchor.getMonth()+1, 0)
-    const startPad = firstDay.getDay()
-    const cells    = []
-    for (let i=0; i<startPad; i++) cells.push(null)
-    for (let d=1; d<=lastDay.getDate(); d++) cells.push(new Date(anchor.getFullYear(), anchor.getMonth(), d))
-    while (cells.length%7!==0) cells.push(null)
-
-    return (
-      <div style={{ flex:1, overflow:'auto' }}>
-        <div style={{ display:'grid', gridTemplateColumns:'repeat(7,1fr)', borderBottom:'1px solid var(--glass-border)' }}>
-          {DAYS_S.map(d=><div key={d} style={{padding:'6px 0',textAlign:'center',fontSize:11,fontWeight:700,color:'var(--text-3)'}}>{d}</div>)}
+      {/* Legend */}
+      <div style={{ padding:'0 32px 10px', display:'flex', gap:16, flexWrap:'wrap', alignItems:'center' }}>
+        <div style={{ display:'flex', alignItems:'center', gap:5, fontSize:11, color:'var(--text-3)' }}>
+          <div style={{ width:24, height:8, borderRadius:4, background:'var(--accent)', opacity:.85 }}/>
+          Due date
         </div>
+        <div style={{ display:'flex', alignItems:'center', gap:5, fontSize:11, color:'var(--text-3)' }}>
+          <div style={{ width:24, height:5, borderRadius:4, background:'var(--accent)', opacity:.25 }}/>
+          Start → due range
+        </div>
+        <div style={{ display:'flex', alignItems:'center', gap:5, fontSize:11, color:'var(--text-3)' }}>
+          <div style={{ width:8, height:8, borderRadius:'50%', background:'var(--accent)', opacity:.5 }}/>
+          Start date
+        </div>
+      </div>
+
+      {/* Calendar grid */}
+      <div style={{ margin:'0 24px 24px', background:'var(--glass-bg)', border:'1px solid var(--glass-border)', borderRadius:'var(--radius-lg)', overflow:'hidden' }}>
+
+        {/* Day headers */}
+        <div style={{ display:'grid', gridTemplateColumns:'repeat(7,1fr)', background:'var(--glass-bg-2)', borderBottom:'1px solid var(--glass-border)' }}>
+          {DAYS_S.map(d => (
+            <div key={d} style={{ padding:'10px 0', textAlign:'center', fontSize:11, fontWeight:700, color:'var(--text-3)', letterSpacing:'.05em' }}>{d}</div>
+          ))}
+        </div>
+
+        {/* Day cells */}
         <div style={{ display:'grid', gridTemplateColumns:'repeat(7,1fr)' }}>
-          {cells.map((day,i) => {
-            if (!day) return <div key={i} style={{ minHeight:72, borderRight:'1px solid var(--glass-border)', borderBottom:'1px solid var(--glass-border)', background:'var(--glass-bg)' }}/>
-            const ds      = day.toISOString().slice(0,10)
-            const isToday = ds === today
-            const dots    = dotMap[ds] || []
-            const db      = dayBlocks(ds)
+          {cells.map((day, i) => {
+            if (!day) return (
+              <div key={`pad-${i}`} style={{ minHeight: cellH, borderRight:'1px solid var(--glass-border)', borderBottom:'1px solid var(--glass-border)', background:'var(--glass-bg)', opacity:.4 }}/>
+            )
+
+            const ds       = day.toISOString().slice(0, 10)
+            const isToday  = ds === today
+            const dueDates = byDue[ds]    || []
+            const startDts = byStart[ds]  || []
+            const inRange  = inRangeAssignments(ds)
+            const isPast   = ds < today
+
             return (
-              <div key={ds} onClick={()=>{setAnchor(day);setView('day')}}
-                style={{ minHeight:72, borderRight:'1px solid var(--glass-border)', borderBottom:'1px solid var(--glass-border)',
-                  padding:'4px 5px', cursor:'pointer', transition:'background .15s',
-                  background: isToday?'var(--accent-dim)':'transparent' }}
-                onMouseEnter={e=>e.currentTarget.style.background=isToday?'var(--accent-dim)':'var(--glass-bg)'}
-                onMouseLeave={e=>e.currentTarget.style.background=isToday?'var(--accent-dim)':'transparent'}
-              >
-                <div style={{ fontSize:12, fontWeight:700, color:isToday?'var(--accent)':'var(--text-2)', marginBottom:3 }}>{day.getDate()}</div>
-                {dots.slice(0,2).map((dot,di)=>(
-                  <button key={di} onClick={e=>{e.stopPropagation();goToAssignment(dot)}} style={{
-                    display:'block', width:'100%', textAlign:'left',
-                    fontSize:9, padding:'1px 4px', borderRadius:3, marginBottom:1,
-                    background:`${dot.color}33`, color:dot.color,
-                    border:'none', cursor:'pointer',
-                    overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap',
-                    fontWeight:600,
-                  }}>
-                    {dot.title}
+              <div key={ds} style={{
+                minHeight: cellH,
+                borderRight: '1px solid var(--glass-border)',
+                borderBottom: '1px solid var(--glass-border)',
+                padding: '6px 5px 5px',
+                position: 'relative',
+                background: isToday ? 'var(--accent-dim)' : isPast ? 'rgba(0,0,0,0.08)' : 'transparent',
+                transition: 'background .15s',
+              }}>
+                {/* Day number */}
+                <div style={{
+                  fontSize: 12, fontWeight: isToday ? 800 : 500,
+                  color: isToday ? 'var(--accent)' : isPast ? 'var(--text-3)' : 'var(--text-2)',
+                  marginBottom: 4, lineHeight: 1,
+                  display: 'flex', alignItems: 'center', gap: 4,
+                }}>
+                  {isToday && (
+                    <div style={{ width:6, height:6, borderRadius:'50%', background:'var(--accent)', boxShadow:'0 0 6px var(--accent)' }}/>
+                  )}
+                  {day.getDate()}
+                </div>
+
+                {/* Range bars — drawn behind pills */}
+                {inRange.map((a, ri) => (
+                  <div key={`range-${a.id}-${ri}`} style={{
+                    height: 4, borderRadius: 2, marginBottom: 2,
+                    background: a.courseColor,
+                    opacity: 0.22,
+                  }}/>
+                ))}
+
+                {/* Start date markers */}
+                {startDts.slice(0, 2).map((a, si) => (
+                  <button key={`start-${a.id}-${si}`}
+                    onClick={e => handleDotClick(e, a)}
+                    style={{
+                      display: 'flex', alignItems: 'center', gap: 3,
+                      width: '100%', border: 'none', cursor: 'pointer', padding: '1px 3px',
+                      background: `${a.courseColor}18`, borderRadius: 3, marginBottom: 2,
+                      borderLeft: `2px solid ${a.courseColor}66`,
+                    }}>
+                    <div style={{ width:5, height:5, borderRadius:'50%', background:a.courseColor, opacity:.5, flexShrink:0 }}/>
+                    <span style={{ fontSize:9, color:a.courseColor, fontWeight:600, overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap', opacity:.8 }}>
+                      ▶ {a.title}
+                    </span>
                   </button>
                 ))}
-                {dots.length>2&&<div style={{fontSize:9,color:'var(--text-3)'}}>+{dots.length-2} more</div>}
-                {db.slice(0,1).map(b=>(
-                  <div key={b.id} style={{ fontSize:9, padding:'1px 4px', borderRadius:3, background:`${b.color}33`, color:b.color, marginBottom:1, overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>{b.title}</div>
-                ))}
+
+                {/* Due date pills */}
+                {dueDates.slice(0, 3).map((a, di) => {
+                  const badge = PRIORITY_BADGE[a.priority || 'none']
+                  const isDone = a.status === 'Done'
+                  return (
+                    <button key={`due-${a.id}-${di}`}
+                      onClick={e => handleDotClick(e, a)}
+                      style={{
+                        display: 'flex', alignItems: 'center', gap: 3,
+                        width: '100%', border: 'none', cursor: 'pointer',
+                        padding: '2px 5px', borderRadius: 4, marginBottom: 2,
+                        background: isDone ? `${a.courseColor}18` : `${a.courseColor}33`,
+                        borderLeft: `3px solid ${isDone ? a.courseColor + '44' : a.courseColor}`,
+                        opacity: isDone ? 0.55 : 1,
+                        transition: 'all .15s',
+                      }}
+                      onMouseEnter={e => { if(!isDone) e.currentTarget.style.background=`${a.courseColor}55` }}
+                      onMouseLeave={e => { e.currentTarget.style.background = isDone ? `${a.courseColor}18` : `${a.courseColor}33` }}
+                    >
+                      <div style={{ width:6, height:6, borderRadius:'50%', background:a.courseColor, flexShrink:0, boxShadow:`0 0 4px ${a.courseColor}` }}/>
+                      <span style={{ fontSize:9, fontWeight:700, color:'var(--text-1)', overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap', flex:1 }}>
+                        {a.title}
+                      </span>
+                      {badge.color && !isDone && (
+                        <div style={{ width:5, height:5, borderRadius:'50%', background:badge.color, flexShrink:0 }}/>
+                      )}
+                      {isDone && <span style={{ fontSize:8, color:'var(--green)', flexShrink:0 }}>✓</span>}
+                    </button>
+                  )
+                })}
+
+                {/* Overflow count */}
+                {(dueDates.length + startDts.length) > 3 && (
+                  <div style={{ fontSize:9, color:'var(--text-3)', paddingLeft:4, marginTop:1 }}>
+                    +{(dueDates.length + startDts.length) - 3} more
+                  </div>
+                )}
               </div>
             )
           })}
         </div>
       </div>
-    )
-  }
 
-  return (
-    <>
-      <div className="page-header" style={{flexWrap:'wrap',gap:10}}>
-        <div>
-          <div className="page-title">Calendar</div>
-          <div className="page-subtitle">{headerTitle()}</div>
-        </div>
-        <div style={{ display:'flex', gap:6, alignItems:'center', flexWrap:'wrap' }}>
-          <Tooltip text="Go to today">
-            <button className="btn btn-ghost" onClick={goToday} style={{ fontSize:12 }}>Today</button>
-          </Tooltip>
-          <button className="btn-icon" onClick={prev} style={{ padding:7 }}><ChevronLeft size={14}/></button>
-          <button className="btn-icon" onClick={next} style={{ padding:7 }}><ChevronRight size={14}/></button>
-          {/* View switcher */}
-          <div style={{ display:'flex', gap:3, background:'var(--glass-bg-2)', padding:3, borderRadius:'var(--radius-md)', border:'1px solid var(--glass-border)' }}>
-            {['day','week','month'].map(v=>(
-              <button key={v} onClick={()=>setView(v)} style={{ padding:'5px 10px', borderRadius:'var(--radius-sm)', border:'none', fontSize:12, fontWeight:600, cursor:'pointer',
-                background:view===v?'var(--accent)':'transparent', color:view===v?'white':'var(--text-2)', transition:'all .15s' }}>
-                {v.charAt(0).toUpperCase()+v.slice(1)}
-              </button>
-            ))}
-          </div>
-        </div>
-      </div>
-
-      {/* Add block form */}
-      {showAdd && (
-        <div style={{ margin:'0 32px 16px', padding:'14px 16px', background:'var(--glass-bg-2)', border:'1px solid var(--glass-border)', borderRadius:'var(--radius-lg)', display:'flex', gap:10, alignItems:'flex-end', flexWrap:'wrap' }}>
-          <div style={{ flex:'1 1 160px' }}>
-            <div style={{ fontSize:11, color:'var(--text-3)', marginBottom:4, fontWeight:600 }}>Title</div>
-            <input style={inputStyle} placeholder="Study block, class, office hours…" value={addForm.title} onChange={e=>setAddForm(f=>({...f,title:e.target.value}))} autoFocus onKeyDown={e=>e.key==='Enter'&&saveBlock()}/>
-          </div>
-          <div style={{ flex:'1 1 110px' }}>
-            <div style={{ fontSize:11, color:'var(--text-3)', marginBottom:4, fontWeight:600 }}>Date</div>
-            <input type="date" style={inputStyle} value={addForm.date} onChange={e=>setAddForm(f=>({...f,date:e.target.value}))}/>
-          </div>
-          <div style={{ flex:'1 1 90px' }}>
-            <div style={{ fontSize:11, color:'var(--text-3)', marginBottom:4, fontWeight:600 }}>Start</div>
-            <select style={inputStyle} value={addForm.startHour} onChange={e=>setAddForm(f=>({...f,startHour:Number(e.target.value)}))}>
-              {HOURS.map(h=><option key={h} value={h}>{h>12?`${h-12}:00 PM`:h===12?'12:00 PM':`${h}:00 AM`}</option>)}
-            </select>
-          </div>
-          <div style={{ flex:'1 1 90px' }}>
-            <div style={{ fontSize:11, color:'var(--text-3)', marginBottom:4, fontWeight:600 }}>End</div>
-            <select style={inputStyle} value={addForm.endHour} onChange={e=>setAddForm(f=>({...f,endHour:Number(e.target.value)}))}>
-              {HOURS.map(h=><option key={h} value={h}>{h>12?`${h-12}:00 PM`:h===12?'12:00 PM':`${h}:00 AM`}</option>)}
-            </select>
-          </div>
-          <div style={{ flex:'1 1 140px' }}>
-            <div style={{ fontSize:11, color:'var(--text-3)', marginBottom:4, fontWeight:600 }}>Color</div>
-            <div style={{ display:'flex', gap:5 }}>
-              {BLOCK_COLORS.map(c=><button key={c} onClick={()=>setAddForm(f=>({...f,color:c}))} style={{ width:22,height:22,borderRadius:'50%',background:c,border:`3px solid ${addForm.color===c?'white':'transparent'}`,cursor:'pointer' }}/>)}
-            </div>
-          </div>
-          <div style={{ display:'flex', gap:6 }}>
-            <button className="btn btn-primary" onClick={saveBlock} style={{ fontSize:12 }}>Save</button>
-            <button className="btn btn-ghost" onClick={()=>{setShowAdd(false);setNewBlock(null)}} style={{ fontSize:12 }}>Cancel</button>
-          </div>
-        </div>
+      {/* Popup */}
+      {popup && (
+        <AssignmentPopup
+          assignment={popup.assignment}
+          anchor={{ x: popup.x, y: popup.y }}
+          onClose={() => setPopup(null)}
+          onJump={() => handleJump(popup.assignment)}
+        />
       )}
 
-      {/* Edit block */}
-      {editBlock && (
-        <div style={{ margin:'0 32px 16px', padding:'14px 16px', background:'var(--glass-bg-2)', border:'1px solid var(--glass-border)', borderRadius:'var(--radius-lg)', display:'flex', gap:10, alignItems:'center', flexWrap:'wrap' }}>
-          <input style={{...inputStyle,flex:1,minWidth:150}} value={editForm.title} onChange={e=>setEditForm(f=>({...f,title:e.target.value}))} autoFocus onKeyDown={e=>e.key==='Enter'&&(updateBlock(editBlock.id,editForm),setEditBlock(null))}/>
-          <div style={{ display:'flex', gap:5 }}>
-            {BLOCK_COLORS.map(c=><button key={c} onClick={()=>setEditForm(f=>({...f,color:c}))} style={{ width:20,height:20,borderRadius:'50%',background:c,border:`3px solid ${editForm.color===c?'white':'transparent'}`,cursor:'pointer' }}/>)}
-          </div>
-          <button className="btn btn-primary" onClick={()=>{updateBlock(editBlock.id,editForm);setEditBlock(null)}} style={{fontSize:12}}>Save</button>
-          <button className="btn btn-ghost" onClick={()=>setEditBlock(null)} style={{fontSize:12}}>Cancel</button>
-          <button className="btn btn-ghost" onClick={()=>{deleteBlock(editBlock.id);setEditBlock(null)}} style={{fontSize:12,color:'var(--coral)'}}>Delete</button>
-        </div>
-      )}
-
-      {/* Calendar grid */}
-      <div style={{ flex:1, display:'flex', flexDirection:'column', margin:'0 32px 24px', background:'var(--glass-bg)', border:'1px solid var(--glass-border)', borderRadius:'var(--radius-lg)', overflow:'hidden', minHeight:400 }}>
-        {view==='month' && <MonthGrid/>}
-        {view==='week'  && <TimeGrid days={weekDays}/>}
-        {view==='day'   && <TimeGrid days={[anchor]}/>}
-      </div>
-
-      {/* Mobile: show agenda list below grid */}
+      {/* Mobile: responsive padding */}
       <style>{`
         @media (max-width: 768px) {
-          .cal-page-header { padding: 16px 16px 0 !important; }
-          .cal-grid-wrap   { margin: 0 12px 20px !important; }
+          .page-body { padding: 0 !important; }
         }
       `}</style>
     </>
