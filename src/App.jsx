@@ -52,13 +52,22 @@ const NAV = [
   ]},
 ]
 
+// ── ALL keys synced to Drive & included in export ─────────────────
+// IMPORTANT: this list must stay in sync with TopBar.jsx ALL_KEYS
 const ALL_KEYS = [
-  'home_tasks', 'study_sessions', 'habit_grid', 'habit_history',
-  'timer_settings', 'streak', 'study_week_goal', 'sem_end_date',
+  'home_tasks',
+  'study_sessions',
+  'habit_grid', 'habit_history',
+  'timer_settings',
+  'streak',
+  'study_week_goal',
+  'sem_end_date',
   'terms_v1', 'assignments',
   'habits_config', 'recurring_tasks', 'rec_history', 'goals_config',
   'course_notes', 'full_course_notes', 'full_course_notes_v2',
-  'quick_links', 'page_links', 'weather_city', 'scheme', 'theme',
+  'quick_links', 'page_links',
+  'weather_city',
+  'scheme', 'theme',
   'flashcard_decks', 'flashcard_cards',
   'calendar_blocks',
   'notification_settings',
@@ -83,7 +92,7 @@ function wipeAllSettings() {
   window.location.reload()
 }
 
-const chipBorder = { border: '1.5px solid rgba(0,0,0,0.55)', boxShadow: '0 1px 4px rgba(0,0,0,0.18)' }
+const chipBorder = { border:'1.5px solid rgba(0,0,0,0.55)', boxShadow:'0 1px 4px rgba(0,0,0,0.18)' }
 
 function Avatar({ profile }) {
   const ini = n => { const p=(n||'?').trim().split(/\s+/); return (p[0][0]+(p[1]?p[1][0]:'')).toUpperCase() }
@@ -98,11 +107,11 @@ function Avatar({ profile }) {
 
 function SidebarMiniWidgets() {
   const loc          = useLocation()
-  const isHome       = loc.pathname === '/'
-  const isCourses    = loc.pathname === '/courses'
-  const isFlashcards = loc.pathname === '/flashcards'
-  const isCalendar   = loc.pathname === '/calendar'
-  const isResources  = loc.pathname === '/resources'
+  const isHome       = loc.pathname==='/'
+  const isCourses    = loc.pathname==='/courses'
+  const isFlashcards = loc.pathname==='/flashcards'
+  const isCalendar   = loc.pathname==='/calendar'
+  const isResources  = loc.pathname==='/resources'
   return (
     <>
       {!isHome && <SidebarMiniTasks/>}
@@ -111,52 +120,55 @@ function SidebarMiniWidgets() {
   )
 }
 
-const THEME_CYCLE_LABEL = { dark: 'Switch to light', light: 'Bing wallpaper', bing: 'Switch to dark' }
-const THEME_CYCLE_ICON  = { dark: '☀️', light: '🌄', bing: '🌙' }
+const THEME_CYCLE_LABEL = { dark:'Switch to light', light:'Bing wallpaper', bing:'Switch to dark' }
+const THEME_CYCLE_ICON  = { dark:'☀️', light:'🌄', bing:'🌙' }
 
-function MobileHeader({ profile, signOut, wipeAllSettings, sidebarOpen, setSidebarOpen, theme, toggleTheme }) {
+function MobileHeader({ profile, signOut, sidebarOpen, setSidebarOpen, theme, toggleTheme }) {
   const [showDropdown, setShowDropdown] = useState(false)
   const dropRef  = useRef(null)
   const navigate = useNavigate()
 
-  useEffect(() => {
-    const handler = e => { if (dropRef.current && !dropRef.current.contains(e.target)) setShowDropdown(false) }
-    document.addEventListener('mousedown', handler)
-    return () => document.removeEventListener('mousedown', handler)
-  }, [])
+  useEffect(()=>{
+    const h = e=>{ if(dropRef.current&&!dropRef.current.contains(e.target)) setShowDropdown(false) }
+    document.addEventListener('mousedown',h)
+    return ()=>document.removeEventListener('mousedown',h)
+  },[])
 
-  const ini = n => { const p=(n||'?').trim().split(/\s+/); return (p[0][0]+(p[1]?p[1][0]:'')).toUpperCase() }
+  const ini = n=>{ const p=(n||'?').trim().split(/\s+/); return (p[0][0]+(p[1]?p[1][0]:'')).toUpperCase() }
 
   return (
     <header className="mobile-header">
       <button style={{background:'none',border:'none',color:'var(--text-1)',display:'flex',padding:4,cursor:'pointer'}} onClick={()=>setSidebarOpen(o=>!o)}>
-        {sidebarOpen ? <X size={20}/> : <Menu size={20}/>}
+        {sidebarOpen?<X size={20}/>:<Menu size={20}/>}
       </button>
       <span style={{fontWeight:700,fontSize:15,letterSpacing:'-0.3px',flex:1}}>Planner</span>
       <div ref={dropRef} style={{position:'relative'}}>
         <button onClick={()=>setShowDropdown(s=>!s)} style={{background:'none',border:'none',cursor:'pointer',padding:0,display:'flex'}}>
           <div className="avatar">
             {profile?.picture
-              ? <img src={profile.picture} referrerPolicy="no-referrer" style={{width:'100%',height:'100%',objectFit:'cover'}} onError={e=>{e.target.style.display='none'}}/>
-              : ini(profile?.name||'?')}
+              ?<img src={profile.picture} referrerPolicy="no-referrer" style={{width:'100%',height:'100%',objectFit:'cover'}} onError={e=>{e.target.style.display='none'}}/>
+              :ini(profile?.name||'?')}
           </div>
         </button>
-        {showDropdown && (
+        {showDropdown&&(
           <div style={{position:'absolute',top:'calc(100% + 8px)',right:0,width:210,background:'var(--panel-bg,#1a1a2e)',border:'1px solid var(--glass-border)',borderRadius:'var(--radius-lg)',boxShadow:'var(--shadow)',zIndex:500,overflow:'hidden'}}>
             <div style={{padding:'12px 14px',borderBottom:'1px solid var(--glass-border)'}}>
               <div style={{fontSize:13,fontWeight:600,color:'var(--text-1)',overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{profile?.name||'User'}</div>
               <div style={{fontSize:11,color:'var(--text-3)',overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{profile?.email||''}</div>
             </div>
             {[
-              { icon: THEME_CYCLE_ICON[theme]||'☀️', label: THEME_CYCLE_LABEL[theme]||'Toggle theme', action: toggleTheme },
+              { icon:THEME_CYCLE_ICON[theme]||'☀️', label:THEME_CYCLE_LABEL[theme]||'Toggle theme', action:toggleTheme },
               { icon:'⚙️', label:'Settings', action:()=>{ navigate('/settings'); setShowDropdown(false) } },
-              { icon:'🚪', label:'Sign out', action: signOut },
+              { icon:'🚪', label:'Sign out', action:signOut },
               { icon:'🗑', label:'Wipe all data', action:()=>{ setShowDropdown(false); wipeAllSettings() }, danger:true },
             ].map((item,i)=>(
-              <button key={i} onClick={item.action}
-                style={{width:'100%',display:'flex',alignItems:'center',gap:10,padding:'11px 14px',background:'none',border:'none',
-                  borderBottom:i<3?'1px solid var(--glass-border)':'none',
-                  color:item.danger?'var(--coral)':'var(--text-1)',fontSize:13,cursor:'pointer',textAlign:'left',transition:'background .15s'}}
+              <button key={i} onClick={item.action} style={{
+                width:'100%',display:'flex',alignItems:'center',gap:10,padding:'11px 14px',
+                background:'none',border:'none',
+                borderBottom:i<3?'1px solid var(--glass-border)':'none',
+                color:item.danger?'var(--coral)':'var(--text-1)',
+                fontSize:13,cursor:'pointer',textAlign:'left',transition:'background .15s',
+              }}
                 onMouseEnter={e=>e.currentTarget.style.background='var(--glass-hover)'}
                 onMouseLeave={e=>e.currentTarget.style.background='none'}>
                 <span>{item.icon}</span>{item.label}
@@ -174,19 +186,19 @@ export default function App() {
   const { theme, scheme, toggleTheme, setScheme, SCHEMES, SCHEME_COLORS } = useTheme()
   const { syncToDrive, saveState }                                         = useDriveSync()
   const { notifs, unread, markAllRead, clearNotif }                        = useNotifications()
-  const { wallpaper }                                                       = useBingWallpaper(theme === 'bing')
+  const { wallpaper }                                                       = useBingWallpaper(theme==='bing')
   const [sidebarOpen, setSidebarOpen] = useState(false)
   const [driveKey,    setDriveKey]    = useState(0)
 
-  useEffect(() => {
-    const handler = () => setDriveKey(k => k + 1)
-    window.addEventListener('drive-loaded', handler)
-    return () => window.removeEventListener('drive-loaded', handler)
-  }, [])
+  useEffect(()=>{
+    const h=()=>setDriveKey(k=>k+1)
+    window.addEventListener('drive-loaded',h)
+    return ()=>window.removeEventListener('drive-loaded',h)
+  },[])
 
-  const handleDataChange = useCallback(() => {
+  const handleDataChange = useCallback(()=>{
     syncToDrive(getAllData())
-  }, [syncToDrive])
+  },[syncToDrive])
 
   if (loading) return (
     <div style={{minHeight:'100vh',display:'flex',alignItems:'center',justifyContent:'center'}}>
@@ -212,12 +224,11 @@ export default function App() {
             </svg>
             <span className="sidebar-logo-text">Planner</span>
           </div>
-
           <nav className="sidebar-nav">
-            {NAV.map(group => (
+            {NAV.map(group=>(
               <div key={group.label}>
                 <div className="nav-section-label">{group.label}</div>
-                {group.items.map(({to,icon:Icon,text}) => (
+                {group.items.map(({to,icon:Icon,text})=>(
                   <NavLink key={to} to={to} end={to==='/'} onClick={()=>setSidebarOpen(false)}
                     className={({isActive})=>`nav-item ${isActive?'active':''}`}>
                     <Icon size={16}/>{text}
@@ -226,9 +237,7 @@ export default function App() {
               </div>
             ))}
           </nav>
-
           <SidebarMiniWidgets/>
-
           <div className="sidebar-footer">
             <div className="user-row">
               <Avatar profile={profile}/>
@@ -257,11 +266,10 @@ export default function App() {
 
         <div className="main-content">
           <MobileHeader
-            profile={profile} signOut={signOut} wipeAllSettings={wipeAllSettings}
+            profile={profile} signOut={signOut}
             sidebarOpen={sidebarOpen} setSidebarOpen={setSidebarOpen}
             theme={theme} toggleTheme={toggleTheme}
           />
-
           <TopBar
             theme={theme} scheme={scheme}
             toggleTheme={toggleTheme} setScheme={setScheme}
@@ -270,10 +278,7 @@ export default function App() {
             onLinksChange={handleDataChange}
             notifs={notifs} unread={unread} markAllRead={markAllRead} clearNotif={clearNotif}
           />
-
-          {/* Bing daily photo — slim header banner, only in bing theme */}
-          <BingHeader enabled={theme === 'bing'} wallpaper={wallpaper}/>
-
+          <BingHeader enabled={theme==='bing'} wallpaper={wallpaper}/>
           <Routes>
             <Route path="/"           element={<WeeklyHome     key={driveKey} onDataChange={handleDataChange}/>}/>
             <Route path="/courses"    element={<Courses        key={driveKey} onDataChange={handleDataChange}/>}/>
