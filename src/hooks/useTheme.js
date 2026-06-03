@@ -1,9 +1,9 @@
 import { useState, useEffect } from 'react'
 import { load, save } from '../utils/storage.js'
 
-const SCHEMES      = ['indigo', 'teal', 'rose', 'amber']
+const SCHEMES       = ['indigo', 'teal', 'rose', 'amber']
 const SCHEME_COLORS = { indigo: '#6366f1', teal: '#14b8a6', rose: '#f43f5e', amber: '#f59e0b' }
-const THEME_CYCLE  = ['dark', 'light', 'bing']
+const THEME_CYCLE   = ['dark', 'light', 'bing']
 
 export function useTheme() {
   const [theme,  setThemeState]  = useState(() => load('theme',  'dark'))
@@ -21,7 +21,7 @@ export function useTheme() {
     save('theme', next)
   }
 
-  const setTheme  = (t) => { setThemeState(t); save('theme', t) }
+  const setTheme  = (t) => { setThemeState(t);  save('theme',  t) }
   const setScheme = (s) => { setSchemeState(s); save('scheme', s) }
 
   return { theme, scheme, toggleTheme, setTheme, setScheme, SCHEMES, SCHEME_COLORS }
