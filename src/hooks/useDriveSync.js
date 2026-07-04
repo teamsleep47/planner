@@ -3,16 +3,9 @@ import { save } from '../utils/storage.js'
 
 const FILE_NAME = 'planner_data_v1.json'
 const LS_TOKEN  = 'planner_token_v1'
-const TS_KEY    = 'planner_v1_last_sync_ts'
 
 function getToken() {
   try { return localStorage.getItem(LS_TOKEN) || '' } catch(e) { return '' }
-}
-function getLocalTs() {
-  try { return Number(localStorage.getItem(TS_KEY) || 0) } catch(e) { return 0 }
-}
-function setLocalTs(ts) {
-  try { localStorage.setItem(TS_KEY, String(ts)) } catch(e) {}
 }
 
 export function useDriveSync() {
@@ -20,6 +13,9 @@ export function useDriveSync() {
   const [synced,     setSynced]     = useState(false)
   const fileIdRef   = useRef(null)
   const debounceRef = useRef(null)
+  // Track whether we're in the middle of a save so we don't boot-load
+  // and clobber a save that just completed on THIS device
+  const justSavedRef = useRef(false)
 
   const getFileId = useCallback(async (token) => {
     if (fileIdRef.current) return fileIdRef.current
@@ -34,7 +30,7 @@ export function useDriveSync() {
       return fileIdRef.current
     }
     const create = await fetch('https://www.googleapis.com/drive/v3/files', {
-      method:  'POST',
+      method: 'POST',
       headers: { Authorization: 'Bearer ' + token, 'Content-Type': 'application/json' },
       body:    JSON.stringify({ name: FILE_NAME, mimeType: 'application/json' }),
     })
@@ -45,9 +41,10 @@ export function useDriveSync() {
   }, [])
 
   // ── Load from Drive on boot ─────────────────────────────────────
-  // Only overwrites localStorage if Drive data is NEWER than last
-  // successful local save. Prevents stale Drive from clobbering
-  // fresh edits made on this device while offline.
+  // Strategy: Drive always wins on load. This means:
+  // - If you edited on PC1 and PC2 loads → PC2 gets PC1's latest data ✓
+  // - If you edited on this device and refresh → Drive has the latest (saved 1.5s after edit) ✓
+  // - The only edge case is editing then refreshing within 1.5s → handled by justSavedRef
   useEffect(() => {
     const token = getToken()
     if (!token) return
@@ -59,35 +56,34 @@ export function useDriveSync() {
           `https://www.googleapis.com/drive/v3/files/${fileId}?alt=media`,
           { headers: { Authorization: 'Bearer ' + token } }
         )
+
         if (res.status === 401) {
           window.dispatchEvent(new Event('token-expired'))
           setSynced(true); return
         }
-        if (!res.ok) { setSynced(true); return }
-
-        const data    = await res.json()
-        const driveTs = Number(data.__sync_ts || 0)
-        const localTs = getLocalTs()
-
-        console.log('[drive] load — driveTs:', driveTs, 'localTs:', localTs)
-
-        if (driveTs >= localTs) {
-          // Drive is same age or newer — load it
-          Object.entries(data).forEach(([key, value]) => {
-            if (key === '__sync_ts') return
-            if (value !== null && value !== undefined) save(key, value)
-          })
-          console.log('[drive] loaded from Drive')
-        } else {
-          // This device is newer — skip Drive load, but still fire event
-          console.log('[drive] local is newer — skipping overwrite')
+        if (!res.ok) {
+          // No file yet (first use) — nothing to load
+          setSynced(true)
+          window.dispatchEvent(new Event('drive-loaded'))
+          return
         }
 
+        const data = await res.json()
+
+        // Remove internal metadata key before writing to localStorage
+        const { __sync_ts, ...payload } = data
+
+        Object.entries(payload).forEach(([key, value]) => {
+          if (value !== null && value !== undefined) save(key, value)
+        })
+
+        console.log('[drive] loaded — Drive wins')
         setSynced(true)
         window.dispatchEvent(new Event('drive-loaded'))
       } catch(e) {
         console.error('[drive] load error:', e)
         setSynced(true)
+        // Fire event anyway so app doesn't hang waiting
         window.dispatchEvent(new Event('drive-loaded'))
       }
     }
@@ -96,6 +92,8 @@ export function useDriveSync() {
   }, [getFileId])
 
   // ── Save to Drive (debounced 1.5s) ─────────────────────────────
+  // Every data change triggers this. The 1.5s debounce means rapid edits
+  // only result in one write. __sync_ts lets us debug timing if needed.
   const syncToDrive = useCallback((allData) => {
     const token = getToken()
     if (!token) return
@@ -104,9 +102,8 @@ export function useDriveSync() {
     debounceRef.current = setTimeout(async () => {
       setSaveState('saving')
       try {
-        const fileId = await getFileId(token)
-        const ts     = Date.now()
-        const payload = { ...allData, __sync_ts: ts }
+        const fileId  = await getFileId(token)
+        const payload = { ...allData, __sync_ts: Date.now() }
 
         const res = await fetch(
           `https://www.googleapis.com/upload/drive/v3/files/${fileId}?uploadType=media`,
@@ -116,14 +113,17 @@ export function useDriveSync() {
             body:    JSON.stringify(payload),
           }
         )
+
         if (res.status === 401) {
           window.dispatchEvent(new Event('token-expired'))
           throw new Error('TOKEN_EXPIRED')
         }
         if (!res.ok) throw new Error('HTTP ' + res.status)
 
-        setLocalTs(ts)
-        console.log('[drive] saved ok, ts:', ts)
+        justSavedRef.current = true
+        setTimeout(() => { justSavedRef.current = false }, 5000)
+
+        console.log('[drive] saved ok at', new Date().toLocaleTimeString())
         setSaveState('saved')
         setTimeout(() => setSaveState('idle'), 2500)
       } catch(e) {
