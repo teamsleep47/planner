@@ -1,16 +1,9 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
-import { CheckCircle2, Circle, Plus, X, History } from 'lucide-react'
+import { CheckCircle2, Circle, Plus, X, History, Calendar } from 'lucide-react'
 import { load, save } from '../utils/storage.js'
 import { formatRelativeDue } from '../utils/timeFormat.js'
-import { getActiveTermCourses } from '../utils/termData.js'
+import { getActiveTermCourses, getCourseColorMap } from '../utils/termData.js'
 import Tooltip from '../components/Tooltip.jsx'
-
-function buildCourseColorMap() {
-  const courses = getActiveTermCourses()
-  const map = { OTHER: 'var(--green)' }
-  courses.forEach(c => { map[c.name] = c.color })
-  return map
-}
 
 const URGENCY = {
   urgent: { color:'#ef4444', label:'🔴 Urgent' },
@@ -21,7 +14,6 @@ const URGENCY = {
 }
 
 const DEFAULT_TIMERS = { focus:25, short:5, long:15 }
-
 const WX_ICONS = {0:'☀️',1:'🌤',2:'⛅',3:'☁️',45:'🌫',51:'🌦',53:'🌦',55:'🌧',61:'🌧',63:'🌧',65:'🌧',80:'🌦',82:'⛈',95:'⛈'}
 
 function getGreeting() {
@@ -37,28 +29,29 @@ const DAY_IDX    = new Date().getDay()
 const IS_CLASS   = DAY_IDX===1||DAY_IDX===3
 const DAYS_SHORT = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat']
 
+// Due-date first, priority as tiebreaker
 function getUpcomingAssignments(count=3) {
   try {
     const terms  = JSON.parse(localStorage.getItem('planner_v1_terms_v1')||'[]')
     const active = terms.find(t=>t.active)||terms[0]
     if (!active) return []
     return active.courses
-      .flatMap(c => c.assignments.map(a=>({...a,courseName:c.name,courseColor:c.color,_type:'assignment'})))
+      .flatMap(c => c.assignments.map(a=>({...a, courseName:c.name, courseColor:c.color, _type:'assignment'})))
       .filter(a => a.status!=='Done' && a.due)
-      .sort((a,b)=>{
-        const pw={urgent:4,high:3,medium:2,low:1,none:0}
-        const pd=(pw[b.priority||'none']||0)-(pw[a.priority||'none']||0)
-        return pd!==0?pd:new Date(a.due)-new Date(b.due)
+      .sort((a,b) => {
+        const dateDiff = new Date(a.due) - new Date(b.due)
+        if (dateDiff !== 0) return dateDiff
+        const pw = {urgent:4,high:3,medium:2,low:1,none:0}
+        return (pw[b.priority||'none']||0) - (pw[a.priority||'none']||0)
       })
       .slice(0,count)
   } catch(e) { return [] }
 }
 
-function getUpcomingPlans(count=3) {
+function getUpcomingPlans(count=2) {
   try {
-    const plans = JSON.parse(localStorage.getItem('planner_v1_calendar_plans')||'[]')
     const today = new Date().toISOString().slice(0,10)
-    return plans
+    return JSON.parse(localStorage.getItem('planner_v1_calendar_plans')||'[]')
       .filter(p => p.date >= today)
       .sort((a,b) => a.date.localeCompare(b.date))
       .slice(0,count)
@@ -66,7 +59,7 @@ function getUpcomingPlans(count=3) {
   } catch(e) { return [] }
 }
 
-// ── TaskRow — outside component so it never remounts on keystroke ──
+// ── TaskRow defined outside component — prevents cursor jump on edit ──
 function TaskRow({
   task, courseColors, courseOptions,
   editId, editText, editCourse, editUrgency, editDue,
@@ -77,18 +70,16 @@ function TaskRow({
   onDragStart, onDragOver, onDrop, onDragEnd,
 }) {
   const urgColor    = URGENCY[task.urgency||'none'].color
-  const courseColor = courseColors[task.course] || courseColors['OTHER']
-  const courseLabel = task.course === 'OTHER' ? 'Other' : (task.course || 'Other')
+  const courseColor = courseColors[task.course] || courseColors['OTHER'] || '#4ade80'
+  const courseLabel = task.course==='OTHER'?'Other':(task.course||'Other')
   const due         = task.due ? formatRelativeDue(task.due,'') : null
-  const isEditing   = editId === task.id
+  const isPlan      = task.isPlan
+  const isEditing   = editId===task.id
 
   if (isEditing) {
     return (
       <div style={{padding:'10px 12px',marginBottom:4,borderRadius:10,background:'var(--glass-bg-2)',border:'1px solid var(--accent)',display:'flex',flexDirection:'column',gap:8}}>
-        <input className="inline-input" value={editText}
-          onChange={e => onEditText(e.target.value)}
-          onKeyDown={e => { if(e.key==='Enter') onSaveEdit(); if(e.key==='Escape') onCancelEdit() }}
-          autoFocus/>
+        <input className="inline-input" value={editText} onChange={e=>onEditText(e.target.value)} onKeyDown={e=>{if(e.key==='Enter')onSaveEdit();if(e.key==='Escape')onCancelEdit()}} autoFocus/>
         <div style={{display:'grid',gridTemplateColumns:'1fr 1fr 1fr',gap:8}}>
           <select className="inline-input" value={editCourse} onChange={e=>onEditCourse(e.target.value)}>
             {courseOptions.map(c=><option key={c} value={c}>{c==='OTHER'?'Other':c}</option>)}
@@ -106,41 +97,35 @@ function TaskRow({
     )
   }
 
-  const isDragOver = dragOverId === task.id
-  const isDragging = dragId     === task.id
-
   return (
     <div
       draggable
-      onDragStart={e => onDragStart(e, task.id)}
-      onDragOver={e => onDragOver(e, task.id)}
-      onDrop={e => onDrop(e, task.id)}
+      onDragStart={e=>onDragStart(e,task.id)}
+      onDragOver={e=>onDragOver(e,task.id)}
+      onDrop={e=>onDrop(e,task.id)}
       onDragEnd={onDragEnd}
-      onDoubleClick={() => onStartEdit(task)}
+      onDoubleClick={()=>onStartEdit(task)}
       className="task-row-mobile"
       style={{
-        display:'flex', alignItems:'center', gap:8,
-        padding:'7px 10px', marginBottom:3, borderRadius:10,
+        display:'flex',alignItems:'center',gap:8,
+        padding:'7px 10px',marginBottom:3,borderRadius:10,
         position:'relative',
-        background: isDragOver ? 'var(--accent-dim)' : 'var(--glass-bg)',
-        border: isDragOver ? '1px solid var(--accent)' : '1px solid var(--glass-border)',
-        outline: urgColor ? `2px solid ${urgColor}44` : 'none',
-        outlineOffset: 2,
-        transition:'background .1s, border .1s',
-        cursor:'grab', opacity: isDragging ? 0.35 : 1,
+        background:dragOverId===task.id?'var(--accent-dim)':'var(--glass-bg)',
+        border:dragOverId===task.id?'1px solid var(--accent)':'1px solid var(--glass-border)',
+        outline:urgColor?`2px solid ${urgColor}44`:'none',
+        outlineOffset:2,
+        cursor:'grab',opacity:dragId===task.id?.35:1,
         userSelect:'none',
       }}
     >
-      {/* Priority bar */}
-      {urgColor && (
-        <div style={{position:'absolute',left:3,top:'20%',width:3,height:'60%',borderRadius:2,background:urgColor,boxShadow:`0 0 6px ${urgColor}`,pointerEvents:'none'}}/>
-      )}
+      {urgColor&&<div style={{position:'absolute',left:3,top:'20%',width:3,height:'60%',borderRadius:2,background:urgColor,boxShadow:`0 0 6px ${urgColor}`,pointerEvents:'none'}}/>}
 
       <button onClick={()=>onToggle(task.id)} style={{background:'none',border:'none',padding:2,flexShrink:0,display:'flex',color:task.done?'var(--green)':'var(--text-3)',cursor:'pointer'}}>
-        {task.done ? <CheckCircle2 size={17}/> : <Circle size={17}/>}
+        {task.done?<CheckCircle2 size={17}/>:<Circle size={17}/>}
       </button>
 
       <span style={{flex:1,fontSize:13,fontWeight:500,color:task.done?'var(--text-3)':'var(--text-1)',textDecoration:task.done?'line-through':'none',overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>
+        {isPlan&&<span style={{fontSize:10,marginRight:4}}>📅</span>}
         {task.text}
       </span>
 
@@ -148,7 +133,7 @@ function TaskRow({
         <span style={{fontSize:10,padding:'1px 6px',borderRadius:20,background:`${courseColor}22`,color:courseColor,border:`1px solid ${courseColor}44`,fontWeight:700}}>
           {courseLabel}
         </span>
-        {due && <span style={{fontSize:10,fontWeight:700,color:due.color}}>{due.label}</span>}
+        {due&&<span style={{fontSize:10,fontWeight:700,color:due.color}}>{due.label}</span>}
         <button onClick={()=>onDelete(task.id)} style={{background:'none',border:'none',color:'var(--text-3)',cursor:'pointer',display:'flex',padding:2}}>
           <X size={12}/>
         </button>
@@ -157,42 +142,41 @@ function TaskRow({
   )
 }
 
-// ── Main component ───────────────────────────────────────────────
 export default function WeeklyHome({ onDataChange }) {
-  const [tasks,        setTasks]       = useState(()=>load('home_tasks',[]))
-  const [timerMins,    setTimerMins]   = useState(()=>load('timer_settings',DEFAULT_TIMERS))
-  const [mode,         setMode]        = useState('focus')
-  const [secs,         setSecs]        = useState(()=>load('timer_settings',DEFAULT_TIMERS).focus*60)
-  const [running,      setRunning]     = useState(false)
-  const [showAdd,      setShowAdd]     = useState(false)
-  const [newTask,      setNewTask]     = useState({text:'',course:'OTHER',urgency:'none',due:''})
+  const [tasks,       setTasks]      = useState(()=>load('home_tasks',[]))
+  const [timerMins,   setTimerMins]  = useState(()=>load('timer_settings',DEFAULT_TIMERS))
+  const [mode,        setMode]       = useState('focus')
+  const [secs,        setSecs]       = useState(()=>load('timer_settings',DEFAULT_TIMERS).focus*60)
+  const [running,     setRunning]    = useState(false)
+  const [showAdd,     setShowAdd]    = useState(false)
+  const [newTask,     setNewTask]    = useState({text:'',course:'OTHER',urgency:'none',due:'',isPlan:false})
   const addInputRef = useRef(null)
 
-  // Flat edit state — prevents cursor jumping
-  const [editId,      setEditId]      = useState(null)
-  const [editText,    setEditText]    = useState('')
-  const [editCourse,  setEditCourse]  = useState('')
-  const [editUrgency, setEditUrgency] = useState('none')
-  const [editDue,     setEditDue]     = useState('')
+  // Flat edit state — no cursor jump
+  const [editId,      setEditId]     = useState(null)
+  const [editText,    setEditText]   = useState('')
+  const [editCourse,  setEditCourse] = useState('')
+  const [editUrgency, setEditUrgency]= useState('none')
+  const [editDue,     setEditDue]    = useState('')
 
-  const [showSettings, setShowSettings] = useState(false)
-  const [draftTimers,  setDraftTimers]  = useState(timerMins)
-  const [weather,      setWeather]      = useState(null)
-  const [city,         setCity]         = useState(()=>load('weather_city','Bradenton'))
-  const [cityDraft,    setCityDraft]    = useState(city)
-  const [showCityEdit, setShowCityEdit] = useState(false)
-  const [greeting,     setGreeting]     = useState(getGreeting())
-  const [semDate,      setSemDate]      = useState(()=>load('sem_end_date','2026-08-05'))
-  const [editSemDate,  setEditSemDate]  = useState(false)
-  const [showHistory,  setShowHistory]  = useState(false)
-  const [upcoming,     setUpcoming]     = useState([])
+  const [showSettings,setShowSettings]=useState(false)
+  const [draftTimers, setDraftTimers] =useState(timerMins)
+  const [weather,     setWeather]    = useState(null)
+  const [city,        setCity]       = useState(()=>load('weather_city','Bradenton'))
+  const [cityDraft,   setCityDraft]  = useState(city)
+  const [showCityEdit,setShowCityEdit]=useState(false)
+  const [greeting,    setGreeting]   = useState(getGreeting())
+  const [semDate,     setSemDate]    = useState(()=>load('sem_end_date','2026-08-05'))
+  const [editSemDate, setEditSemDate]=useState(false)
+  const [showHistory, setShowHistory]=useState(false)
+  const [upcoming,    setUpcoming]   = useState([])
 
-  // Drag state
-  const [dragId,    setDragId]    = useState(null)
-  const [dragOverId,setDragOverId]= useState(null)
+  const [dragId,      setDragId]     = useState(null)
+  const [dragOverId,  setDragOverId] = useState(null)
   const timerRef = useRef(null)
 
-  const COURSE_COLORS = buildCourseColorMap()
+  // Use shared getCourseColorMap — always fresh from localStorage
+  const COURSE_COLORS = getCourseColorMap()
   const courseOptions = [...getActiveTermCourses().map(c=>c.name), 'OTHER']
 
   useEffect(()=>{ const id=setInterval(()=>setGreeting(getGreeting()),60000); return()=>clearInterval(id) },[])
@@ -200,88 +184,95 @@ export default function WeeklyHome({ onDataChange }) {
   useEffect(()=>{ save('timer_settings',timerMins) },[timerMins])
   useEffect(()=>{ save('sem_end_date',semDate) },[semDate])
 
-  // Refresh upcoming when tasks or plans change
+  const refreshUpcoming = useCallback(() => {
+    const assignments = getUpcomingAssignments(3)
+    const plans       = getUpcomingPlans(2)
+    setUpcoming([...assignments, ...plans].slice(0,4))
+  },[])
+
+  useEffect(()=>{ refreshUpcoming() },[tasks])
   useEffect(()=>{
-    const refresh = () => {
-      const assignments = getUpcomingAssignments(3)
-      const plans       = getUpcomingPlans(3)
-      // Merge and take top 4 total (assignments first by priority, plans by date)
-      setUpcoming([...assignments.slice(0,3), ...plans.slice(0,2)].slice(0,4))
-    }
-    refresh()
-    window.addEventListener('drive-loaded', refresh)
-    return () => window.removeEventListener('drive-loaded', refresh)
-  },[tasks])
+    refreshUpcoming()
+    window.addEventListener('drive-loaded',refreshUpcoming)
+    return()=>window.removeEventListener('drive-loaded',refreshUpcoming)
+  },[])
 
   useEffect(()=>{
-    if(running){ timerRef.current=setInterval(()=>setSecs(s=>{ if(s<=1){clearInterval(timerRef.current);setRunning(false);return timerMins[mode]*60} return s-1 }),1000) }
+    if(running){timerRef.current=setInterval(()=>setSecs(s=>{if(s<=1){clearInterval(timerRef.current);setRunning(false);return timerMins[mode]*60}return s-1}),1000)}
     else clearInterval(timerRef.current)
     return()=>clearInterval(timerRef.current)
   },[running,mode,timerMins])
 
   const fetchWeather = async (c=city) => {
     try {
-      const cached = sessionStorage.getItem('planner_weather_cache')
-      if(cached){ const p=JSON.parse(cached); if(p.city===c){ setWeather(p); return } }
-      const geo = await fetch(`https://geocoding-api.open-meteo.com/v1/search?name=${encodeURIComponent(c)}&count=1`)
-      const gd  = await geo.json()
+      const cached=sessionStorage.getItem('planner_weather_cache')
+      if(cached){const p=JSON.parse(cached);if(p.city===c){setWeather(p);return}}
+      const geo=await fetch(`https://geocoding-api.open-meteo.com/v1/search?name=${encodeURIComponent(c)}&count=1`)
+      const gd=await geo.json()
       if(!gd.results?.length) return
       const{latitude,longitude,name}=gd.results[0]
-      const wx  = await fetch(`https://api.open-meteo.com/v1/forecast?latitude=${latitude}&longitude=${longitude}&daily=temperature_2m_max,temperature_2m_min,weathercode&temperature_unit=fahrenheit&timezone=auto&forecast_days=7`)
-      const wd  = await wx.json()
-      const d   = {...wd,city:name}
+      const wx=await fetch(`https://api.open-meteo.com/v1/forecast?latitude=${latitude}&longitude=${longitude}&daily=temperature_2m_max,temperature_2m_min,weathercode&temperature_unit=fahrenheit&timezone=auto&forecast_days=7`)
+      const wd=await wx.json()
+      const d={...wd,city:name}
       sessionStorage.setItem('planner_weather_cache',JSON.stringify(d))
       setWeather(d)
-    } catch(e){}
+    }catch(e){}
   }
   useEffect(()=>{ fetchWeather() },[])
 
-  // ── Task ops ─────────────────────────────────────────────────
-  // Enter key: add task and keep field open for rapid entry
+  // Task ops
   const addTask = useCallback(() => {
     if (!newTask.text.trim()) return
-    setTasks(ts => [{ ...newTask, id:Date.now(), done:false }, ...ts])
-    setNewTask(n => ({...n, text:''}))   // clear text, keep course/urgency/due
-    // Refocus input for next entry
-    setTimeout(() => addInputRef.current?.focus(), 0)
-  }, [newTask])
+    const task = {...newTask, id:Date.now(), done:false}
+    setTasks(ts=>[task,...ts])
+    // If marked as plan, also save to calendar_plans
+    if (newTask.isPlan && newTask.due) {
+      const plans = JSON.parse(localStorage.getItem('planner_v1_calendar_plans')||'[]')
+      plans.unshift({ id:'t'+Date.now(), title:newTask.text, date:newTask.due, notes:'', color:'#6366f1', _type:'plan' })
+      localStorage.setItem('planner_v1_calendar_plans', JSON.stringify(plans))
+    }
+    setNewTask(n=>({...n,text:'',due:'',isPlan:false}))
+    setTimeout(()=>addInputRef.current?.focus(),0)
+  },[newTask])
 
-  const toggleTask  = useCallback(id => setTasks(ts=>ts.map(t=>t.id===id?{...t,done:!t.done}:t)),[])
-  const deleteTask  = useCallback(id => setTasks(ts=>ts.filter(t=>t.id!==id)),[])
-  const restoreTask = id => setTasks(ts=>ts.map(t=>t.id===id?{...t,done:false}:t))
+  const toggleTask  = useCallback(id=>setTasks(ts=>ts.map(t=>t.id===id?{...t,done:!t.done}:t)),[])
+  const deleteTask  = useCallback(id=>setTasks(ts=>ts.filter(t=>t.id!==id)),[])
+  const restoreTask = id=>setTasks(ts=>ts.map(t=>t.id===id?{...t,done:false}:t))
 
-  const startEdit = useCallback(task => {
+  const startEdit = useCallback(task=>{
     setEditId(task.id); setEditText(task.text)
     setEditCourse(task.course||'OTHER'); setEditUrgency(task.urgency||'none'); setEditDue(task.due||'')
   },[])
-  const saveEdit  = useCallback(()=>{ setTasks(ts=>ts.map(t=>t.id===editId?{...t,text:editText,course:editCourse,urgency:editUrgency,due:editDue}:t)); setEditId(null) },[editId,editText,editCourse,editUrgency,editDue])
+  const saveEdit  = useCallback(()=>{
+    setTasks(ts=>ts.map(t=>t.id===editId?{...t,text:editText,course:editCourse,urgency:editUrgency,due:editDue}:t))
+    setEditId(null)
+  },[editId,editText,editCourse,editUrgency,editDue])
   const cancelEdit= useCallback(()=>setEditId(null),[])
 
-  // ── Drag & drop ───────────────────────────────────────────────
-  const handleDragStart = useCallback((e,id)=>{ setDragId(id); e.dataTransfer.effectAllowed='move'; e.dataTransfer.setData('text/plain',String(id)) },[])
-  const handleDragOver  = useCallback((e,id)=>{ e.preventDefault(); e.dataTransfer.dropEffect='move'; setDragOverId(id) },[])
+  const handleDragStart = useCallback((e,id)=>{setDragId(id);e.dataTransfer.effectAllowed='move';e.dataTransfer.setData('text/plain',String(id))},[])
+  const handleDragOver  = useCallback((e,id)=>{e.preventDefault();e.dataTransfer.dropEffect='move';setDragOverId(id)},[])
   const handleDrop      = useCallback((e,targetId)=>{
     e.preventDefault()
-    if(!dragId||dragId===targetId){ setDragId(null);setDragOverId(null);return }
+    if(!dragId||dragId===targetId){setDragId(null);setDragOverId(null);return}
     setTasks(ts=>{
-      const active=[...ts.filter(t=>!t.done)], done=ts.filter(t=>t.done)
-      const fi=active.findIndex(t=>t.id===dragId), ti=active.findIndex(t=>t.id===targetId)
-      if(fi===-1||ti===-1) return ts
-      const[moved]=active.splice(fi,1); active.splice(ti,0,moved)
-      return [...active,...done]
+      const active=[...ts.filter(t=>!t.done)],done=ts.filter(t=>t.done)
+      const fi=active.findIndex(t=>t.id===dragId),ti=active.findIndex(t=>t.id===targetId)
+      if(fi===-1||ti===-1)return ts
+      const[moved]=active.splice(fi,1);active.splice(ti,0,moved)
+      return[...active,...done]
     })
-    setDragId(null); setDragOverId(null)
+    setDragId(null);setDragOverId(null)
   },[dragId])
-  const handleDragEnd = useCallback(()=>{ setDragId(null); setDragOverId(null) },[])
+  const handleDragEnd=useCallback(()=>{setDragId(null);setDragOverId(null)},[])
 
   const activeTasks = tasks.filter(t=>!t.done)
   const doneTasks   = tasks.filter(t=>t.done)
   const streak      = load('streak',0)
-  const semDays     = semDate ? formatRelativeDue(semDate,'') : null
-  const mm = String(Math.floor(secs/60)).padStart(2,'0')
-  const ss = String(secs%60).padStart(2,'0')
-  const pct= ((timerMins[mode]*60-secs)/(timerMins[mode]*60))*100
-  const inputSm = {padding:'7px 10px',background:'var(--glass-bg-2)',border:'1px solid var(--glass-border)',borderRadius:'var(--radius-sm)',color:'var(--text-1)',fontSize:12,fontFamily:'inherit'}
+  const semDays     = semDate?formatRelativeDue(semDate,''):null
+  const mm=String(Math.floor(secs/60)).padStart(2,'0')
+  const ss=String(secs%60).padStart(2,'0')
+  const pct=((timerMins[mode]*60-secs)/(timerMins[mode]*60))*100
+  const inputSm={padding:'7px 10px',background:'var(--glass-bg-2)',border:'1px solid var(--glass-border)',borderRadius:'var(--radius-sm)',color:'var(--text-1)',fontSize:12,fontFamily:'inherit'}
 
   return (
     <>
@@ -312,10 +303,10 @@ export default function WeeklyHome({ onDataChange }) {
         {/* Weather */}
         {weather&&(
           <div className="card" style={{padding:'12px 16px'}}>
-            <div style={{display:'flex',gap:6,alignItems:'center',flexWrap:'wrap'}}>
+            <div className="weather-strip" style={{display:'flex',gap:6,alignItems:'center',flexWrap:'wrap'}}>
               {weather.daily.time.slice(0,7).map((ds,i)=>{
                 const d=new Date(ds+'T12:00:00')
-                return (
+                return(
                   <Tooltip key={i} text={`${i===0?'Today':d.toLocaleDateString('en-US',{weekday:'long'})}: ${Math.round(weather.daily.temperature_2m_max[i])}°/${Math.round(weather.daily.temperature_2m_min[i])}°F`}>
                     <div style={{textAlign:'center',padding:'5px 7px',borderRadius:10,background:i===0?'var(--accent-dim)':'var(--glass-bg)',border:`1px solid ${i===0?'var(--accent)':'var(--glass-border)'}`,minWidth:40,cursor:'default'}}>
                       <div style={{fontSize:9,fontWeight:700,color:i===0?'var(--accent)':'var(--text-3)',marginBottom:1}}>{i===0?'Now':d.toLocaleDateString('en-US',{weekday:'short'})}</div>
@@ -352,7 +343,7 @@ export default function WeeklyHome({ onDataChange }) {
                   </button>
                 </Tooltip>
                 <Tooltip text="Add task">
-                  <button className="btn-icon" onClick={()=>{ setShowAdd(s=>!s); setTimeout(()=>addInputRef.current?.focus(),50) }} style={{padding:5}}>
+                  <button className="btn-icon" onClick={()=>{setShowAdd(s=>!s);setTimeout(()=>addInputRef.current?.focus(),50)}} style={{padding:5}}>
                     {showAdd?<X size={13}/>:<Plus size={13}/>}
                   </button>
                 </Tooltip>
@@ -361,19 +352,13 @@ export default function WeeklyHome({ onDataChange }) {
 
             <div style={{fontSize:11,color:'var(--text-3)',marginBottom:8}}>Double-click to edit · drag to reorder · Enter to add more</div>
 
-            {/* Add form — stays open, Enter adds and keeps focus */}
             {showAdd&&(
               <div style={{marginBottom:12,padding:12,background:'var(--glass-bg-2)',borderRadius:'var(--radius-md)',border:'1px solid var(--accent)',display:'flex',flexDirection:'column',gap:8}}>
-                <input
-                  ref={addInputRef}
-                  className="inline-input"
-                  placeholder="Task description — press Enter to add more"
+                <input ref={addInputRef} className="inline-input"
+                  placeholder="Task description — Enter to add more"
                   value={newTask.text}
                   onChange={e=>setNewTask(n=>({...n,text:e.target.value}))}
-                  onKeyDown={e=>{
-                    if(e.key==='Enter') { e.preventDefault(); addTask() }
-                    if(e.key==='Escape') setShowAdd(false)
-                  }}
+                  onKeyDown={e=>{if(e.key==='Enter'){e.preventDefault();addTask()}if(e.key==='Escape')setShowAdd(false)}}
                   autoFocus
                 />
                 <div style={{display:'grid',gridTemplateColumns:'1fr 1fr 1fr',gap:8}}>
@@ -385,6 +370,19 @@ export default function WeeklyHome({ onDataChange }) {
                   </select>
                   <input type="date" className="inline-input" value={newTask.due} onChange={e=>setNewTask(n=>({...n,due:e.target.value}))}/>
                 </div>
+                {/* Plan toggle — only shown if a date is set */}
+                {newTask.due && (
+                  <button onClick={()=>setNewTask(n=>({...n,isPlan:!n.isPlan}))} style={{
+                    display:'flex',alignItems:'center',gap:8,padding:'6px 10px',borderRadius:8,
+                    background:newTask.isPlan?'var(--accent-dim)':'var(--glass-bg)',
+                    border:`1px solid ${newTask.isPlan?'var(--accent)':'var(--glass-border)'}`,
+                    color:newTask.isPlan?'var(--accent)':'var(--text-3)',
+                    fontSize:12,fontWeight:600,cursor:'pointer',transition:'all .15s',
+                  }}>
+                    <Calendar size={12}/>
+                    {newTask.isPlan?'📅 Will appear on calendar':'Add to calendar too?'}
+                  </button>
+                )}
                 <div style={{display:'flex',gap:8}}>
                   <button className="btn btn-primary" onClick={addTask} style={{flex:1}}>Add task</button>
                   <button className="btn btn-ghost" onClick={()=>setShowAdd(false)}>Done</button>
@@ -428,26 +426,18 @@ export default function WeeklyHome({ onDataChange }) {
           {/* Right column */}
           <div style={{display:'flex',flexDirection:'column',gap:16}} className="home-timer-col">
 
-            {/* Upcoming — assignments + plans */}
+            {/* Upcoming — due date first */}
             <div className="card">
               <div className="card-title">Upcoming</div>
               {upcoming.length===0
-                ? <div style={{fontSize:12,color:'var(--text-3)',textAlign:'center',padding:'8px 0'}}>Nothing upcoming</div>
-                : upcoming.map((item,i)=>{
-                  const due = item._type==='assignment' ? formatRelativeDue(item.due,'') : null
-                  const planDate = item._type==='plan'
-                    ? new Date(item.date+'T12:00:00').toLocaleDateString('en-US',{month:'short',day:'numeric'})
-                    : null
-                  const color = item.courseColor || item.color || 'var(--accent)'
-                  const isFirst = i===0
-                  return (
-                    <div key={item.id||i} style={{
-                      padding:isFirst?'8px 10px':'5px 10px', borderRadius:8,
-                      background:isFirst?'var(--glass-bg-2)':'transparent',
-                      border:isFirst?'1px solid var(--glass-border)':'none',
-                      borderLeft:`3px solid ${isFirst?color:'var(--glass-border)'}`,
-                      opacity:isFirst?1:0.75, marginBottom:4,
-                    }}>
+                ?<div style={{fontSize:12,color:'var(--text-3)',textAlign:'center',padding:'8px 0'}}>Nothing upcoming</div>
+                :upcoming.map((item,i)=>{
+                  const due=item._type==='assignment'?formatRelativeDue(item.due,''):null
+                  const planDate=item._type==='plan'?new Date(item.date+'T12:00:00').toLocaleDateString('en-US',{month:'short',day:'numeric'}):null
+                  const color=item.courseColor||item.color||'var(--accent)'
+                  const isFirst=i===0
+                  return(
+                    <div key={item.id||i} style={{padding:isFirst?'8px 10px':'5px 10px',borderRadius:8,background:isFirst?'var(--glass-bg-2)':'transparent',border:isFirst?'1px solid var(--glass-border)':'none',borderLeft:`3px solid ${isFirst?color:'var(--glass-border)'}`,opacity:isFirst?1:.75,marginBottom:4}}>
                       <div style={{display:'flex',alignItems:'center',gap:5,marginBottom:2}}>
                         {item._type==='plan'&&<span style={{fontSize:9}}>📅</span>}
                         <span style={{fontSize:isFirst?13:11,fontWeight:isFirst?700:500,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap',flex:1}}>{item.title}</span>
