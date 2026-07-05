@@ -109,7 +109,7 @@ function CountdownCards() {
 }
 
 // TaskRow — defined OUTSIDE component to prevent remount-on-keystroke
-function TaskRow({task,courseColors,courseOptions,editId,editText,editCourse,editUrgency,editDue,onEditText,onEditCourse,onEditUrgency,onEditDue,onSaveEdit,onCancelEdit,onStartEdit,onToggle,onDelete,dragOverId,dragId,onDragStart,onDragOver,onDrop,onDragEnd}) {
+function TaskRow({task,courseColors,courseOptions,editId,editText,editCourse,editUrgency,editDue,editIsPlan,onEditText,onEditCourse,onEditUrgency,onEditDue,onToggleIsPlan,onSaveEdit,onCancelEdit,onStartEdit,onToggle,onDelete,dragOverId,dragId,onDragStart,onDragOver,onDrop,onDragEnd}) {
   const urgColor=URGENCY[task.urgency||'none'].color
   const courseColor=courseColors[task.course]||courseColors['OTHER']||'#4ade80'
   const courseLabel=task.course==='OTHER'?'Other':(task.course||'Other')
@@ -124,6 +124,20 @@ function TaskRow({task,courseColors,courseOptions,editId,editText,editCourse,edi
         <select className="inline-input" value={editUrgency} onChange={e=>onEditUrgency(e.target.value)}>{Object.entries(URGENCY).map(([k,v])=><option key={k} value={k}>{v.label}</option>)}</select>
         <input type="date" className="inline-input" value={editDue} onChange={e=>onEditDue(e.target.value)}/>
       </div>
+      {editDue&&(
+        <div onClick={onToggleIsPlan}
+          style={{display:'flex',alignItems:'center',gap:10,padding:'8px 10px',borderRadius:'var(--radius-md)',cursor:'pointer',transition:'all .2s',
+            background:editIsPlan?'var(--accent-dim)':'var(--glass-bg)',
+            border:`2px solid ${editIsPlan?'var(--accent)':'var(--glass-border)'}`,
+          }}>
+          <div style={{width:18,height:18,borderRadius:5,background:editIsPlan?'var(--accent)':'transparent',border:`2px solid ${editIsPlan?'var(--accent)':'var(--glass-border)'}`,display:'flex',alignItems:'center',justifyContent:'center',flexShrink:0,transition:'all .2s'}}>
+            {editIsPlan&&<span style={{color:'white',fontSize:11,lineHeight:1}}>✓</span>}
+          </div>
+          <span style={{fontSize:12,fontWeight:600,color:editIsPlan?'var(--accent)':'var(--text-2)'}}>
+            {editIsPlan?'Will show on calendar':'Add to calendar?'}
+          </span>
+        </div>
+      )}
       <div style={{display:'flex',gap:8}}>
         <button className="btn btn-primary" onClick={onSaveEdit} style={{flex:1,fontSize:12}}>Save</button>
         <button className="btn btn-ghost" onClick={onCancelEdit} style={{fontSize:12}}>Cancel</button>
@@ -170,6 +184,7 @@ export default function WeeklyHome({ onDataChange }) {
   const [editCourse,  setEditCourse] = useState('')
   const [editUrgency, setEditUrgency]= useState('none')
   const [editDue,     setEditDue]    = useState('')
+  const [editIsPlan,  setEditIsPlan] = useState(false)
   const [showSettings,setShowSettings]=useState(false)
   const [draftTimers, setDraftTimers]=useState(timerMins)
   const [weather,     setWeather]    = useState(null)
@@ -239,8 +254,23 @@ export default function WeeklyHome({ onDataChange }) {
   const toggleTask =useCallback(id=>setTasks(ts=>ts.map(t=>t.id===id?{...t,done:!t.done}:t)),[])
   const deleteTask =useCallback(id=>setTasks(ts=>ts.filter(t=>t.id!==id)),[])
   const restoreTask=id=>setTasks(ts=>ts.map(t=>t.id===id?{...t,done:false}:t))
-  const startEdit  =useCallback(task=>{setEditId(task.id);setEditText(task.text);setEditCourse(task.course||'OTHER');setEditUrgency(task.urgency||'none');setEditDue(task.due||'')},[])
-  const saveEdit   =useCallback(()=>{setTasks(ts=>ts.map(t=>t.id===editId?{...t,text:editText,course:editCourse,urgency:editUrgency,due:editDue}:t));setEditId(null)},[editId,editText,editCourse,editUrgency,editDue])
+  const startEdit  =useCallback(task=>{setEditId(task.id);setEditText(task.text);setEditCourse(task.course||'OTHER');setEditUrgency(task.urgency||'none');setEditDue(task.due||'');setEditIsPlan(!!task.isPlan)},[])
+  const saveEdit   =useCallback(()=>{
+    setTasks(ts=>ts.map(t=>{
+      if(t.id!==editId) return t
+      const updated={...t,text:editText,course:editCourse,urgency:editUrgency,due:editDue,isPlan:editIsPlan}
+      // If user just toggled isPlan on and there's a date, add to calendar_plans
+      if(editIsPlan && !t.isPlan && editDue){
+        const existing=load('calendar_plans',[])
+        const alreadyExists=existing.some(p=>p.id==='task_'+t.id)
+        if(!alreadyExists){
+          save('calendar_plans',[...existing,{id:'task_'+t.id,title:editText,date:editDue,notes:'',color:'#6366f1',_type:'plan'}])
+        }
+      }
+      return updated
+    }))
+    setEditId(null)
+  },[editId,editText,editCourse,editUrgency,editDue,editIsPlan])
   const cancelEdit =useCallback(()=>setEditId(null),[])
   const handleDragStart=useCallback((e,id)=>{setDragId(id);e.dataTransfer.effectAllowed='move';e.dataTransfer.setData('text/plain',String(id))},[])
   const handleDragOver =useCallback((e,id)=>{e.preventDefault();e.dataTransfer.dropEffect='move';setDragOverId(id)},[])
@@ -334,9 +364,24 @@ export default function WeeklyHome({ onDataChange }) {
                   <input type="date" className="inline-input" value={newTask.due} onChange={e=>setNewTask(n=>({...n,due:e.target.value}))}/>
                 </div>
                 {newTask.due&&(
-                  <button onClick={()=>setNewTask(n=>({...n,isPlan:!n.isPlan}))} style={{display:'flex',alignItems:'center',gap:8,padding:'6px 10px',borderRadius:8,background:newTask.isPlan?'var(--accent-dim)':'var(--glass-bg)',border:`1px solid ${newTask.isPlan?'var(--accent)':'var(--glass-border)'}`,color:newTask.isPlan?'var(--accent)':'var(--text-3)',fontSize:12,fontWeight:600,cursor:'pointer',transition:'all .15s'}}>
-                    <Calendar size={12}/>{newTask.isPlan?'📅 Will appear on calendar':'Add to calendar too?'}
-                  </button>
+                  <div onClick={()=>setNewTask(n=>({...n,isPlan:!n.isPlan}))}
+                    style={{display:'flex',alignItems:'center',gap:10,padding:'10px 12px',borderRadius:'var(--radius-md)',cursor:'pointer',transition:'all .2s',
+                      background:newTask.isPlan?'var(--accent-dim)':'var(--glass-bg)',
+                      border:`2px solid ${newTask.isPlan?'var(--accent)':'var(--glass-border)'}`,
+                    }}>
+                    <div style={{width:20,height:20,borderRadius:6,background:newTask.isPlan?'var(--accent)':'transparent',border:`2px solid ${newTask.isPlan?'var(--accent)':'var(--glass-border)'}`,display:'flex',alignItems:'center',justifyContent:'center',flexShrink:0,transition:'all .2s'}}>
+                      {newTask.isPlan&&<span style={{color:'white',fontSize:12,lineHeight:1}}>✓</span>}
+                    </div>
+                    <div>
+                      <div style={{fontSize:13,fontWeight:700,color:newTask.isPlan?'var(--accent)':'var(--text-1)'}}>
+                        <Calendar size={13} style={{display:'inline',marginRight:6,verticalAlign:'middle'}}/>
+                        {newTask.isPlan?'Will appear on calendar':'Add to calendar?'}
+                      </div>
+                      <div style={{fontSize:11,color:'var(--text-3)',marginTop:1}}>
+                        {newTask.isPlan?'A plan pill will show on the selected date':'Tap to also create a calendar plan'}
+                      </div>
+                    </div>
+                  </div>
                 )}
                 <div style={{display:'flex',justifyContent:'flex-end'}}>
                   <button className="btn btn-ghost" onClick={()=>{ if(newTask.text.trim()) addTask(); setShowAdd(false) }} style={{fontSize:12}}>Done</button>
@@ -346,8 +391,8 @@ export default function WeeklyHome({ onDataChange }) {
             {activeTasks.length===0&&!showAdd&&<div style={{textAlign:'center',color:'var(--text-3)',fontSize:13,padding:'16px 0'}}>No active tasks — click + to add one</div>}
             {activeTasks.map(task=>(
               <TaskRow key={task.id} task={task} courseColors={COURSE_COLORS} courseOptions={courseOptions}
-                editId={editId} editText={editText} editCourse={editCourse} editUrgency={editUrgency} editDue={editDue}
-                onEditText={setEditText} onEditCourse={setEditCourse} onEditUrgency={setEditUrgency} onEditDue={setEditDue}
+                editId={editId} editText={editText} editCourse={editCourse} editUrgency={editUrgency} editDue={editDue} editIsPlan={editIsPlan}
+                onEditText={setEditText} onEditCourse={setEditCourse} onEditUrgency={setEditUrgency} onEditDue={setEditDue} onToggleIsPlan={()=>setEditIsPlan(v=>!v)}
                 onSaveEdit={saveEdit} onCancelEdit={cancelEdit} onStartEdit={startEdit}
                 onToggle={toggleTask} onDelete={deleteTask}
                 dragId={dragId} dragOverId={dragOverId}

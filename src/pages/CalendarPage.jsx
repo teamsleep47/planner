@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { ChevronLeft, ChevronRight, X, ExternalLink, Edit2, Trash2 } from 'lucide-react'
+import { ChevronLeft, ChevronRight, X, ExternalLink, Edit2, Trash2, Check } from 'lucide-react'
 import { load, save } from '../utils/storage.js'
 import { useNavigate } from 'react-router-dom'
 import { loadTerms, saveTerms, uid, ASSIGNMENT_TYPES } from '../utils/termData.js'
@@ -35,6 +35,49 @@ function getActiveCourses() {
     const active = terms.find(t => t.active) || terms[0]
     return active?.courses || []
   } catch(e) { return [] }
+}
+
+// ── Plan popup — matches assignment popup style ──────────────────
+function PlanPopup({ plan, anchor, onClose, onEdit, onDelete }) {
+  const style = {
+    position:'fixed', zIndex:1000,
+    top:  Math.min(anchor.y + 8, window.innerHeight - 260),
+    left: Math.min(Math.max(anchor.x - 150, 8), window.innerWidth - 320),
+    width: 300,
+  }
+  const planDate = plan.date
+    ? new Date(plan.date+'T12:00:00').toLocaleDateString('en-US',{weekday:'short',month:'short',day:'numeric'})
+    : null
+  return (
+    <>
+      <div style={{position:'fixed',inset:0,zIndex:999}} onClick={onClose}/>
+      <div className="card" style={{...style,padding:0,overflow:'hidden',border:`2px solid ${plan.color}`,boxShadow:'0 16px 48px rgba(0,0,0,.4)'}}>
+        <div style={{background:`${plan.color}22`,borderBottom:`1px solid ${plan.color}44`,padding:'12px 14px 10px',display:'flex',alignItems:'flex-start',gap:10}}>
+          <div style={{width:10,height:10,borderRadius:'50%',background:plan.color,boxShadow:`0 0 8px ${plan.color}`,flexShrink:0,marginTop:3}}/>
+          <div style={{flex:1,minWidth:0}}>
+            <div style={{fontWeight:700,fontSize:14,lineHeight:1.3,marginBottom:3}}>{plan.title}</div>
+            <div style={{fontSize:11,color:plan.color,fontWeight:600,display:'flex',alignItems:'center',gap:6}}>
+              {'\u{1F4C5}'} Personal event
+              {plan.tasked && <span style={{fontSize:10,padding:'1px 6px',borderRadius:20,background:`${plan.color}33`,color:plan.color,border:`1px solid ${plan.color}66`,fontWeight:700}}>tasked</span>}
+            </div>
+          </div>
+          <button onClick={onClose} style={{background:'none',border:'none',color:'var(--text-3)',cursor:'pointer',padding:2,flexShrink:0}}><X size={14}/></button>
+        </div>
+        <div style={{padding:'12px 14px',display:'flex',flexDirection:'column',gap:8}}>
+          {planDate && <div style={{display:'flex',alignItems:'center',gap:8}}><span style={{fontSize:11,color:'var(--text-3)',width:44}}>Date</span><span style={{fontSize:13,fontWeight:700,color:'var(--text-1)'}}>{planDate}</span></div>}
+          {plan.notes && <div style={{fontSize:11,color:'var(--text-3)',lineHeight:1.5,background:'var(--glass-bg)',borderRadius:6,padding:'7px 9px',maxHeight:60,overflow:'hidden',WebkitMaskImage:'linear-gradient(to bottom,black 60%,transparent 100%)'}}>{plan.notes}</div>}
+        </div>
+        <div style={{padding:'0 14px 14px',display:'flex',gap:8}}>
+          <button onClick={()=>{onEdit();onClose()}} className="btn btn-primary" style={{flex:1,justifyContent:'center',gap:6,fontSize:13}}>
+            <Edit2 size={13}/> Edit
+          </button>
+          <button onClick={()=>{if(confirm('Delete this plan?')){onDelete();onClose()}}} className="btn btn-ghost" style={{color:'var(--coral)',fontSize:13,padding:'8px 12px'}}>
+            <Trash2 size={13}/>
+          </button>
+        </div>
+      </div>
+    </>
+  )
 }
 
 // ── Assignment popup ─────────────────────────────────────────────
@@ -290,10 +333,51 @@ function AddModal({ date, onClose, onSaveAssignment, onSavePlan }) {
                   ))}
                 </div>
               </div>
-              <div style={{marginBottom:20}}><label style={lbl}>Notes</label><textarea style={{...inp,minHeight:70,resize:'vertical',lineHeight:1.6,fontFamily:'var(--font-mono)'}} value={pForm.notes} onChange={e=>setPForm(f=>({...f,notes:e.target.value}))} placeholder="What's this for?"/></div>
+              <div style={{marginBottom:14}}><label style={lbl}>Notes</label><textarea style={{...inp,minHeight:60,resize:'vertical',lineHeight:1.6,fontFamily:'var(--font-mono)'}} value={pForm.notes} onChange={e=>setPForm(f=>({...f,notes:e.target.value}))} placeholder="What's this for?"/></div>
+
+              {/* Also add as task — prominent, in creation form */}
+              <div style={{marginBottom:16,padding:12,borderRadius:'var(--radius-md)',background:pForm.alsoTask?'var(--accent-dim)':'var(--glass-bg)',border:`2px solid ${pForm.alsoTask?'var(--accent)':'var(--glass-border)'}`,cursor:'pointer',transition:'all .2s'}}
+                onClick={()=>setPForm(f=>({...f,alsoTask:!f.alsoTask}))}>
+                <div style={{display:'flex',alignItems:'center',gap:10}}>
+                  <div style={{width:20,height:20,borderRadius:6,background:pForm.alsoTask?'var(--accent)':'transparent',border:`2px solid ${pForm.alsoTask?'var(--accent)':'var(--glass-border)'}`,display:'flex',alignItems:'center',justifyContent:'center',flexShrink:0,transition:'all .2s'}}>
+                    {pForm.alsoTask && <Check size={12} color="white"/>}
+                  </div>
+                  <div>
+                    <div style={{fontSize:13,fontWeight:700,color:pForm.alsoTask?'var(--accent)':'var(--text-1)'}}>✅ Also add as a task</div>
+                    <div style={{fontSize:11,color:'var(--text-3)',marginTop:2}}>Adds to Today's Focus so you can track it</div>
+                  </div>
+                </div>
+                {pForm.alsoTask && (
+                  <div style={{marginTop:10,display:'grid',gridTemplateColumns:'1fr 1fr',gap:8}} onClick={e=>e.stopPropagation()}>
+                    <div>
+                      <div style={{fontSize:11,fontWeight:700,color:'var(--text-3)',marginBottom:4}}>Course</div>
+                      <select style={inp} value={pForm.taskCourse||'OTHER'} onChange={e=>setPForm(f=>({...f,taskCourse:e.target.value}))}>
+                        <option value="OTHER">Other / Personal</option>
+                        {getActiveCourses().map(c=><option key={c.id} value={c.name}>{c.name}</option>)}
+                      </select>
+                    </div>
+                    <div>
+                      <div style={{fontSize:11,fontWeight:700,color:'var(--text-3)',marginBottom:4}}>Priority</div>
+                      <select style={inp} value={pForm.taskUrgency||'none'} onChange={e=>setPForm(f=>({...f,taskUrgency:e.target.value}))}>
+                        <option value="none">No priority</option>
+                        <option value="low">🟢 Relaxed</option>
+                        <option value="medium">🟡 Soon</option>
+                        <option value="high">🟠 High</option>
+                        <option value="urgent">🔴 Urgent</option>
+                      </select>
+                    </div>
+                  </div>
+                )}
+              </div>
+
               <div style={{display:'flex',gap:8}}>
                 <button className="btn btn-ghost" onClick={()=>setStep('pick')} style={{fontSize:12}}>← Back</button>
-                <button className="btn btn-primary" style={{flex:1,justifyContent:'center'}} onClick={()=>{ if(!pForm.title.trim()||!pForm.date) return; onSavePlan(pForm); onClose() }} disabled={!pForm.title.trim()||!pForm.date}>
+                <button className="btn btn-primary" style={{flex:1,justifyContent:'center'}} onClick={()=>{
+                  if(!pForm.title.trim()||!pForm.date) return
+                  const taskData = pForm.alsoTask ? { text:pForm.title, course:pForm.taskCourse||'OTHER', urgency:pForm.taskUrgency||'none', due:pForm.date, isPlan:false } : null
+                  onSavePlan({...pForm, tasked:!!pForm.alsoTask}, taskData)
+                  onClose()
+                }} disabled={!pForm.title.trim()||!pForm.date}>
                   Add event
                 </button>
               </div>
@@ -312,6 +396,7 @@ export default function CalendarPage({ onDataChange }) {
   const [popup,    setPopup]    = useState(null)
   const [addModal, setAddModal] = useState(null)   // date string
   const [editPlan, setEditPlan] = useState(null)   // plan object
+  const [planPopup, setPlanPopup] = useState(null)  // { plan, x, y }
   const [plans,    setPlans]    = useState(() => load('calendar_plans', []))
 
   const assignments = getAllAssignments()
@@ -371,15 +456,25 @@ export default function CalendarPage({ onDataChange }) {
     onDataChange?.()
   }
 
-  const handleSavePlan   = form  => setPlans(ps => [...ps, { ...form, id: uid(), _type:'plan' }])
+  const handleSavePlan = (form, taskData) => {
+    setPlans(ps => [...ps, { ...form, id: uid(), _type:'plan' }])
+    if (taskData) {
+      const tasks   = JSON.parse(localStorage.getItem('planner_v1_home_tasks') || '[]')
+      const newTask = { ...taskData, id: Date.now(), done: false }
+      localStorage.setItem('planner_v1_home_tasks', JSON.stringify([newTask, ...tasks]))
+      onDataChange?.()
+    }
+  }
   const handleUpdatePlan = (id, form) => setPlans(ps => ps.map(p => p.id===id ? { ...p, ...form } : p))
   const handleDeletePlan = id   => setPlans(ps => ps.filter(p => p.id!==id))
 
-  // Add a calendar plan as a home task
-  const handleAddPlanAsTask = (taskData) => {
+  // Add a calendar plan as a home task; marks the plan as tasked
+  const handleAddPlanAsTask = (taskData, planId) => {
     const tasks   = JSON.parse(localStorage.getItem('planner_v1_home_tasks') || '[]')
     const newTask = { ...taskData, id: Date.now(), done: false }
     localStorage.setItem('planner_v1_home_tasks', JSON.stringify([newTask, ...tasks]))
+    // Mark the plan as tasked so the pill shows "tasked" badge
+    if (planId) setPlans(ps => ps.map(p => p.id===planId ? {...p, tasked:true} : p))
     onDataChange?.()
   }
 
@@ -440,7 +535,8 @@ export default function CalendarPage({ onDataChange }) {
             return (
               <div key={ds}
                 style={{
-                  minHeight:cellH, borderRight:'1px solid var(--glass-border)', borderBottom:'1px solid var(--glass-border)',
+                  minHeight:cellH, maxHeight:200, overflowY:'auto',
+                  borderRight:'1px solid var(--glass-border)', borderBottom:'1px solid var(--glass-border)',
                   padding:'6px 5px 5px', position:'relative',
                   background:isToday?'var(--accent-dim)':isPast?'rgba(0,0,0,.07)':'transparent',
                   cursor:'default', transition:'background .1s',
@@ -461,7 +557,7 @@ export default function CalendarPage({ onDataChange }) {
                 ))}
 
                 {/* Start markers */}
-                {starts.slice(0,1).map((a,si)=>(
+                {starts.map((a,si)=>(
                   <button key={`s-${a.id}-${si}`} onClick={e=>handleAssignClick(e,a)} style={{display:'flex',alignItems:'center',gap:3,width:'100%',border:'none',cursor:'pointer',padding:'1px 3px',background:`${a.courseColor}18`,borderRadius:3,marginBottom:2,borderLeft:`2px solid ${a.courseColor}55`}}>
                     <div style={{width:4,height:4,borderRadius:'50%',background:a.courseColor,opacity:.5,flexShrink:0}}/>
                     <span style={{fontSize:9,color:a.courseColor,fontWeight:600,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap',opacity:.8}}>▶ {a.title}</span>
@@ -469,7 +565,7 @@ export default function CalendarPage({ onDataChange }) {
                 ))}
 
                 {/* Due pills */}
-                {dues.slice(0,2).map((a,di)=>{
+                {dues.map((a,di)=>{
                   const badge=PRIORITY_BADGE[a.priority||'none']
                   const isDone=a.status==='Done'
                   return (
@@ -484,26 +580,31 @@ export default function CalendarPage({ onDataChange }) {
                   )
                 })}
 
-                {/* Plan pills — double-click to edit */}
-                {dayPlan.slice(0,1).map((p,pi)=>(
-                  <button key={`p-${p.id}-${pi}`}
-                    onClick={e=>{ e.stopPropagation() }}
-                    onDoubleClick={e=>{ e.stopPropagation(); setEditPlan(p) }}
-                    style={{display:'flex',alignItems:'center',gap:3,width:'100%',border:'none',cursor:'pointer',padding:'2px 5px',borderRadius:4,marginBottom:2,background:`${p.color}25`,borderLeft:`3px solid ${p.color}`,transition:'all .1s'}}
+                {/* Plan pills — click=popup, double-click=edit, X=delete */}
+                {dayPlan.map((p,pi)=>(
+                  <div key={`p-${p.id}-${pi}`} style={{display:'flex',alignItems:'center',gap:2,marginBottom:2,borderRadius:4,background:`${p.color}25`,borderLeft:`3px solid ${p.color}`,transition:'all .1s'}}
                     onMouseEnter={e=>e.currentTarget.style.background=`${p.color}40`}
                     onMouseLeave={e=>e.currentTarget.style.background=`${p.color}25`}
-                    title="Double-click to edit"
                   >
-                    <span style={{fontSize:9}}>📅</span>
-                    <span style={{fontSize:9,fontWeight:700,color:p.color,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap',flex:1}}>{p.title}</span>
-                    <Edit2 size={8} style={{color:p.color,opacity:.6,flexShrink:0}}/>
-                  </button>
+                    <button
+                      onClick={e=>{ e.stopPropagation(); const r=e.currentTarget.getBoundingClientRect(); setPlanPopup({plan:p,x:r.left+r.width/2,y:r.bottom}) }}
+                      onDoubleClick={e=>{ e.stopPropagation(); setEditPlan(p) }}
+                      style={{display:'flex',alignItems:'center',gap:3,flex:1,border:'none',cursor:'pointer',padding:'2px 5px',background:'transparent',borderRadius:4}}
+                    >
+                      <span style={{fontSize:9}}>📅</span>
+                      <span style={{fontSize:9,fontWeight:700,color:p.color,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap',flex:1}}>{p.title}</span>
+                      {p.tasked && <span style={{fontSize:7,padding:'0 3px',borderRadius:3,background:`${p.color}44`,color:p.color,fontWeight:700,flexShrink:0}}>tasked</span>}
+                    </button>
+                    <button onClick={e=>{ e.stopPropagation(); handleDeletePlan(p.id) }}
+                      style={{background:'none',border:'none',cursor:'pointer',padding:'2px 4px',color:'var(--text-3)',display:'flex',flexShrink:0,borderRadius:3}}
+                      onMouseEnter={e=>e.currentTarget.style.color='var(--coral)'}
+                      onMouseLeave={e=>e.currentTarget.style.color='var(--text-3)'}>
+                      <X size={8}/>
+                    </button>
+                  </div>
                 ))}
 
-                {/* Overflow count */}
-                {(dues.length + starts.length + dayPlan.length) > 3 && (
-                  <div style={{fontSize:9,color:'var(--text-3)',paddingLeft:4}}>+{dues.length+starts.length+dayPlan.length-3} more</div>
-                )}
+
               </div>
             )
           })}
@@ -520,6 +621,17 @@ export default function CalendarPage({ onDataChange }) {
         <AddModal date={addModal} onClose={()=>setAddModal(null)} onSaveAssignment={handleSaveAssignment} onSavePlan={handleSavePlan}/>
       )}
 
+      {/* Plan popup — single click */}
+      {planPopup && (
+        <PlanPopup
+          plan={planPopup.plan}
+          anchor={{x:planPopup.x, y:planPopup.y}}
+          onClose={()=>setPlanPopup(null)}
+          onEdit={()=>setEditPlan(planPopup.plan)}
+          onDelete={()=>handleDeletePlan(planPopup.plan.id)}
+        />
+      )}
+
       {/* Plan edit modal */}
       {editPlan && (
         <PlanEditModal
@@ -527,7 +639,7 @@ export default function CalendarPage({ onDataChange }) {
           onClose={()=>setEditPlan(null)}
           onSave={form=>handleUpdatePlan(editPlan.id,form)}
           onDelete={()=>handleDeletePlan(editPlan.id)}
-          onAddAsTask={handleAddPlanAsTask}
+          onAddAsTask={(taskData)=>handleAddPlanAsTask(taskData, editPlan.id)}
         />
       )}
     </>
