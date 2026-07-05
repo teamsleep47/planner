@@ -23,6 +23,13 @@ function getGreeting() {
   return '🌙 Good night'
 }
 
+// Local date string — avoids UTC offset bug where toISOString() returns yesterday
+// before midnight UTC (e.g. 8pm EDT = midnight UTC = next day in ISO)
+function localDateStr() {
+  const d = new Date()
+  return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`
+}
+
 const DATE_STR   = new Date().toLocaleDateString('en-US',{weekday:'long',month:'long',day:'numeric',year:'numeric'})
 const DAY_IDX    = new Date().getDay()
 const IS_CLASS   = DAY_IDX===1||DAY_IDX===3
@@ -48,7 +55,7 @@ function getUpcomingAssignments(count=3) {
 
 function getUpcomingPlans(count=2) {
   try {
-    const today=new Date().toISOString().slice(0,10)
+    const today=localDateStr()
     return load('calendar_plans',[])
       .filter(p=>p.date>=today)
       .sort((a,b)=>a.date.localeCompare(b.date))
@@ -332,7 +339,7 @@ export default function WeeklyHome({ onDataChange }) {
                   </button>
                 )}
                 <div style={{display:'flex',justifyContent:'flex-end'}}>
-                  <button className="btn btn-ghost" onClick={()=>setShowAdd(false)} style={{fontSize:12}}>Done</button>
+                  <button className="btn btn-ghost" onClick={()=>{ if(newTask.text.trim()) addTask(); setShowAdd(false) }} style={{fontSize:12}}>Done</button>
                 </div>
               </div>
             )}

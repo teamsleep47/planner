@@ -77,15 +77,29 @@ function AssignmentPopup({ item, anchor, onClose, onJump }) {
 }
 
 // ── Plan edit modal ──────────────────────────────────────────────
-function PlanEditModal({ plan, onClose, onSave, onDelete }) {
-  const [form, setForm] = useState({ title: plan.title, date: plan.date, notes: plan.notes || '', color: plan.color })
+function PlanEditModal({ plan, onClose, onSave, onDelete, onAddAsTask }) {
+  const [form,        setForm]        = useState({ title: plan.title, date: plan.date, notes: plan.notes || '', color: plan.color })
+  const [showTaskForm,setShowTaskForm]= useState(false)
+  const [taskCourse,  setTaskCourse]  = useState('OTHER')
+  const [taskUrgency, setTaskUrgency] = useState('none')
+
   const inp = { padding:'9px 11px', background:'var(--glass-bg-2)', border:'1px solid var(--glass-border)', borderRadius:'var(--radius-md)', color:'var(--text-1)', fontSize:13, fontFamily:'inherit', width:'100%' }
   const lbl = { fontSize:11, fontWeight:700, color:'var(--text-3)', textTransform:'uppercase', letterSpacing:'.05em', marginBottom:5, display:'block' }
+
+  const courses = getActiveCourses()
+
+  const URGENCY_OPTS = [
+    { key:'none',   label:'No priority' },
+    { key:'low',    label:'🟢 Relaxed'  },
+    { key:'medium', label:'🟡 Soon'     },
+    { key:'high',   label:'🟠 High'     },
+    { key:'urgent', label:'🔴 Urgent'   },
+  ]
 
   return (
     <div style={{position:'fixed',inset:0,zIndex:900,display:'flex',alignItems:'center',justifyContent:'center',padding:16}} onClick={onClose}>
       <div style={{position:'absolute',inset:0,background:'rgba(0,0,0,.55)',backdropFilter:'blur(4px)'}}/>
-      <div className="card" style={{position:'relative',zIndex:1,width:'100%',maxWidth:440,padding:0}} onClick={e=>e.stopPropagation()}>
+      <div className="card" style={{position:'relative',zIndex:1,width:'100%',maxWidth:480,maxHeight:'90vh',overflow:'auto',padding:0}} onClick={e=>e.stopPropagation()}>
         <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',padding:'16px 18px',borderBottom:'1px solid var(--glass-border)'}}>
           <span style={{fontWeight:700,fontSize:15}}>Edit plan</span>
           <button onClick={onClose} style={{background:'none',border:'none',color:'var(--text-3)',cursor:'pointer',display:'flex',padding:2}}><X size={16}/></button>
@@ -101,7 +115,52 @@ function PlanEditModal({ plan, onClose, onSave, onDelete }) {
               ))}
             </div>
           </div>
-          <div style={{marginBottom:20}}><label style={lbl}>Notes</label><textarea style={{...inp,minHeight:70,resize:'vertical',lineHeight:1.6,fontFamily:'var(--font-mono)'}} value={form.notes} onChange={e=>setForm(f=>({...f,notes:e.target.value}))} placeholder="What's this for?"/></div>
+          <div style={{marginBottom:16}}><label style={lbl}>Notes</label><textarea style={{...inp,minHeight:60,resize:'vertical',lineHeight:1.6,fontFamily:'var(--font-mono)'}} value={form.notes} onChange={e=>setForm(f=>({...f,notes:e.target.value}))} placeholder="What's this for?"/></div>
+
+          {/* ── Add as task mini-form ── */}
+          <div style={{borderTop:'1px solid var(--glass-border)',paddingTop:14,marginBottom:16}}>
+            <button onClick={()=>setShowTaskForm(s=>!s)} style={{
+              display:'flex',alignItems:'center',gap:8,width:'100%',padding:'8px 12px',
+              borderRadius:'var(--radius-md)',cursor:'pointer',textAlign:'left',
+              background:showTaskForm?'var(--accent-dim)':'var(--glass-bg)',
+              border:`1px solid ${showTaskForm?'var(--accent)':'var(--glass-border)'}`,
+              color:showTaskForm?'var(--accent)':'var(--text-2)',
+              fontSize:13,fontWeight:600,transition:'all .15s',
+            }}>
+              <span style={{fontSize:16}}>✅</span>
+              {showTaskForm ? 'Cancel adding as task' : 'Also add as a task →'}
+            </button>
+
+            {showTaskForm && (
+              <div style={{marginTop:10,padding:12,background:'var(--glass-bg-2)',borderRadius:'var(--radius-md)',border:'1px solid var(--glass-border)',display:'flex',flexDirection:'column',gap:8}}>
+                <div style={{fontSize:11,color:'var(--text-3)'}}>
+                  Will add "<strong style={{color:'var(--text-1)'}}>{form.title||plan.title}</strong>" to Today's Focus with due date {form.date}
+                </div>
+                <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:8}}>
+                  <div>
+                    <div style={{fontSize:11,fontWeight:700,color:'var(--text-3)',marginBottom:4}}>Course</div>
+                    <select style={inp} value={taskCourse} onChange={e=>setTaskCourse(e.target.value)}>
+                      <option value="OTHER">Other / Personal</option>
+                      {courses.map(c=><option key={c.id} value={c.name}>{c.name}</option>)}
+                    </select>
+                  </div>
+                  <div>
+                    <div style={{fontSize:11,fontWeight:700,color:'var(--text-3)',marginBottom:4}}>Priority</div>
+                    <select style={inp} value={taskUrgency} onChange={e=>setTaskUrgency(e.target.value)}>
+                      {URGENCY_OPTS.map(o=><option key={o.key} value={o.key}>{o.label}</option>)}
+                    </select>
+                  </div>
+                </div>
+                <button className="btn btn-primary" style={{justifyContent:'center',fontSize:12}} onClick={()=>{
+                  onAddAsTask({ text: form.title||plan.title, course: taskCourse, urgency: taskUrgency, due: form.date, isPlan: false })
+                  setShowTaskForm(false)
+                }}>
+                  Add to Today's Focus
+                </button>
+              </div>
+            )}
+          </div>
+
           <div style={{display:'flex',gap:8}}>
             <button className="btn btn-primary" style={{flex:1,justifyContent:'center'}} onClick={()=>{ if(!form.title.trim()) return; onSave(form); onClose() }}>Save</button>
             <button className="btn btn-ghost" style={{color:'var(--coral)'}} onClick={()=>{ if(confirm('Delete this plan?')) { onDelete(); onClose() } }}><Trash2 size={13}/></button>
@@ -259,7 +318,8 @@ export default function CalendarPage({ onDataChange }) {
 
   useEffect(() => { save('calendar_plans', plans); onDataChange?.() }, [plans])
 
-  const today = new Date().toISOString().slice(0, 10)
+  // Local date — avoids UTC offset bug (toISOString returns yesterday before 8pm EDT)
+  const today = (() => { const d=new Date(); return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}` })()
   const year  = anchor.getFullYear()
   const month = anchor.getMonth()
 
@@ -314,6 +374,14 @@ export default function CalendarPage({ onDataChange }) {
   const handleSavePlan   = form  => setPlans(ps => [...ps, { ...form, id: uid(), _type:'plan' }])
   const handleUpdatePlan = (id, form) => setPlans(ps => ps.map(p => p.id===id ? { ...p, ...form } : p))
   const handleDeletePlan = id   => setPlans(ps => ps.filter(p => p.id!==id))
+
+  // Add a calendar plan as a home task
+  const handleAddPlanAsTask = (taskData) => {
+    const tasks   = JSON.parse(localStorage.getItem('planner_v1_home_tasks') || '[]')
+    const newTask = { ...taskData, id: Date.now(), done: false }
+    localStorage.setItem('planner_v1_home_tasks', JSON.stringify([newTask, ...tasks]))
+    onDataChange?.()
+  }
 
   const cellH = 115
 
@@ -459,6 +527,7 @@ export default function CalendarPage({ onDataChange }) {
           onClose={()=>setEditPlan(null)}
           onSave={form=>handleUpdatePlan(editPlan.id,form)}
           onDelete={()=>handleDeletePlan(editPlan.id)}
+          onAddAsTask={handleAddPlanAsTask}
         />
       )}
     </>
