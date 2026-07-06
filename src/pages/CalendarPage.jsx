@@ -389,14 +389,96 @@ function AddModal({ date, onClose, onSaveAssignment, onSavePlan }) {
   )
 }
 
+
+// ── Mobile day overlay — tapping the date number shows all items ─
+function DayOverlay({ ds, x, y, assignments, plans, onClose, onAssignClick, onPlanClick, onPlanEdit, onAdd }) {
+  const dues    = assignments.filter(a => a.due === ds)
+  const starts  = assignments.filter(a => a.startDate === ds && a.startDate !== a.due)
+  const dayPlan = plans.filter(p => p.date === ds)
+  const allItems = [...dues, ...starts, ...dayPlan]
+
+  const date = new Date(ds + 'T12:00:00')
+  const label = date.toLocaleDateString('en-US', { weekday:'long', month:'long', day:'numeric' })
+
+  // Position: try to keep on screen
+  const overlayW = Math.min(300, window.innerWidth - 16)
+  const posX = Math.min(Math.max(x, 8), window.innerWidth - overlayW - 8)
+  const posY = Math.min(y, window.innerHeight - 320)
+
+  return (
+    <>
+      <div style={{position:'fixed',inset:0,zIndex:800}} onClick={onClose}/>
+      <div className="cal-day-overlay card" style={{
+        position:'fixed', zIndex:801,
+        top: posY, left: posX, width: overlayW,
+        padding:0, overflow:'hidden',
+        boxShadow:'0 16px 48px rgba(0,0,0,0.45)',
+        border:'1px solid var(--glass-border)',
+      }}>
+        {/* Header */}
+        <div style={{padding:'12px 14px 10px',borderBottom:'1px solid var(--glass-border)',display:'flex',alignItems:'center',justifyContent:'space-between',background:'var(--glass-bg-2)'}}>
+          <div style={{fontSize:13,fontWeight:700,color:'var(--text-1)'}}>{label}</div>
+          <div style={{display:'flex',gap:6}}>
+            <button onClick={()=>{onAdd(ds);onClose()}} style={{background:'var(--accent-dim)',border:'1px solid var(--accent)',borderRadius:8,color:'var(--accent)',fontSize:11,fontWeight:700,padding:'4px 10px',cursor:'pointer'}}>+ Add</button>
+            <button onClick={onClose} style={{background:'none',border:'none',color:'var(--text-3)',cursor:'pointer',display:'flex',padding:2}}><X size={14}/></button>
+          </div>
+        </div>
+
+        {/* Items */}
+        <div style={{padding:'10px',display:'flex',flexDirection:'column',gap:6,maxHeight:260,overflowY:'auto'}}>
+          {allItems.length === 0 && (
+            <div style={{fontSize:12,color:'var(--text-3)',textAlign:'center',padding:'12px 0'}}>Nothing scheduled — tap + to add</div>
+          )}
+
+          {/* Assignment items */}
+          {[...dues, ...starts].map((a, i) => {
+            const due = a.due ? formatRelativeDue(a.due, a.dueTime) : null
+            const isStart = a.startDate === ds && a.due !== ds
+            return (
+              <button key={`a-${a.id}-${i}`} onClick={()=>{ onAssignClick(a); onClose() }}
+                style={{display:'flex',alignItems:'center',gap:10,padding:'10px 12px',borderRadius:10,background:`${a.courseColor}18`,border:`1px solid ${a.courseColor}44`,cursor:'pointer',textAlign:'left',width:'100%'}}>
+                <div style={{width:8,height:8,borderRadius:'50%',background:a.courseColor,flexShrink:0,boxShadow:`0 0 6px ${a.courseColor}`}}/>
+                <div style={{flex:1,minWidth:0}}>
+                  <div style={{fontSize:12,fontWeight:700,color:'var(--text-1)',overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{a.title}</div>
+                  <div style={{fontSize:10,color:a.courseColor,fontWeight:600,marginTop:2}}>
+                    {isStart ? '▶ Start date' : 'Due'} · {a.courseName}
+                    {due && !isStart && <span style={{color:due.color,marginLeft:6}}>{due.label}</span>}
+                  </div>
+                </div>
+                <ExternalLink size={12} style={{color:'var(--text-3)',flexShrink:0}}/>
+              </button>
+            )
+          })}
+
+          {/* Plan items */}
+          {dayPlan.map((p, i) => (
+            <button key={`p-${p.id}-${i}`}
+              onClick={()=>{ onPlanEdit(p); onClose() }}
+              style={{display:'flex',alignItems:'center',gap:10,padding:'10px 12px',borderRadius:10,background:`${p.color}18`,border:`1px solid ${p.color}44`,cursor:'pointer',textAlign:'left',width:'100%'}}>
+              <span style={{fontSize:14,flexShrink:0}}>📅</span>
+              <div style={{flex:1,minWidth:0}}>
+                <div style={{fontSize:12,fontWeight:700,color:p.color,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{p.title}</div>
+                {p.notes && <div style={{fontSize:10,color:'var(--text-3)',marginTop:2,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{p.notes}</div>}
+                {p.tasked && <div style={{fontSize:10,color:p.color,fontWeight:600,marginTop:2}}>✓ Added as task</div>}
+              </div>
+              <Edit2 size={12} style={{color:'var(--text-3)',flexShrink:0}}/>
+            </button>
+          ))}
+        </div>
+      </div>
+    </>
+  )
+}
+
 // ── Main calendar ────────────────────────────────────────────────
 export default function CalendarPage({ onDataChange }) {
   const navigate   = useNavigate()
   const [anchor,   setAnchor]   = useState(new Date())
   const [popup,    setPopup]    = useState(null)
   const [addModal, setAddModal] = useState(null)   // date string
-  const [editPlan, setEditPlan] = useState(null)   // plan object
-  const [planPopup, setPlanPopup] = useState(null)  // { plan, x, y }
+  const [editPlan,    setEditPlan]    = useState(null)   // plan object
+  const [planPopup,   setPlanPopup]   = useState(null)  // { plan, x, y }
+  const [dayOverlay,  setDayOverlay]  = useState(null)  // { ds, x, y } — mobile day tap
   const [plans,    setPlans]    = useState(() => load('calendar_plans', []))
 
   const assignments = getAllAssignments()
@@ -546,7 +628,9 @@ export default function CalendarPage({ onDataChange }) {
                 onMouseLeave={e=>{ e.currentTarget.style.background=isToday?'var(--accent-dim)':isPast?'rgba(0,0,0,.07)':'transparent' }}
               >
                 {/* Day number */}
-                <div className="cal-day-num" style={{fontSize:12,fontWeight:isToday?800:500,lineHeight:1,marginBottom:4,color:isToday?'var(--accent)':isPast?'var(--text-3)':'var(--text-2)',display:'flex',alignItems:'center',gap:4}}>
+                <div className="cal-day-num"
+                  onClick={e=>{ e.stopPropagation(); const r=e.currentTarget.getBoundingClientRect(); setDayOverlay({ds, x:r.left, y:r.bottom+4}) }}
+                  style={{fontSize:12,fontWeight:isToday?800:500,lineHeight:1,marginBottom:4,color:isToday?'var(--accent)':isPast?'var(--text-3)':'var(--text-2)',display:'flex',alignItems:'center',gap:4,cursor:'pointer',userSelect:'none'}}>
                   {isToday && <div style={{width:5,height:5,borderRadius:'50%',background:'var(--accent)',boxShadow:'0 0 6px var(--accent)'}}/>}
                   {day.getDate()}
                 </div>
@@ -619,6 +703,21 @@ export default function CalendarPage({ onDataChange }) {
       {/* Add modal */}
       {addModal && (
         <AddModal date={addModal} onClose={()=>setAddModal(null)} onSaveAssignment={handleSaveAssignment} onSavePlan={handleSavePlan}/>
+      )}
+
+      {/* Mobile day overlay */}
+      {dayOverlay && (
+        <DayOverlay
+          ds={dayOverlay.ds}
+          x={dayOverlay.x}
+          y={dayOverlay.y}
+          assignments={assignments}
+          plans={plans}
+          onClose={()=>setDayOverlay(null)}
+          onAssignClick={a=>{ const r={left:window.innerWidth/2,bottom:window.innerHeight/2}; setPopup({item:a, x:r.left, y:r.bottom}) }}
+          onPlanEdit={p=>setEditPlan(p)}
+          onAdd={ds=>setAddModal(ds)}
+        />
       )}
 
       {/* Plan popup — single click */}

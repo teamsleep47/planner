@@ -117,7 +117,7 @@ function SidebarMiniWidgets({ hiddenTabs }) {
   )
 }
 
-function MobileHeader({ profile, signOut, sidebarOpen, setSidebarOpen, theme, toggleTheme }) {
+function MobileHeader({ profile, signOut, sidebarOpen, setSidebarOpen, theme, toggleTheme, saveState }) {
   const [showDropdown, setShowDropdown] = useState(false)
   const dropRef  = useRef(null)
   const navigate = useNavigate()
@@ -152,6 +152,13 @@ function MobileHeader({ profile, signOut, sidebarOpen, setSidebarOpen, theme, to
 
       {/* Title */}
       <span style={{fontWeight:700,fontSize:16,letterSpacing:'-0.4px',flex:1,color:'var(--text-1)'}}>Planner</span>
+      {/* Mobile save indicator dot */}
+      <div style={{display:'flex',alignItems:'center',gap:5,marginRight:4}}>
+        <div className={`mobile-save-dot ${saveState||'idle'}`}/>
+        {saveState==='saving'&&<span style={{fontSize:10,color:'var(--amber)',fontWeight:600}}>Saving</span>}
+        {saveState==='saved'&&<span style={{fontSize:10,color:'var(--green)',fontWeight:600}}>Saved</span>}
+        {saveState==='error'&&<span style={{fontSize:10,color:'var(--coral)',fontWeight:700}}>Error!</span>}
+      </div>
 
       {/* Avatar dropdown */}
       <div ref={dropRef} style={{position:'relative'}}>
@@ -272,6 +279,7 @@ export default function App() {
   const { notifs, unread, markAllRead, clearNotif }                        = useNotifications()
   const { wallpaper }                                                       = useBingWallpaper(theme === 'bing')
   const [sidebarOpen, setSidebarOpen] = useState(false)
+  const [errorOverlay, setErrorOverlay] = useState(false)
   const [driveKey,    setDriveKey]    = useState(0)
   const [hiddenTabs,  setHiddenTabs]  = useState(() => load('hidden_tabs', []))
 
@@ -279,14 +287,32 @@ export default function App() {
     const h = () => {
       setDriveKey(k => k + 1)
       setHiddenTabs(load('hidden_tabs', []))
+      // Stamp so we can detect if event fired before next mount
+      localStorage.setItem('planner_v1_last_drive_load', String(Date.now()))
     }
     window.addEventListener('drive-loaded', h)
+    // Race condition fix: if Drive loaded before this effect registered,
+    // the stamp will be recent — force a re-read
+    const lastLoad = Number(localStorage.getItem('planner_v1_last_drive_load') || 0)
+    if (lastLoad && (Date.now() - lastLoad) < 5000) {
+      setDriveKey(k => k + 1)
+      setHiddenTabs(load('hidden_tabs', []))
+    }
     return () => window.removeEventListener('drive-loaded', h)
   }, [])
 
   const handleDataChange = useCallback(() => {
     syncToDrive(getAllData())
   }, [syncToDrive])
+
+  // Show full-page red background when Drive save fails
+  useEffect(() => {
+    if (saveState === 'error') {
+      setErrorOverlay(true)
+      const t = setTimeout(() => setErrorOverlay(false), 1800)
+      return () => clearTimeout(t)
+    }
+  }, [saveState])
 
   // Filter NAV based on hidden tabs
   const visibleNav = ALL_NAV
@@ -338,6 +364,13 @@ export default function App() {
   return (
     <HashRouter>
       {SessionExpiredBanner}
+      {/* Full-page error flash */}
+      {errorOverlay && (
+        <div className="save-error-overlay" style={{
+          position:'fixed',inset:0,zIndex:9999,pointerEvents:'none',
+        }}/>
+      )}
+
       <div className="app-shell">
         <div className={`sidebar-overlay ${sidebarOpen?'open':''}`} onClick={()=>setSidebarOpen(false)}/>
 

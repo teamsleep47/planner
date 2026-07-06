@@ -4,6 +4,7 @@ import { load, save } from '../utils/storage.js'
 import { formatRelativeDue } from '../utils/timeFormat.js'
 import { getActiveTermCourses, getCourseColorMap } from '../utils/termData.js'
 import Tooltip from '../components/Tooltip.jsx'
+import { useSaveHalo } from '../hooks/useSaveHalo.js'
 
 const URGENCY = {
   urgent: { color:'#ef4444', label:'🔴 Urgent' },
@@ -109,7 +110,7 @@ function CountdownCards() {
 }
 
 // TaskRow — defined OUTSIDE component to prevent remount-on-keystroke
-function TaskRow({task,courseColors,courseOptions,editId,editText,editCourse,editUrgency,editDue,editIsPlan,onEditText,onEditCourse,onEditUrgency,onEditDue,onToggleIsPlan,onSaveEdit,onCancelEdit,onStartEdit,onToggle,onDelete,dragOverId,dragId,onDragStart,onDragOver,onDrop,onDragEnd}) {
+function TaskRow({task,courseColors,courseOptions,editId,editText,editCourse,editUrgency,editDue,editIsPlan,onEditText,onEditCourse,onEditUrgency,onEditDue,onToggleIsPlan,onSaveEdit,onCancelEdit,onStartEdit,onToggle,onDelete,dragOverId,dragId,onDragStart,onDragOver,onDrop,onDragEnd,expandedTaskId,onToggleExpand}) {
   const urgColor=URGENCY[task.urgency||'none'].color
   const courseColor=courseColors[task.course]||courseColors['OTHER']||'#4ade80'
   const courseLabel=task.course==='OTHER'?'Other':(task.course||'Other')
@@ -145,27 +146,56 @@ function TaskRow({task,courseColors,courseOptions,editId,editText,editCourse,edi
     </div>
   )
 
+  const isExpanded = expandedTaskId === task.id
+  const URGENCY_LABELS = {urgent:'🔴 Urgent',high:'🟠 High',medium:'🟡 Soon',low:'🟢 Relaxed',none:null}
+  const urgLabel = URGENCY_LABELS[task.urgency||'none']
+
   return(
-    <div
-      draggable
-      onDragStart={e=>onDragStart(e,task.id)} onDragOver={e=>onDragOver(e,task.id)}
-      onDrop={e=>onDrop(e,task.id)} onDragEnd={onDragEnd}
-      onDoubleClick={()=>onStartEdit(task)}
-      className="task-row-mobile"
-      style={{display:'flex',alignItems:'center',gap:8,padding:'7px 10px',marginBottom:3,borderRadius:10,position:'relative',background:dragOverId===task.id?'var(--accent-dim)':'var(--glass-bg)',border:dragOverId===task.id?'1px solid var(--accent)':'1px solid var(--glass-border)',outline:urgColor?`2px solid ${urgColor}44`:'none',outlineOffset:2,cursor:'grab',opacity:dragId===task.id?.35:1,userSelect:'none'}}
-    >
-      {urgColor&&<div style={{position:'absolute',left:3,top:'20%',width:3,height:'60%',borderRadius:2,background:urgColor,boxShadow:`0 0 6px ${urgColor}`,pointerEvents:'none'}}/>}
-      <button onClick={()=>onToggle(task.id)} style={{background:'none',border:'none',padding:2,flexShrink:0,display:'flex',color:task.done?'var(--green)':'var(--text-3)',cursor:'pointer'}}>
-        {task.done?<CheckCircle2 size={17}/>:<Circle size={17}/>}
-      </button>
-      <span style={{flex:1,fontSize:13,fontWeight:500,color:task.done?'var(--text-3)':'var(--text-1)',textDecoration:task.done?'line-through':'none',overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>
-        {task.isPlan&&<span style={{fontSize:10,marginRight:4}}>📅</span>}{task.text}
-      </span>
-      <div style={{display:'flex',alignItems:'center',gap:5,flexShrink:0}}>
-        <span style={{fontSize:10,padding:'1px 6px',borderRadius:20,background:`${courseColor}22`,color:courseColor,border:`1px solid ${courseColor}44`,fontWeight:700}}>{courseLabel}</span>
-        {due&&<span style={{fontSize:10,fontWeight:700,color:due.color}}>{due.label}</span>}
-        <button onClick={()=>onDelete(task.id)} style={{background:'none',border:'none',color:'var(--text-3)',cursor:'pointer',display:'flex',padding:2}}><X size={12}/></button>
+    <div style={{marginBottom:3}}>
+      <div
+        draggable
+        onDragStart={e=>onDragStart(e,task.id)} onDragOver={e=>onDragOver(e,task.id)}
+        onDrop={e=>onDrop(e,task.id)} onDragEnd={onDragEnd}
+        onDoubleClick={()=>onStartEdit(task)}
+        onClick={()=>onToggleExpand(task.id)}
+        className="task-row-mobile"
+        style={{display:'flex',alignItems:'center',gap:8,padding:'10px 10px',borderRadius:isExpanded?'10px 10px 0 0':'10px',position:'relative',background:dragOverId===task.id?'var(--accent-dim)':'var(--glass-bg)',border:dragOverId===task.id?'1px solid var(--accent)':`1px solid ${isExpanded?'var(--accent)':'var(--glass-border)'}`,outline:urgColor?`2px solid ${urgColor}44`:'none',outlineOffset:2,cursor:'pointer',opacity:dragId===task.id?.35:1,userSelect:'none',transition:'border-radius .2s, border-color .2s'}}
+      >
+        {urgColor&&<div style={{position:'absolute',left:3,top:'20%',width:3,height:'60%',borderRadius:2,background:urgColor,boxShadow:`0 0 6px ${urgColor}`,pointerEvents:'none'}}/>}
+        <button onClick={e=>{e.stopPropagation();onToggle(task.id)}} style={{background:'none',border:'none',padding:2,flexShrink:0,display:'flex',color:task.done?'var(--green)':'var(--text-3)',cursor:'pointer'}}>
+          {task.done?<CheckCircle2 size={17}/>:<Circle size={17}/>}
+        </button>
+        {/* Title — full width, no truncation on mobile */}
+        <span style={{flex:1,fontSize:13,fontWeight:500,color:task.done?'var(--text-3)':'var(--text-1)',textDecoration:task.done?'line-through':'none',wordBreak:'break-word',lineHeight:1.3}}>
+          {task.isPlan&&<span style={{fontSize:10,marginRight:4}}>📅</span>}{task.text}
+        </span>
+        <div style={{display:'flex',alignItems:'center',gap:4,flexShrink:0}}>
+          {due&&<span style={{fontSize:10,fontWeight:700,color:task.done?'var(--text-3)':due.color}}>{due.label}</span>}
+          <button onClick={e=>{e.stopPropagation();onDelete(task.id)}} style={{background:'none',border:'none',color:'var(--text-3)',cursor:'pointer',display:'flex',padding:2}}><X size={12}/></button>
+        </div>
       </div>
+
+      {/* Expanded attributes — animated */}
+      {isExpanded&&(
+        <div className="task-expand-attrs" style={{
+          padding:'8px 12px 10px',
+          background:'var(--glass-bg-2)',
+          border:'1px solid var(--accent)',
+          borderTop:'none',
+          borderRadius:'0 0 10px 10px',
+        }}>
+          <div style={{display:'flex',flexWrap:'wrap',gap:6,alignItems:'center'}}>
+            {/* Course */}
+            <span style={{fontSize:11,padding:'2px 8px',borderRadius:20,background:`${courseColor}22`,color:courseColor,border:`1px solid ${courseColor}44`,fontWeight:700}}>{courseLabel}</span>
+            {/* Priority */}
+            {urgLabel&&<span style={{fontSize:11,padding:'2px 8px',borderRadius:20,background:urgColor?`${urgColor}22`:'var(--glass-bg)',color:urgColor||'var(--text-3)',fontWeight:700}}>{urgLabel}</span>}
+            {/* Due */}
+            {task.due&&<span style={{fontSize:11,padding:'2px 8px',borderRadius:20,background:'var(--glass-bg)',color:'var(--text-2)',border:'1px solid var(--glass-border)'}}>📅 {task.due}</span>}
+            {/* Edit button */}
+            <button onClick={e=>{e.stopPropagation();onStartEdit(task)}} style={{fontSize:11,padding:'2px 10px',borderRadius:20,background:'var(--accent-dim)',color:'var(--accent)',border:'1px solid var(--accent)',fontWeight:600,cursor:'pointer',marginLeft:'auto'}}>Edit</button>
+          </div>
+        </div>
+      )}
     </div>
   )
 }
@@ -198,13 +228,19 @@ export default function WeeklyHome({ onDataChange }) {
   const [upcoming,    setUpcoming]   = useState([])
   const [dragId,      setDragId]     = useState(null)
   const [dragOverId,  setDragOverId] = useState(null)
+  const [expandedTaskId, setExpandedTaskId] = useState(null)
   const timerRef = useRef(null)
+  const { haloRef: taskHaloRef, triggerHalo: triggerTaskHalo } = useSaveHalo()
 
   const COURSE_COLORS = getCourseColorMap()
   const courseOptions = [...getActiveTermCourses().map(c=>c.name),'OTHER']
 
   useEffect(()=>{ const id=setInterval(()=>setGreeting(getGreeting()),60000); return()=>clearInterval(id) },[])
-  useEffect(()=>{ save('home_tasks',tasks); onDataChange?.() },[tasks])
+  useEffect(()=>{
+    save('home_tasks',tasks)
+    onDataChange?.()
+    triggerTaskHalo('green')
+  },[tasks])
   useEffect(()=>{ save('timer_settings',timerMins) },[timerMins])
   useEffect(()=>{ save('sem_end_date',semDate) },[semDate])
 
@@ -329,7 +365,7 @@ export default function WeeklyHome({ onDataChange }) {
         )}
 
         <div className="home-main-grid">
-          <div className="card home-tasks-col">
+          <div className="card home-tasks-col" ref={taskHaloRef}>
             <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:8}}>
               <span className="card-title" style={{margin:0}}>Today's focus</span>
               <div style={{display:'flex',gap:6}}>
@@ -397,6 +433,7 @@ export default function WeeklyHome({ onDataChange }) {
                 onToggle={toggleTask} onDelete={deleteTask}
                 dragId={dragId} dragOverId={dragOverId}
                 onDragStart={handleDragStart} onDragOver={handleDragOver} onDrop={handleDrop} onDragEnd={handleDragEnd}
+                expandedTaskId={expandedTaskId} onToggleExpand={(id)=>setExpandedTaskId(v=>v===id?null:id)}
               />
             ))}
             {showHistory&&(
