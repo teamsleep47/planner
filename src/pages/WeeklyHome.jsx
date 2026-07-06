@@ -328,7 +328,7 @@ export default function WeeklyHome({ onDataChange }) {
           </div>
         )}
 
-        <div className="home-main-grid" style={{display:'grid',gridTemplateColumns:'1.6fr 1fr',gap:16,alignItems:'start'}}>
+        <div className="home-main-grid">
           <div className="card home-tasks-col">
             <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:8}}>
               <span className="card-title" style={{margin:0}}>Today's focus</span>

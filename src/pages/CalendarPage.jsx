@@ -488,9 +488,9 @@ export default function CalendarPage({ onDataChange }) {
           <div className="page-subtitle">{MONTHS[month]} {year} — double-click a date to add</div>
         </div>
         <div style={{display:'flex',gap:6,alignItems:'center'}}>
-          <button className="btn btn-ghost" onClick={goToday} style={{fontSize:12}}>Today</button>
-          <button className="btn-icon" onClick={prev} style={{padding:7}}><ChevronLeft size={14}/></button>
-          <button className="btn-icon" onClick={next} style={{padding:7}}><ChevronRight size={14}/></button>
+          <button className="btn btn-ghost cal-today-btn" onClick={goToday} style={{fontSize:12}}>Today</button>
+          <button className="btn-icon cal-nav-btn" onClick={prev} style={{padding:7}}><ChevronLeft size={16}/></button>
+          <button className="btn-icon cal-nav-btn" onClick={next} style={{padding:7}}><ChevronRight size={16}/></button>
         </div>
       </div>
 
@@ -533,7 +533,7 @@ export default function CalendarPage({ onDataChange }) {
             const dayPlan = plansFor(ds)
 
             return (
-              <div key={ds}
+              <div key={ds} className="cal-day-cell"
                 style={{
                   minHeight:cellH, maxHeight:200, overflowY:'auto',
                   borderRight:'1px solid var(--glass-border)', borderBottom:'1px solid var(--glass-border)',
@@ -546,7 +546,7 @@ export default function CalendarPage({ onDataChange }) {
                 onMouseLeave={e=>{ e.currentTarget.style.background=isToday?'var(--accent-dim)':isPast?'rgba(0,0,0,.07)':'transparent' }}
               >
                 {/* Day number */}
-                <div style={{fontSize:12,fontWeight:isToday?800:500,lineHeight:1,marginBottom:4,color:isToday?'var(--accent)':isPast?'var(--text-3)':'var(--text-2)',display:'flex',alignItems:'center',gap:4}}>
+                <div className="cal-day-num" style={{fontSize:12,fontWeight:isToday?800:500,lineHeight:1,marginBottom:4,color:isToday?'var(--accent)':isPast?'var(--text-3)':'var(--text-2)',display:'flex',alignItems:'center',gap:4}}>
                   {isToday && <div style={{width:5,height:5,borderRadius:'50%',background:'var(--accent)',boxShadow:'0 0 6px var(--accent)'}}/>}
                   {day.getDate()}
                 </div>
@@ -569,7 +569,7 @@ export default function CalendarPage({ onDataChange }) {
                   const badge=PRIORITY_BADGE[a.priority||'none']
                   const isDone=a.status==='Done'
                   return (
-                    <button key={`d-${a.id}-${di}`} onClick={e=>handleAssignClick(e,a)} style={{display:'flex',alignItems:'center',gap:3,width:'100%',border:'none',cursor:'pointer',padding:'2px 5px',borderRadius:4,marginBottom:2,background:isDone?`${a.courseColor}15`:`${a.courseColor}30`,borderLeft:`3px solid ${isDone?a.courseColor+'44':a.courseColor}`,opacity:isDone?.5:1,transition:'all .1s'}}
+                    <button key={`d-${a.id}-${di}`} className="cal-pill" onClick={e=>handleAssignClick(e,a)} style={{display:'flex',alignItems:'center',gap:3,width:'100%',border:'none',cursor:'pointer',padding:'2px 5px',borderRadius:4,marginBottom:2,background:isDone?`${a.courseColor}15`:`${a.courseColor}30`,borderLeft:`3px solid ${isDone?a.courseColor+'44':a.courseColor}`,opacity:isDone?.5:1,transition:'all .1s'}}
                       onMouseEnter={e=>{if(!isDone)e.currentTarget.style.background=`${a.courseColor}50`}}
                       onMouseLeave={e=>{e.currentTarget.style.background=isDone?`${a.courseColor}15`:`${a.courseColor}30`}}>
                       <div style={{width:5,height:5,borderRadius:'50%',background:a.courseColor,flexShrink:0,boxShadow:`0 0 4px ${a.courseColor}`}}/>
