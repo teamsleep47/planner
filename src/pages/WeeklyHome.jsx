@@ -200,6 +200,70 @@ function TaskRow({task,courseColors,courseOptions,editId,editText,editCourse,edi
   )
 }
 
+// ── weatherwidget.org embed ─────────────────────────────────────
+// Injects the third-party script once on mount, cleans up on unmount.
+// The widget uses loc='auto' for automatic location detection.
+// The id must be unique — ww_a4398b2f1b96c matches the generated code.
+function WeatherWidget() {
+  const containerRef = useRef(null)
+
+  useEffect(() => {
+    const WIDGET_ID = 'ww_a4398b2f1b96c'
+    const SCRIPT_ID = 'weatherwidget-io-js'
+
+    // Remove any previous instance so HMR/re-mount doesn't double-inject
+    const existing = document.getElementById(SCRIPT_ID)
+    if (existing) existing.remove()
+
+    // Re-render the anchor so the widget script picks it up
+    const el = document.getElementById(WIDGET_ID)
+    if (el) {
+      // Force widget re-init by removing and re-adding the class
+      el.classList.remove('weatherwidget-io')
+      void el.offsetWidth
+      el.classList.add('weatherwidget-io')
+    }
+
+    const script = document.createElement('script')
+    script.id    = SCRIPT_ID
+    script.async = true
+    script.src   = 'https://app3.weatherwidget.org/js/?id=' + WIDGET_ID
+    document.body.appendChild(script)
+
+    return () => {
+      const s = document.getElementById(SCRIPT_ID)
+      if (s) s.remove()
+    }
+  }, [])
+
+  return (
+    <div ref={containerRef} style={{borderRadius:'var(--radius-lg)',overflow:'hidden',marginBottom:0}}>
+      <a
+        id="ww_a4398b2f1b96c"
+        className="weatherwidget-io"
+        href="https://forecast7.com/en/27d50n82d57/bradenton/"
+        data-label_1="BRADENTON"
+        data-label_2="FLORIDA"
+        data-theme="original"
+        data-basecolor="#0e0c20"
+        data-textcolor="#eeeeff"
+        data-cloud="#8888b8"
+        data-persp="#6366f1"
+        data-sun="#f59e0b"
+        data-moon="#f59e0b"
+        data-thund="#ef4444"
+        data-odd="#0000000a"
+        data-lang="en"
+        data-sl_lpl="1"
+        data-sl_sot="fahrenheit"
+        data-cl_bkg="image"
+      >
+        BRADENTON
+      </a>
+    </div>
+  )
+}
+
 export default function WeeklyHome({ onDataChange }) {
   const [tasks,       setTasks]      = useState(()=>load('home_tasks',[]))
   const [timerMins,   setTimerMins]  = useState(()=>load('timer_settings',DEFAULT_TIMERS))
@@ -342,27 +406,8 @@ export default function WeeklyHome({ onDataChange }) {
           <div className="stat-card"><div className="stat-label">Upcoming</div><div className="stat-value" style={{color:'var(--amber)',fontSize:22}}>{upcoming.length}</div><div className="stat-sub">due soon</div></div>
         </div>
 
-        {weather&&(
-          <div className="card" style={{padding:'12px 16px'}}>
-            <div className="weather-strip" style={{display:'flex',gap:6,alignItems:'center',flexWrap:'wrap'}}>
-              {weather.daily.time.slice(0,7).map((ds,i)=>{const d=new Date(ds+'T12:00:00');return(
-                <Tooltip key={i} text={`${i===0?'Today':d.toLocaleDateString('en-US',{weekday:'long'})}: ${Math.round(weather.daily.temperature_2m_max[i])}°/${Math.round(weather.daily.temperature_2m_min[i])}°F`}>
-                  <div style={{textAlign:'center',padding:'5px 7px',borderRadius:10,background:i===0?'var(--accent-dim)':'var(--glass-bg)',border:`1px solid ${i===0?'var(--accent)':'var(--glass-border)'}`,minWidth:40,cursor:'default'}}>
-                    <div style={{fontSize:9,fontWeight:700,color:i===0?'var(--accent)':'var(--text-3)',marginBottom:1}}>{i===0?'Now':d.toLocaleDateString('en-US',{weekday:'short'})}</div>
-                    <div style={{fontSize:13}}>{WX_ICONS[weather.daily.weathercode[i]]||'🌡'}</div>
-                    <div style={{fontSize:10,fontWeight:700}}>{Math.round(weather.daily.temperature_2m_max[i])}°</div>
-                  </div>
-                </Tooltip>
-              )})}
-              <button onClick={()=>setShowCityEdit(s=>!s)} style={{background:'none',border:'none',fontSize:11,color:'var(--text-3)',cursor:'pointer',padding:'2px 4px'}}>📍{weather.city}</button>
-              {showCityEdit&&(<div style={{display:'flex',gap:4}}>
-                <input style={{...inputSm,width:110}} value={cityDraft} onChange={e=>setCityDraft(e.target.value)}
-                  onKeyDown={e=>e.key==='Enter'&&(setCity(cityDraft),save('weather_city',cityDraft),setShowCityEdit(false),sessionStorage.removeItem('planner_weather_cache'),fetchWeather(cityDraft))} autoFocus/>
-                <button className="btn-icon" style={{padding:5}} onClick={()=>{setCity(cityDraft);save('weather_city',cityDraft);setShowCityEdit(false);sessionStorage.removeItem('planner_weather_cache');fetchWeather(cityDraft)}}>✓</button>
-              </div>)}
-            </div>
-          </div>
-        )}
+        {/* weatherwidget.org embed */}
+        <WeatherWidget/>
 
         <div className="home-main-grid">
           <div className="card home-tasks-col" ref={taskHaloRef}>
