@@ -201,61 +201,47 @@ function TaskRow({task,courseColors,courseOptions,editId,editText,editCourse,edi
 }
 
 // ── weatherwidget.org embed ─────────────────────────────────────
-// Injects the third-party script once on mount, cleans up on unmount.
-// The widget uses loc='auto' for automatic location detection.
-// The id must be unique — ww_a4398b2f1b96c matches the generated code.
 function WeatherWidget() {
+  const containerRef = useRef(null)
+
   useEffect(() => {
+    const container = containerRef.current
+    if (!container) return
+
     const WIDGET_ID = 'ww_a4398b2f1b96c'
     const SCRIPT_ID = 'weatherwidget-io-js'
 
-    // Small delay ensures React has committed the <a> to the real DOM
-    // before the widget script scans for .weatherwidget-io elements
-    const timer = setTimeout(() => {
-      // Remove stale script so it re-runs and picks up the element
-      const existing = document.getElementById(SCRIPT_ID)
-      if (existing) existing.remove()
+    const a = document.createElement('a')
+    a.id = WIDGET_ID
+    a.className = 'weatherwidget-io'
+    a.href = 'https://forecast7.com/en/27d50n82d57/bradenton/'
+    a.textContent = 'BRADENTON'
+    const attrs = {
+      label_1:'BRADENTON', label_2:'FLORIDA', theme:'original',
+      basecolor:'#0e0c20', textcolor:'#eeeeff', cloud:'#8888b8',
+      persp:'#6366f1', sun:'#f59e0b', moon:'#f59e0b', thund:'#ef4444',
+      odd:'#0000000a', lang:'en', sl_lpl:'1', sl_sot:'fahrenheit', cl_bkg:'image',
+    }
+    Object.entries(attrs).forEach(([k,v]) => a.setAttribute('data-'+k, v))
+    container.appendChild(a)
 
-      const script = document.createElement('script')
-      script.id    = SCRIPT_ID
-      script.async = true
-      script.src   = 'https://app3.weatherwidget.org/js/?id=' + WIDGET_ID
-      document.body.appendChild(script)
-    }, 100)
+    const existing = document.getElementById(SCRIPT_ID)
+    if (existing) existing.remove()
+
+    const script = document.createElement('script')
+    script.id    = SCRIPT_ID
+    script.async = true
+    script.src   = 'https://app3.weatherwidget.org/js/?id=' + WIDGET_ID
+    document.body.appendChild(script)
 
     return () => {
-      clearTimeout(timer)
       const s = document.getElementById(SCRIPT_ID)
       if (s) s.remove()
+      container.innerHTML = ''
     }
   }, [])
 
-  return (
-    <div style={{borderRadius:'var(--radius-lg)',overflow:'hidden',marginBottom:0}}>
-      <a
-        id="ww_a4398b2f1b96c"
-        className="weatherwidget-io"
-        href="https://forecast7.com/en/27d50n82d57/bradenton/"
-        data-label_1="BRADENTON"
-        data-label_2="FLORIDA"
-        data-theme="original"
-        data-basecolor="#0e0c20"
-        data-textcolor="#eeeeff"
-        data-cloud="#8888b8"
-        data-persp="#6366f1"
-        data-sun="#f59e0b"
-        data-moon="#f59e0b"
-        data-thund="#ef4444"
-        data-odd="#0000000a"
-        data-lang="en"
-        data-sl_lpl="1"
-        data-sl_sot="fahrenheit"
-        data-cl_bkg="image"
-      >
-        BRADENTON
-      </a>
-    </div>
-  )
+  return <div ref={containerRef} style={{borderRadius:'var(--radius-lg)',overflow:'hidden',marginBottom:0}} />
 }
 
 export default function WeeklyHome({ onDataChange }) {
