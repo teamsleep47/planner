@@ -152,13 +152,7 @@ function MobileHeader({ profile, signOut, sidebarOpen, setSidebarOpen, theme, to
 
       {/* Title */}
       <span style={{fontWeight:700,fontSize:16,letterSpacing:'-0.4px',flex:1,color:'var(--text-1)'}}>Planner</span>
-      {/* Mobile save indicator dot */}
-      <div style={{display:'flex',alignItems:'center',gap:5,marginRight:4}}>
-        <div className={`mobile-save-dot ${saveState||'idle'}`}/>
-        {saveState==='saving'&&<span style={{fontSize:10,color:'var(--amber)',fontWeight:600}}>Saving</span>}
-        {saveState==='saved'&&<span style={{fontSize:10,color:'var(--green)',fontWeight:600}}>Saved</span>}
-        {saveState==='error'&&<span style={{fontSize:10,color:'var(--coral)',fontWeight:700}}>Error!</span>}
-      </div>
+
 
       {/* Avatar dropdown */}
       <div ref={dropRef} style={{position:'relative'}}>
@@ -365,6 +359,13 @@ export default function App() {
     <HashRouter>
       {SessionExpiredBanner}
       {/* Full-page error flash */}
+      {/* ── Floating mobile save toast ─────────────────────────── */}
+      <div className={`mobile-save-toast ${saveState==='saving'?'saving':saveState==='saved'?'saved':saveState==='error'?'error':''}`}>
+        {saveState==='saving' && <><span style={{fontSize:14}}>⟳</span> Saving…</>}
+        {saveState==='saved'  && <><span style={{fontSize:14}}>✓</span> Saved to Drive</>}
+        {saveState==='error'  && <><span style={{fontSize:14}}>⚠</span> Save failed — check connection</>}
+      </div>
+
       {errorOverlay && (
         <div className="save-error-overlay" style={{
           position:'fixed',inset:0,zIndex:9999,pointerEvents:'none',

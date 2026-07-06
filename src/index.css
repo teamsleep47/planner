@@ -1040,3 +1040,61 @@ select option {
 .mobile-save-dot.saved  { background: var(--green); animation: saveDotPulse 0.6s ease-out 1; }
 .mobile-save-dot.error  { background: var(--coral); animation: saveDotPulse 0.5s ease-in-out 3; }
 .mobile-save-dot.idle   { background: var(--glass-border); }
+
+/* ════════════════════════════════════════════════════
+   MOBILE SAVE TOAST — floating pill at bottom
+   ════════════════════════════════════════════════════ */
+.mobile-save-toast {
+  display: none; /* hidden on desktop */
+  position: fixed;
+  bottom: 24px;
+  left: 50%;
+  transform: translateX(-50%) translateY(20px);
+  z-index: 999;
+  padding: 10px 20px;
+  border-radius: 30px;
+  font-size: 13px;
+  font-weight: 700;
+  white-space: nowrap;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity .25s, transform .25s;
+  box-shadow: 0 4px 24px rgba(0,0,0,0.35);
+  align-items: center;
+  gap: 8px;
+}
+.mobile-save-toast.saving {
+  background: var(--amber-dim);
+  color: var(--amber);
+  border: 1px solid var(--amber);
+  opacity: 1;
+  transform: translateX(-50%) translateY(0);
+}
+.mobile-save-toast.saved {
+  background: var(--green-dim);
+  color: var(--green);
+  border: 1px solid var(--green);
+  opacity: 1;
+  transform: translateX(-50%) translateY(0);
+}
+.mobile-save-toast.error {
+  background: var(--coral-dim);
+  color: var(--coral);
+  border: 1px solid var(--coral);
+  opacity: 1;
+  transform: translateX(-50%) translateY(0);
+}
+
+@media (max-width: 768px) {
+  .mobile-save-toast { display: flex; }
+
+  /* Calendar pills — non-interactive on mobile */
+  /* Whole cell is the tap target, pills just display */
+  .cal-pill-nomobile {
+    pointer-events: none !important;
+  }
+  /* Plan pills also non-interactive on mobile */
+  .cal-day-cell .cal-plan-pill {
+    pointer-events: none !important;
+  }
+}

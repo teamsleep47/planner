@@ -3,6 +3,7 @@ import { ChevronLeft, ChevronRight, X, ExternalLink, Edit2, Trash2, Check } from
 import { load, save } from '../utils/storage.js'
 import { useNavigate } from 'react-router-dom'
 import { loadTerms, saveTerms, uid, ASSIGNMENT_TYPES } from '../utils/termData.js'
+import { useSaveHalo } from '../hooks/useSaveHalo.js'
 import { formatRelativeDue } from '../utils/timeFormat.js'
 
 const MONTHS  = ['January','February','March','April','May','June','July','August','September','October','November','December']
@@ -472,6 +473,7 @@ function DayOverlay({ ds, x, y, assignments, plans, onClose, onAssignClick, onPl
 
 // ── Main calendar ────────────────────────────────────────────────
 export default function CalendarPage({ onDataChange }) {
+  const { haloRef: calHaloRef, triggerHalo: triggerCalHalo } = useSaveHalo()
   const navigate   = useNavigate()
   const [anchor,   setAnchor]   = useState(new Date())
   const [popup,    setPopup]    = useState(null)
@@ -483,7 +485,7 @@ export default function CalendarPage({ onDataChange }) {
 
   const assignments = getAllAssignments()
 
-  useEffect(() => { save('calendar_plans', plans); onDataChange?.() }, [plans])
+  useEffect(() => { save('calendar_plans', plans); onDataChange?.(); triggerCalHalo('green') }, [plans])
 
   // Local date — avoids UTC offset bug (toISOString returns yesterday before 8pm EDT)
   const today = (() => { const d=new Date(); return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}` })()
@@ -591,7 +593,7 @@ export default function CalendarPage({ onDataChange }) {
       </div>
 
       {/* Grid */}
-      <div style={{margin:'0 24px 24px',background:'var(--glass-bg)',border:'1px solid var(--glass-border)',borderRadius:'var(--radius-lg)',overflow:'hidden'}}>
+      <div ref={calHaloRef} style={{margin:'0 24px 24px',background:'var(--glass-bg)',border:'1px solid var(--glass-border)',borderRadius:'var(--radius-lg)',overflow:'hidden'}}>
         {/* Day headers */}
         <div style={{display:'grid',gridTemplateColumns:'repeat(7,1fr)',background:'var(--glass-bg-2)',borderBottom:'1px solid var(--glass-border)'}}>
           {DAYS_S.map(d=>(
@@ -621,15 +623,15 @@ export default function CalendarPage({ onDataChange }) {
                   borderRight:'1px solid var(--glass-border)', borderBottom:'1px solid var(--glass-border)',
                   padding:'6px 5px 5px', position:'relative',
                   background:isToday?'var(--accent-dim)':isPast?'rgba(0,0,0,.07)':'transparent',
-                  cursor:'default', transition:'background .1s',
+                  cursor:'pointer', transition:'background .1s',
                 }}
-                onDoubleClick={()=>setAddModal(ds)}
+                onClick={e=>{ const r=e.currentTarget.getBoundingClientRect(); setDayOverlay({ds,x:r.left,y:r.bottom+2}) }}
+                onDoubleClick={e=>{ e.stopPropagation(); setAddModal(ds) }}
                 onMouseEnter={e=>{ if(!isToday) e.currentTarget.style.background='var(--glass-bg-2)' }}
                 onMouseLeave={e=>{ e.currentTarget.style.background=isToday?'var(--accent-dim)':isPast?'rgba(0,0,0,.07)':'transparent' }}
               >
                 {/* Day number */}
                 <div className="cal-day-num"
-                  onClick={e=>{ e.stopPropagation(); const r=e.currentTarget.getBoundingClientRect(); setDayOverlay({ds, x:r.left, y:r.bottom+4}) }}
                   style={{fontSize:12,fontWeight:isToday?800:500,lineHeight:1,marginBottom:4,color:isToday?'var(--accent)':isPast?'var(--text-3)':'var(--text-2)',display:'flex',alignItems:'center',gap:4,cursor:'pointer',userSelect:'none'}}>
                   {isToday && <div style={{width:5,height:5,borderRadius:'50%',background:'var(--accent)',boxShadow:'0 0 6px var(--accent)'}}/>}
                   {day.getDate()}
@@ -653,7 +655,7 @@ export default function CalendarPage({ onDataChange }) {
                   const badge=PRIORITY_BADGE[a.priority||'none']
                   const isDone=a.status==='Done'
                   return (
-                    <button key={`d-${a.id}-${di}`} className="cal-pill" onClick={e=>handleAssignClick(e,a)} style={{display:'flex',alignItems:'center',gap:3,width:'100%',border:'none',cursor:'pointer',padding:'2px 5px',borderRadius:4,marginBottom:2,background:isDone?`${a.courseColor}15`:`${a.courseColor}30`,borderLeft:`3px solid ${isDone?a.courseColor+'44':a.courseColor}`,opacity:isDone?.5:1,transition:'all .1s'}}
+                    <button key={`d-${a.id}-${di}`} className="cal-pill cal-pill-nomobile" onClick={e=>{e.stopPropagation();handleAssignClick(e,a)}} style={{display:'flex',alignItems:'center',gap:3,width:'100%',border:'none',cursor:'pointer',padding:'2px 5px',borderRadius:4,marginBottom:2,background:isDone?`${a.courseColor}15`:`${a.courseColor}30`,borderLeft:`3px solid ${isDone?a.courseColor+'44':a.courseColor}`,opacity:isDone?.5:1,transition:'all .1s'}}
                       onMouseEnter={e=>{if(!isDone)e.currentTarget.style.background=`${a.courseColor}50`}}
                       onMouseLeave={e=>{e.currentTarget.style.background=isDone?`${a.courseColor}15`:`${a.courseColor}30`}}>
                       <div style={{width:5,height:5,borderRadius:'50%',background:a.courseColor,flexShrink:0,boxShadow:`0 0 4px ${a.courseColor}`}}/>

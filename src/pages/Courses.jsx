@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import { Plus, Trash2, Edit2, Check, X, ChevronDown, ChevronUp, BookOpen } from 'lucide-react'
 import { loadTerms, saveTerms, uid, ASSIGNMENT_TYPES, getCourseColorMap } from '../utils/termData.js'
+import { useSaveHalo } from '../hooks/useSaveHalo.js'
 import { formatRelativeDue } from '../utils/timeFormat.js'
 import { load, save } from '../utils/storage.js'
 import Tooltip from '../components/Tooltip.jsx'
@@ -24,6 +25,7 @@ const BLANK_ASSIGN  = { title:'', type:ASSIGNMENT_TYPES[0], due:'', dueTime:'', 
 const ACCORDION_KEY = 'courses_accordion_state'
 
 export default function Courses({ onDataChange }) {
+  const { haloRef: coursesHaloRef, triggerHalo: triggerCoursesHalo } = useSaveHalo()
   const [terms,        setTerms]        = useState(()=>loadTerms())
   const [activeTermId, setActiveTermId] = useState(()=>{ const t=loadTerms().find(t=>t.active); return t?.id||loadTerms()[0]?.id })
   // Accordion state: { courseId: bool } — persisted to localStorage
@@ -46,7 +48,7 @@ export default function Courses({ onDataChange }) {
 
   // Persist accordion state whenever it changes
   useEffect(()=>{ save(ACCORDION_KEY, expanded) },[expanded])
-  useEffect(()=>{ saveTerms(terms); onDataChange?.() },[terms])
+  useEffect(()=>{ saveTerms(terms); onDataChange?.(); triggerCoursesHalo('green') },[terms])
 
   // Calendar jump
   useEffect(()=>{
@@ -95,7 +97,7 @@ export default function Courses({ onDataChange }) {
         <div><div className="page-title">Assignments</div><div className="page-subtitle">Double-click any row to edit · accordion state saved</div></div>
         <button className="btn btn-primary" onClick={()=>setShowAddTerm(s=>!s)}><Plus size={14}/> Add term</button>
       </div>
-      <div className="page-body" style={{display:'flex',flexDirection:'column',gap:16}}>
+      <div ref={coursesHaloRef} className="page-body" style={{display:'flex',flexDirection:'column',gap:16}}>
         {showAddTerm&&(
           <div className="card" style={{display:'flex',gap:8,alignItems:'center'}}>
             <input style={{...inp,flex:1}} placeholder="Term name (e.g. Fall 2026)" value={newTermName} onChange={e=>setNewTermName(e.target.value)} onKeyDown={e=>e.key==='Enter'&&addTerm()} autoFocus/>
