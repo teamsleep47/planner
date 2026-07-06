@@ -205,39 +205,33 @@ function TaskRow({task,courseColors,courseOptions,editId,editText,editCourse,edi
 // The widget uses loc='auto' for automatic location detection.
 // The id must be unique — ww_a4398b2f1b96c matches the generated code.
 function WeatherWidget() {
-  const containerRef = useRef(null)
-
   useEffect(() => {
     const WIDGET_ID = 'ww_a4398b2f1b96c'
     const SCRIPT_ID = 'weatherwidget-io-js'
 
-    // Remove any previous instance so HMR/re-mount doesn't double-inject
-    const existing = document.getElementById(SCRIPT_ID)
-    if (existing) existing.remove()
+    // Small delay ensures React has committed the <a> to the real DOM
+    // before the widget script scans for .weatherwidget-io elements
+    const timer = setTimeout(() => {
+      // Remove stale script so it re-runs and picks up the element
+      const existing = document.getElementById(SCRIPT_ID)
+      if (existing) existing.remove()
 
-    // Re-render the anchor so the widget script picks it up
-    const el = document.getElementById(WIDGET_ID)
-    if (el) {
-      // Force widget re-init by removing and re-adding the class
-      el.classList.remove('weatherwidget-io')
-      void el.offsetWidth
-      el.classList.add('weatherwidget-io')
-    }
-
-    const script = document.createElement('script')
-    script.id    = SCRIPT_ID
-    script.async = true
-    script.src   = 'https://app3.weatherwidget.org/js/?id=' + WIDGET_ID
-    document.body.appendChild(script)
+      const script = document.createElement('script')
+      script.id    = SCRIPT_ID
+      script.async = true
+      script.src   = 'https://app3.weatherwidget.org/js/?id=' + WIDGET_ID
+      document.body.appendChild(script)
+    }, 100)
 
     return () => {
+      clearTimeout(timer)
       const s = document.getElementById(SCRIPT_ID)
       if (s) s.remove()
     }
   }, [])
 
   return (
-    <div ref={containerRef} style={{borderRadius:'var(--radius-lg)',overflow:'hidden',marginBottom:0}}>
+    <div style={{borderRadius:'var(--radius-lg)',overflow:'hidden',marginBottom:0}}>
       <a
         id="ww_a4398b2f1b96c"
         className="weatherwidget-io"
