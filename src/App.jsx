@@ -266,7 +266,7 @@ function MobileHeader({ profile, signOut, sidebarOpen, setSidebarOpen, theme, to
 }
 
 export default function App() {
-  const { token, profile, loading, error, signIn, signOut, isAuthed } = useAuth()
+  const { token, profile, loading, error, signIn, signOut, isAuthed, sessionExpired, refreshNow } = useAuth()
   const { theme, scheme, toggleTheme, setScheme, SCHEMES, SCHEME_COLORS } = useTheme()
   const { syncToDrive, saveState }                                         = useDriveSync()
   const { notifs, unread, markAllRead, clearNotif }                        = useNotifications()
@@ -304,8 +304,40 @@ export default function App() {
 
   if (!isAuthed) return <LoginPage onSignIn={signIn} error={error} loading={loading}/>
 
+  // Session expired overlay — shown instead of white screen when token dies
+  // The app stays visible underneath so data isn't lost
+  const SessionExpiredBanner = sessionExpired ? (
+    <div style={{
+      position:'fixed', inset:0, zIndex:9000,
+      background:'rgba(0,0,0,0.75)', backdropFilter:'blur(8px)',
+      display:'flex', alignItems:'center', justifyContent:'center',
+      padding:24,
+    }}>
+      <div style={{
+        background:'var(--glass-bg)', border:'1px solid var(--glass-border)',
+        borderRadius:'var(--radius-lg)', padding:'32px 28px', maxWidth:380, width:'100%',
+        textAlign:'center', boxShadow:'0 24px 64px rgba(0,0,0,0.5)',
+      }}>
+        <div style={{fontSize:40, marginBottom:16}}>🔐</div>
+        <div style={{fontWeight:700, fontSize:18, marginBottom:8}}>Session expired</div>
+        <div style={{fontSize:13, color:'var(--text-3)', lineHeight:1.6, marginBottom:24}}>
+          Your Google session expired while the tab was idle. Your data is safe — just sign back in to continue.
+        </div>
+        <button className="btn btn-primary" onClick={refreshNow}
+          style={{width:'100%', justifyContent:'center', fontSize:14, padding:'12px', marginBottom:10}}>
+          🔄 Sign back in
+        </button>
+        <button className="btn btn-ghost" onClick={signOut}
+          style={{width:'100%', justifyContent:'center', fontSize:13}}>
+          Sign out completely
+        </button>
+      </div>
+    </div>
+  ) : null
+
   return (
     <HashRouter>
+      {SessionExpiredBanner}
       <div className="app-shell">
         <div className={`sidebar-overlay ${sidebarOpen?'open':''}`} onClick={()=>setSidebarOpen(false)}/>
 
