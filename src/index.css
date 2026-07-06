@@ -506,9 +506,14 @@ textarea.inline-input { resize: vertical; line-height: 1.5; }
   gap: 12px;
   padding: 12px 18px;
   background: var(--glass-bg);
-  backdrop-filter: var(--blur-sm);
+  backdrop-filter: var(--blur);
+  -webkit-backdrop-filter: var(--blur);
   border-bottom: 1px solid var(--glass-border);
-  position: sticky; top: 0; z-index: 150;
+  position: sticky;
+  top: 0;
+  z-index: 150;
+  /* Taller = easier to touch */
+  min-height: 56px;
 }
 
 /* ── Sidebar overlay ─────────────────────────────── */
@@ -527,34 +532,64 @@ textarea.inline-input { resize: vertical; line-height: 1.5; }
 .input-sm:focus { outline: none; border-color: var(--accent); }
 
 /* ── Responsive ──────────────────────────────────── */
+/* ════════════════════════════════════════════════════
+   MOBILE — full professional pass
+   Target: Samsung Galaxy S25 Ultra + all modern phones
+   ════════════════════════════════════════════════════ */
 @media (max-width: 768px) {
-  :root { --sidebar-w: 260px; }
+  :root { --sidebar-w: 280px; }
 
-  .sidebar { transform: translateX(-100%); transition: transform .25s ease; border-right: 1px solid var(--glass-border); }
-  .sidebar.open { transform: translateX(0); }
+  /* ── Sidebar drawer — smooth + polished ── */
+  .sidebar {
+    transform: translateX(-100%);
+    transition: transform .28s cubic-bezier(0.4, 0, 0.2, 1);
+    box-shadow: none;
+    z-index: 210;
+    width: var(--sidebar-w);
+  }
+  .sidebar.open {
+    transform: translateX(0);
+    box-shadow: 4px 0 32px rgba(0,0,0,0.4);
+  }
+  .sidebar-overlay { display: none; position: fixed; inset: 0; background: rgba(0,0,0,.5); z-index: 205; }
   .sidebar-overlay.open { display: block; }
 
-  .main-content {
-    margin-left: 0;
-  }
-
+  /* ── Layout ── */
+  .main-content { margin-left: 0; }
   .mobile-header { display: flex; }
   .top-bar { display: none; }
 
+  /* ── Page spacing ── */
+  .page-header {
+    padding: 18px 16px 0;
+    gap: 10px;
+  }
+  .page-body { padding: 14px 14px 80px; } /* 80px bottom padding for thumb reach */
+  .page-title { font-size: 21px; }
+  .page-subtitle { font-size: 12px; }
 
+  /* ── Grids ── */
+  .grid-2 { grid-template-columns: 1fr; gap: 10px; }
+  .grid-3 { grid-template-columns: 1fr 1fr; gap: 10px; }
+  .grid-4 { grid-template-columns: 1fr 1fr; gap: 9px; }
 
-  .page-header { padding: 20px 16px 0; }
-  .page-body   { padding: 16px 16px 24px; }
+  /* ── Cards ── */
+  .card { padding: 14px 16px; border-radius: 14px; }
+  .stat-card { padding: 12px 14px; }
+  .stat-value { font-size: 24px; }
+  .stat-label { font-size: 10px; }
 
-  .grid-2 { grid-template-columns: 1fr; }
-  .grid-3 { grid-template-columns: 1fr; }
-  .grid-4 { grid-template-columns: 1fr 1fr; gap: 10px; }
+  /* ── Prevent iOS font zoom on inputs ── */
+  input, select, textarea { font-size: 16px !important; }
 
-  .page-title { font-size: 20px; }
+  /* ── Modals — full screen on mobile ── */
+  .card[style*="max-width: 520"] { max-width: 100% !important; margin: 0 !important; border-radius: 0 !important; max-height: 100vh !important; }
 }
 
 @media (max-width: 400px) {
+  .grid-3 { grid-template-columns: 1fr; }
   .grid-4 { grid-template-columns: 1fr; }
+  .page-body { padding: 12px 12px 80px; }
 }
 
 /* ── Tooltip ─────────────────────────────────────── */
@@ -781,86 +816,77 @@ select option {
 @keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
 
 
-/* ── Mobile home card order ─────────────────────── */
+/* ════════════════════════════════════════════════════
+   MOBILE — page-specific overrides
+   ════════════════════════════════════════════════════ */
 @media (max-width: 768px) {
-  .home-grid-main {
+
+  /* ── Home page ── */
+  .home-main-grid {
     display: flex !important;
     flex-direction: column !important;
-    gap: 14px !important;
+    gap: 12px !important;
   }
-  .home-timer-col {
-    order: 99 !important;
+  .home-tasks-col { order: 1; }
+  .home-timer-col { order: 2; }
+
+  /* ── Task rows ── */
+  .task-row-mobile {
+    padding: 10px 12px !important;
+    gap: 8px !important;
+    min-height: 44px; /* minimum touch target */
   }
-  .home-tasks-col {
-    order: 1 !important;
-  }
+
+  /* ── Weather strip ── */
   .weather-strip {
     overflow-x: auto;
     flex-wrap: nowrap !important;
     -webkit-overflow-scrolling: touch;
     padding-bottom: 4px;
+    scrollbar-width: none;
   }
-  .weather-strip::-webkit-scrollbar { height: 3px; }
+  .weather-strip::-webkit-scrollbar { display: none; }
+
+  /* ── Calendar ── */
+  .cal-grid-wrap { margin: 0 8px 16px !important; border-radius: 12px !important; }
+
+  /* ── Desktop-only pills hidden on mobile ── */
+  .desktop-only { display: none !important; }
+
+  /* ── Assignments tab ── */
+  .assign-row { flex-wrap: wrap !important; }
+  .pill-row { flex-wrap: wrap !important; gap: 4px !important; }
+
+  /* ── Notes tab ── */
+  .notes-layout { flex-direction: column !important; }
+  .notes-course-sidebar {
+    width: 100% !important;
+    flex-direction: row !important;
+    overflow-x: auto !important;
+    flex-wrap: nowrap !important;
+    gap: 4px !important;
+    padding-bottom: 6px;
+    scrollbar-width: none;
+  }
+  .notes-course-sidebar::-webkit-scrollbar { display: none; }
+
+  /* ── Flashcards ── */
+  .flashcard-grid { grid-template-columns: 1fr !important; }
+
+  /* ── Study sessions ── */
+  .study-grid { grid-template-columns: 1fr !important; }
+
+  /* ── Habits/Goals ── */
+  .habit-table-wrap { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+
+  /* ── Tooltips — suppress on touch ── */
+  .tooltip-box { display: none !important; }
+
+  /* ── Sidebar mini widgets ── */
+  .sidebar-mini { display: none; }
 }
 
-/* ── Mobile home fixed order ─────────────────────── */
-@media (max-width: 768px) {
-  /* Home page main grid stacks */
-  .home-main-grid {
-    display: flex !important;
-    flex-direction: column !important;
-    gap: 14px !important;
-  }
-
-  /* Task row wraps on mobile */
-  .task-row-mobile {
-    flex-wrap: wrap !important;
-    align-items: flex-start !important;
-  }
-
-  /* Task text gets full width on mobile */
-  .task-row-mobile > span {
-    flex: 1 1 100% !important;
-    order: 1;
-  }
-
-  /* Task badges and buttons go on second line */
-  .task-row-mobile > .task-actions-mobile {
-    order: 3;
-    width: 100%;
-    justify-content: flex-end;
-    margin-top: 4px;
-  }
-
-  /* Course/urgency badges stay inline */
-  .task-row-mobile > span:last-of-type {
-    order: 2;
-  }
-
-  /* Stats row stays 2-col on mobile */
-  .stats-row-mobile {
-    display: grid !important;
-    grid-template-columns: 1fr 1fr !important;
-    gap: 10px !important;
-  }
-
-  /* Upcoming assignments span full width */
-  .upcoming-full-mobile {
-    grid-column: 1 / -1 !important;
-  }
-
-  /* Timer card on mobile */
-  .timer-col-mobile {
-    order: 10 !important;
-  }
-
-  /* Sidebar mini widgets */
-  @keyframes slideDown {
-    from { opacity: 0; transform: translateY(-6px); }
-    to   { opacity: 1; transform: translateY(0); }
-  }
-}
-
+/* ── Animations ── */
 @keyframes slideDown {
   from { opacity: 0; transform: translateY(-6px); }
   to   { opacity: 1; transform: translateY(0); }

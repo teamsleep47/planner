@@ -128,47 +128,137 @@ function MobileHeader({ profile, signOut, sidebarOpen, setSidebarOpen, theme, to
     return () => document.removeEventListener('mousedown', h)
   }, [])
 
+  // Close dropdown when navigating
+  const go = (path) => { navigate(path); setShowDropdown(false); }
+
   const ini = n => { const p=(n||'?').trim().split(/\s+/); return (p[0][0]+(p[1]?p[1][0]:'')).toUpperCase() }
 
   return (
     <header className="mobile-header">
-      <button style={{background:'none',border:'none',color:'var(--text-1)',display:'flex',padding:4,cursor:'pointer'}} onClick={()=>setSidebarOpen(o=>!o)}>
-        {sidebarOpen ? <X size={20}/> : <Menu size={20}/>}
+      {/* Hamburger — 44px touch target */}
+      <button
+        onClick={() => setSidebarOpen(o => !o)}
+        style={{
+          background: sidebarOpen ? 'var(--accent-dim)' : 'none',
+          border: 'none',
+          color: sidebarOpen ? 'var(--accent)' : 'var(--text-1)',
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+          width: 44, height: 44, borderRadius: 12,
+          cursor: 'pointer', flexShrink: 0,
+          transition: 'background .2s, color .2s',
+        }}>
+        {sidebarOpen ? <X size={22}/> : <Menu size={22}/>}
       </button>
-      <span style={{fontWeight:700,fontSize:15,letterSpacing:'-0.3px',flex:1}}>Planner</span>
+
+      {/* Title */}
+      <span style={{fontWeight:700,fontSize:16,letterSpacing:'-0.4px',flex:1,color:'var(--text-1)'}}>Planner</span>
+
+      {/* Avatar dropdown */}
       <div ref={dropRef} style={{position:'relative'}}>
-        <button onClick={()=>setShowDropdown(s=>!s)} style={{background:'none',border:'none',cursor:'pointer',padding:0,display:'flex'}}>
-          <div className="avatar">
+        <button
+          onClick={() => setShowDropdown(s => !s)}
+          style={{
+            background: 'none', border: 'none', cursor: 'pointer',
+            padding: 0, display: 'flex',
+            width: 44, height: 44, alignItems: 'center', justifyContent: 'center',
+          }}>
+          <div className="avatar" style={{width:36,height:36}}>
             {profile?.picture
               ? <img src={profile.picture} referrerPolicy="no-referrer" style={{width:'100%',height:'100%',objectFit:'cover'}} onError={e=>{e.target.style.display='none'}}/>
               : ini(profile?.name||'?')}
           </div>
         </button>
+
         {showDropdown && (
-          <div style={{position:'absolute',top:'calc(100% + 8px)',right:0,width:210,background:'var(--panel-bg,#1a1a2e)',border:'1px solid var(--glass-border)',borderRadius:'var(--radius-lg)',boxShadow:'var(--shadow)',zIndex:500,overflow:'hidden'}}>
-            <div style={{padding:'12px 14px',borderBottom:'1px solid var(--glass-border)'}}>
-              <div style={{fontSize:13,fontWeight:600,color:'var(--text-1)',overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{profile?.name||'User'}</div>
-              <div style={{fontSize:11,color:'var(--text-3)',overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{profile?.email||''}</div>
+          <div style={{
+            position:'fixed', top:0, right:0, width:'min(280px, 90vw)',
+            height:'100vh', zIndex:600,
+            background:'var(--glass-bg)', backdropFilter:'var(--blur)',
+            borderLeft:'1px solid var(--glass-border)',
+            boxShadow:'-4px 0 32px rgba(0,0,0,0.35)',
+            display:'flex', flexDirection:'column',
+            transform: showDropdown ? 'translateX(0)' : 'translateX(100%)',
+            transition: 'transform .25s cubic-bezier(0.4,0,0.2,1)',
+          }}>
+            {/* Header */}
+            <div style={{
+              padding:'54px 20px 20px',
+              borderBottom:'1px solid var(--glass-border)',
+              background:'var(--glass-bg-2)',
+            }}>
+              <button onClick={()=>setShowDropdown(false)} style={{
+                position:'absolute', top:14, right:14,
+                background:'var(--glass-bg-2)', border:'1px solid var(--glass-border)',
+                borderRadius:10, width:36, height:36,
+                display:'flex', alignItems:'center', justifyContent:'center',
+                color:'var(--text-2)', cursor:'pointer',
+              }}><X size={16}/></button>
+              <div className="avatar" style={{width:52,height:52,fontSize:18,marginBottom:12}}>
+                {profile?.picture
+                  ? <img src={profile.picture} referrerPolicy="no-referrer" style={{width:'100%',height:'100%',objectFit:'cover'}}/>
+                  : ini(profile?.name||'?')}
+              </div>
+              <div style={{fontSize:15,fontWeight:700,color:'var(--text-1)',marginBottom:3}}>{profile?.name||'User'}</div>
+              <div style={{fontSize:12,color:'var(--text-3)',overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{profile?.email||''}</div>
             </div>
-            {[
-              { icon: theme==='dark'?'☀️':'🌙', label: theme==='dark'?'Switch to light':'Switch to dark', action: toggleTheme },
-              { icon:'⚙️', label:'Settings', action:()=>{ navigate('/settings'); setShowDropdown(false) } },
-              { icon:'🚪', label:'Sign out',  action: signOut },
-              { icon:'🗑',  label:'Wipe data', action:()=>{ setShowDropdown(false); wipeAllSettings() }, danger:true },
-            ].map((item,i)=>(
-              <button key={i} onClick={item.action} style={{
-                width:'100%',display:'flex',alignItems:'center',gap:10,padding:'11px 14px',
-                background:'none',border:'none',
-                borderBottom:i<3?'1px solid var(--glass-border)':'none',
-                color:item.danger?'var(--coral)':'var(--text-1)',
-                fontSize:13,cursor:'pointer',textAlign:'left',transition:'background .15s',
+
+            {/* Menu items */}
+            <div style={{flex:1,overflow:'auto',padding:'10px 8px'}}>
+              {[
+                { icon:'🌙', iconLight:'☀️', label: theme==='dark'?'Switch to light':'Switch to dark', action: toggleTheme },
+                { icon:'⚙️', label:'Settings', action:()=>go('/settings') },
+                { icon:'📅', label:'Calendar', action:()=>go('/calendar') },
+                { icon:'📚', label:'Assignments', action:()=>go('/courses') },
+              ].map((item,i)=>(
+                <button key={i} onClick={item.action} style={{
+                  width:'100%', display:'flex', alignItems:'center', gap:14,
+                  padding:'14px 16px', background:'none', border:'none',
+                  borderRadius:12, color:'var(--text-1)',
+                  fontSize:14, fontWeight:500, cursor:'pointer', textAlign:'left',
+                  marginBottom:2, transition:'background .15s',
+                }}
+                  onTouchStart={e=>e.currentTarget.style.background='var(--glass-bg-2)'}
+                  onTouchEnd={e=>e.currentTarget.style.background='none'}
+                  onMouseEnter={e=>e.currentTarget.style.background='var(--glass-bg-2)'}
+                  onMouseLeave={e=>e.currentTarget.style.background='none'}>
+                  <span style={{fontSize:20}}>{item.icon}</span>
+                  <span>{item.label}</span>
+                </button>
+              ))}
+            </div>
+
+            {/* Footer actions */}
+            <div style={{padding:'12px 8px',borderTop:'1px solid var(--glass-border)'}}>
+              <button onClick={signOut} style={{
+                width:'100%', display:'flex', alignItems:'center', gap:14,
+                padding:'14px 16px', background:'none', border:'none',
+                borderRadius:12, color:'var(--text-2)',
+                fontSize:14, cursor:'pointer', textAlign:'left', marginBottom:4,
               }}
-                onMouseEnter={e=>e.currentTarget.style.background='var(--glass-hover)'}
+                onMouseEnter={e=>e.currentTarget.style.background='var(--glass-bg-2)'}
                 onMouseLeave={e=>e.currentTarget.style.background='none'}>
-                <span>{item.icon}</span>{item.label}
+                <span style={{fontSize:20}}>🚪</span> Sign out
               </button>
-            ))}
+              <button onClick={()=>{setShowDropdown(false); wipeAllSettings()}} style={{
+                width:'100%', display:'flex', alignItems:'center', gap:14,
+                padding:'14px 16px', background:'none', border:'none',
+                borderRadius:12, color:'var(--coral)',
+                fontSize:14, cursor:'pointer', textAlign:'left',
+              }}
+                onMouseEnter={e=>e.currentTarget.style.background='rgba(248,113,113,0.08)'}
+                onMouseLeave={e=>e.currentTarget.style.background='none'}>
+                <span style={{fontSize:20}}>🗑</span> Wipe all data
+              </button>
+            </div>
           </div>
+        )}
+
+        {/* Backdrop for dropdown */}
+        {showDropdown && (
+          <div
+            onClick={() => setShowDropdown(false)}
+            style={{position:'fixed',inset:0,zIndex:599,background:'rgba(0,0,0,0.3)'}}
+          />
         )}
       </div>
     </header>

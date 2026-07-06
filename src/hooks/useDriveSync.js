@@ -91,6 +91,57 @@ export function useDriveSync() {
     loadFromDrive()
   }, [getFileId])
 
+  // ── Re-sync when tab becomes visible ──────────────────────────
+  // This is the fix for cross-device stale data. When you switch back
+  // to this tab after editing on another device, Drive is re-pulled.
+  // We throttle to once per 30 seconds to avoid hammering the API.
+  useEffect(() => {
+    let lastSync = 0
+    const THROTTLE_MS = 30_000
+
+    const onVisible = async () => {
+      if (document.visibilityState !== 'visible') return
+      const now = Date.now()
+      if (now - lastSync < THROTTLE_MS) return
+      lastSync = now
+
+      const token = getToken()
+      if (!token) return
+
+      try {
+        const fileId = await getFileId(token)
+        const res    = await fetch(
+          `https://www.googleapis.com/drive/v3/files/${fileId}?alt=media`,
+          { headers: { Authorization: 'Bearer ' + token } }
+        )
+        if (res.status === 401) { window.dispatchEvent(new Event('token-expired')); return }
+        if (!res.ok) return
+
+        const data = await res.json()
+        const { __sync_ts, ...payload } = data
+
+        // Only overwrite if Drive is newer than what we last saved
+        const driveTs = Number(__sync_ts || 0)
+        const localTs = Number(localStorage.getItem('planner_v1_last_save_ts') || 0)
+
+        if (driveTs > localTs) {
+          Object.entries(payload).forEach(([key, value]) => {
+            if (value !== null && value !== undefined) save(key, value)
+          })
+          console.log('[drive] visibility sync — Drive newer, refreshing…')
+          window.dispatchEvent(new Event('drive-loaded'))
+        } else {
+          console.log('[drive] visibility sync — local is current, no update needed')
+        }
+      } catch(e) {
+        console.error('[drive] visibility sync error:', e)
+      }
+    }
+
+    document.addEventListener('visibilitychange', onVisible)
+    return () => document.removeEventListener('visibilitychange', onVisible)
+  }, [getFileId])
+
   // ── Save to Drive (debounced 1.5s) ─────────────────────────────
   // Every data change triggers this. The 1.5s debounce means rapid edits
   // only result in one write. __sync_ts lets us debug timing if needed.
@@ -122,6 +173,8 @@ export function useDriveSync() {
 
         justSavedRef.current = true
         setTimeout(() => { justSavedRef.current = false }, 5000)
+        // Stamp local save time so visibility sync knows Drive is current
+        localStorage.setItem('planner_v1_last_save_ts', String(payload.__sync_ts))
 
         console.log('[drive] saved ok at', new Date().toLocaleTimeString())
         setSaveState('saved')
