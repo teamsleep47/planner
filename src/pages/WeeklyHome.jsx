@@ -201,6 +201,21 @@ function TaskRow({task,courseColors,courseOptions,editId,editText,editCourse,edi
 }
 
 // ── weatherwidget.org embed ─────────────────────────────────────
+// The widget's script replaces our <a> with an <iframe> directly in the
+// DOM, outside React's control. If React ever re-renders this subtree
+// (e.g. from the parent's autosave/timer ticks) it tries to reconcile a
+// node the script already swapped out, and the script's own internal
+// lookups then hit a null element — hence the recurring
+// "Cannot read properties of null (reading 'getAttribute')" error.
+//
+// Fix: build the anchor imperatively in the effect and mount it into a
+// plain ref container. React only ever renders the empty wrapper <div>;
+// it never owns or diffs the anchor/iframe inside it, so re-renders of
+// the parent can no longer interfere with the widget.
+// ── weatherwidget.org embed ─────────────────────────────────────
+// New embed format (v1.3) uses a <div> with JSON config, not an <a> tag.
+// Widget ID: ww_2d7caf62b4815
+// Built imperatively so React never owns the subtree the script replaces.
 function WeatherWidget() {
   const containerRef = useRef(null)
 
@@ -208,23 +223,24 @@ function WeatherWidget() {
     const container = containerRef.current
     if (!container) return
 
-    const WIDGET_ID = 'ww_a4398b2f1b96c'
+    const WIDGET_ID = 'ww_2d7caf62b4815'
     const SCRIPT_ID = 'weatherwidget-io-js'
 
-    const a = document.createElement('a')
-    a.id = WIDGET_ID
-    a.className = 'weatherwidget-io'
-    a.href = 'https://forecast7.com/en/27d50n82d57/bradenton/'
-    a.textContent = 'BRADENTON'
-    const attrs = {
-      label_1:'BRADENTON', label_2:'FLORIDA', theme:'original',
-      basecolor:'#0e0c20', textcolor:'#eeeeff', cloud:'#8888b8',
-      persp:'#6366f1', sun:'#f59e0b', moon:'#f59e0b', thund:'#ef4444',
-      odd:'#0000000a', lang:'en', sl_lpl:'1', sl_sot:'fahrenheit', cl_bkg:'image',
-    }
-    Object.entries(attrs).forEach(([k,v]) => a.setAttribute('data-'+k, v))
-    container.appendChild(a)
+    // Build the widget div imperatively — React must never touch this subtree
+    const div = document.createElement('div')
+    div.id = WIDGET_ID
+    div.setAttribute('v', '1.3')
+    div.setAttribute('loc', 'auto')
+    div.setAttribute('a', JSON.stringify({
+      t: 'responsive', lang: 'en', sl_lpl: 1, ids: [],
+      font: 'Arial', sl_ics: 'one_a', sl_sot: 'fahrenheit',
+      cl_bkg: 'image', cl_font: '#FFFFFF', cl_cloud: '#FFFFFF',
+      cl_persp: '#81D4FA', cl_sun: '#FFC107', cl_moon: '#FFC107',
+      cl_thund: '#FF5722', cl_odd: 'rgba(0,0,0,0.135)',
+    }))
+    container.appendChild(div)
 
+    // Remove stale script first, then re-inject
     const existing = document.getElementById(SCRIPT_ID)
     if (existing) existing.remove()
 
@@ -273,6 +289,7 @@ export default function WeeklyHome({ onDataChange }) {
   const [dragId,      setDragId]     = useState(null)
   const [dragOverId,  setDragOverId] = useState(null)
   const [expandedTaskId, setExpandedTaskId] = useState(null)
+  const [confirmModal,   setConfirmModal]   = useState(null) // { type, taskId, planId, message }
   const timerRef = useRef(null)
   const { haloRef: taskHaloRef, triggerHalo: triggerTaskHalo } = useSaveHalo()
 
@@ -287,6 +304,13 @@ export default function WeeklyHome({ onDataChange }) {
   },[tasks])
   useEffect(()=>{ save('timer_settings',timerMins) },[timerMins])
   useEffect(()=>{ save('sem_end_date',semDate) },[semDate])
+
+  // Re-read tasks from localStorage when Drive syncs (replaces driveKey remount)
+  useEffect(() => {
+    const h = () => setTasks(load('home_tasks', []))
+    window.addEventListener('drive-loaded', h)
+    return () => window.removeEventListener('drive-loaded', h)
+  }, [])
 
   const refreshUpcoming=useCallback(()=>{
     const a=getUpcomingAssignments(3),p=getUpcomingPlans(2)
@@ -315,24 +339,48 @@ export default function WeeklyHome({ onDataChange }) {
   }
   useEffect(()=>{ fetchWeather() },[])
 
-  // FIX: append to calendar_plans using load/save helpers (not raw localStorage)
-  // so multiple tasks on the same date don't overwrite each other
   const addTask=useCallback(()=>{
     if(!newTask.text.trim())return
-    setTasks(ts=>[{...newTask,id:Date.now(),done:false},...ts])
+    const taskId = Date.now()
+    const planId = newTask.isPlan && newTask.due ? 'task_plan_'+taskId : null
+    // 📅 emoji prepended when task is also a calendar plan
+    const taskText = newTask.isPlan ? '📅 '+newTask.text : newTask.text
+    setTasks(ts=>[{...newTask,text:taskText,id:taskId,done:false,...(planId?{calendarPlanId:planId}:{})},...ts])
     if(newTask.isPlan&&newTask.due){
       const existing=load('calendar_plans',[])
       save('calendar_plans',[...existing,{
-        id:'task_'+Date.now(),title:newTask.text,
-        date:newTask.due,notes:'',color:'#6366f1',_type:'plan',
+        id:planId,title:newTask.text,
+        date:newTask.due,notes:'',color:'#6366f1',_type:'plan',taskId,
       }])
     }
-    setNewTask(n=>({...n,text:''})) // keep date/course/urgency for rapid entry
+    setNewTask(n=>({...n,text:''}))
     setTimeout(()=>addInputRef.current?.focus(),0)
   },[newTask])
 
-  const toggleTask =useCallback(id=>setTasks(ts=>ts.map(t=>t.id===id?{...t,done:!t.done}:t)),[])
-  const deleteTask =useCallback(id=>setTasks(ts=>ts.filter(t=>t.id!==id)),[])
+  const toggleTask =useCallback(id=>{
+    const task = load('home_tasks',[]).find(t=>t.id===id)||tasks.find(t=>t.id===id)
+    if(task&&!task.done&&task.calendarPlanId){
+      // Completing a task linked to a calendar plan — ask to remove plan too
+      setConfirmModal({
+        type:'complete_task',taskId:id,planId:task.calendarPlanId,
+        message:`Mark "${task.text.replace(/^📅 /,'')}" as done and remove the linked calendar plan?`,
+      })
+    } else {
+      setTasks(ts=>ts.map(t=>t.id===id?{...t,done:!t.done}:t))
+    }
+  },[tasks])
+
+  const deleteTask =useCallback(id=>{
+    const task = tasks.find(t=>t.id===id)
+    if(task?.calendarPlanId){
+      setConfirmModal({
+        type:'delete_task',taskId:id,planId:task.calendarPlanId,
+        message:`Delete "${task.text.replace(/^📅 /,'')}"? Also remove the linked calendar plan?`,
+      })
+    } else {
+      setTasks(ts=>ts.filter(t=>t.id!==id))
+    }
+  },[tasks])
   const restoreTask=id=>setTasks(ts=>ts.map(t=>t.id===id?{...t,done:false}:t))
   const startEdit  =useCallback(task=>{setEditId(task.id);setEditText(task.text);setEditCourse(task.course||'OTHER');setEditUrgency(task.urgency||'none');setEditDue(task.due||'');setEditIsPlan(!!task.isPlan)},[])
   const saveEdit   =useCallback(()=>{
@@ -352,6 +400,25 @@ export default function WeeklyHome({ onDataChange }) {
     setEditId(null)
   },[editId,editText,editCourse,editUrgency,editDue,editIsPlan])
   const cancelEdit =useCallback(()=>setEditId(null),[])
+
+  const handleConfirm=useCallback((alsoCalendar)=>{
+    if(!confirmModal) return
+    const {type,taskId,planId}=confirmModal
+    if(type==='complete_task'){
+      setTasks(ts=>ts.map(t=>t.id===taskId?{...t,done:true}:t))
+      if(alsoCalendar){
+        const plans=load('calendar_plans',[])
+        save('calendar_plans',plans.filter(p=>p.id!==planId))
+      }
+    } else if(type==='delete_task'){
+      setTasks(ts=>ts.filter(t=>t.id!==taskId))
+      if(alsoCalendar){
+        const plans=load('calendar_plans',[])
+        save('calendar_plans',plans.filter(p=>p.id!==planId))
+      }
+    }
+    setConfirmModal(null)
+  },[confirmModal])
   const handleDragStart=useCallback((e,id)=>{setDragId(id);e.dataTransfer.effectAllowed='move';e.dataTransfer.setData('text/plain',String(id))},[])
   const handleDragOver =useCallback((e,id)=>{e.preventDefault();e.dataTransfer.dropEffect='move';setDragOverId(id)},[])
   const handleDrop     =useCallback((e,tid)=>{
@@ -533,6 +600,28 @@ export default function WeeklyHome({ onDataChange }) {
           </div>
         </div>
       </div>
+
+      {/* In-app confirm modal for linked task/plan deletion */}
+      {confirmModal && (
+        <div style={{position:'fixed',inset:0,zIndex:1000,display:'flex',alignItems:'center',justifyContent:'center',padding:16,background:'rgba(0,0,0,.6)',backdropFilter:'blur(4px)'}}>
+          <div className="card" style={{maxWidth:360,width:'100%',padding:24,textAlign:'center'}}>
+            <div style={{fontSize:24,marginBottom:12}}>🔗</div>
+            <div style={{fontWeight:700,fontSize:15,marginBottom:8,color:'var(--text-1)'}}>Linked calendar plan</div>
+            <div style={{fontSize:13,color:'var(--text-2)',marginBottom:20,lineHeight:1.6}}>{confirmModal.message}</div>
+            <div style={{display:'flex',flexDirection:'column',gap:8}}>
+              <button className="btn btn-primary" style={{justifyContent:'center'}} onClick={()=>handleConfirm(true)}>
+                Yes, remove both
+              </button>
+              <button className="btn btn-ghost" style={{justifyContent:'center'}} onClick={()=>handleConfirm(false)}>
+                {confirmModal.type==='complete_task'?'Mark done, keep plan':'Delete task only'}
+              </button>
+              <button className="btn btn-ghost" style={{justifyContent:'center',color:'var(--text-3)'}} onClick={()=>setConfirmModal(null)}>
+                Cancel
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </>
   )
 }

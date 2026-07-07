@@ -45,6 +45,11 @@ export default function FlashcardsPage({ onDataChange }) {
 
   useEffect(() => { save('flashcard_decks', decks); onDataChange?.() }, [decks])
   useEffect(() => { save('flashcard_cards', cards); onDataChange?.() }, [cards])
+  useEffect(() => {
+    const h = () => { setDecks(load('flashcard_decks', [])); setCards(load('flashcard_cards', [])) }
+    window.addEventListener('drive-loaded', h)
+    return () => window.removeEventListener('drive-loaded', h)
+  }, [])
 
   const deckCards  = activeDeck ? cards.filter(c=>c.deckId===activeDeck.id) : []
   const dueCards   = getDueCards(deckCards)

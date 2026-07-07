@@ -26,6 +26,11 @@ export default function Notes({ onDataChange }) {
   const [addForm,  setAddForm]  = useState(BLANK)
 
   useEffect(() => { save('page_links', links); onDataChange?.() }, [links])
+  useEffect(() => {
+    const h = () => setLinks(load('page_links', DEFAULT_LINKS))
+    window.addEventListener('drive-loaded', h)
+    return () => window.removeEventListener('drive-loaded', h)
+  }, [])
 
   const startEdit = l => { setEditId(l.id); setEditForm({ label: l.label, url: l.url, emoji: l.emoji, desc: l.desc || '', category: l.category }) }
   const saveEdit  = () => {

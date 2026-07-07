@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react'
 import { ChevronLeft, ChevronRight, X, ExternalLink, Edit2, Trash2, Check } from 'lucide-react'
 import { load, save } from '../utils/storage.js'
 import { useNavigate } from 'react-router-dom'
-import { loadTerms, saveTerms, uid, ASSIGNMENT_TYPES } from '../utils/termData.js'
+import { loadTerms, saveTerms, uid, ASSIGNMENT_TYPES, getCourseColorMap } from '../utils/termData.js'
 import { useSaveHalo } from '../hooks/useSaveHalo.js'
 import { formatRelativeDue } from '../utils/timeFormat.js'
 
@@ -478,14 +478,25 @@ export default function CalendarPage({ onDataChange }) {
   const [anchor,   setAnchor]   = useState(new Date())
   const [popup,    setPopup]    = useState(null)
   const [addModal, setAddModal] = useState(null)   // date string
-  const [editPlan,    setEditPlan]    = useState(null)   // plan object
-  const [planPopup,   setPlanPopup]   = useState(null)  // { plan, x, y }
-  const [dayOverlay,  setDayOverlay]  = useState(null)  // { ds, x, y } — mobile day tap
-  const [plans,    setPlans]    = useState(() => load('calendar_plans', []))
+  const [editPlan,      setEditPlan]      = useState(null)
+  const [planPopup,     setPlanPopup]     = useState(null)
+  const [dayOverlay,    setDayOverlay]    = useState(null)
+  const [plans,         setPlans]         = useState(() => load('calendar_plans', []))
+  const [dragPill,      setDragPill]      = useState(null)   // { type:'plan'|'assignment', item, originDate }
+  const [dragOverDate,  setDragOverDate]  = useState(null)
+  const [dupModal,      setDupModal]      = useState(null)   // { type, item, newDate, oldDate }
+  const [confirmDelete, setConfirmDelete] = useState(null)   // { planId, taskId, planTitle }
 
   const assignments = getAllAssignments()
 
   useEffect(() => { save('calendar_plans', plans); onDataChange?.(); triggerCalHalo('green') }, [plans])
+
+  // Re-read plans when Drive syncs
+  useEffect(() => {
+    const h = () => setPlans(load('calendar_plans', []))
+    window.addEventListener('drive-loaded', h)
+    return () => window.removeEventListener('drive-loaded', h)
+  }, [])
 
   // Local date — avoids UTC offset bug (toISOString returns yesterday before 8pm EDT)
   const today = (() => { const d=new Date(); return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}` })()
@@ -541,24 +552,116 @@ export default function CalendarPage({ onDataChange }) {
   }
 
   const handleSavePlan = (form, taskData) => {
-    setPlans(ps => [...ps, { ...form, id: uid(), _type:'plan' }])
+    const planId  = uid()
+    const taskId  = taskData ? Date.now() : undefined
+    setPlans(ps => [...ps, { ...form, id: planId, _type:'plan', ...(taskId ? {taskId} : {}) }])
     if (taskData) {
-      const tasks   = JSON.parse(localStorage.getItem('planner_v1_home_tasks') || '[]')
-      const newTask = { ...taskData, id: Date.now(), done: false }
-      localStorage.setItem('planner_v1_home_tasks', JSON.stringify([newTask, ...tasks]))
+      const tasks   = load('home_tasks', [])
+      const newTask = { ...taskData, text: '📅 '+taskData.text, id: taskId, done: false, calendarPlanId: planId }
+      save('home_tasks', [newTask, ...tasks])
       onDataChange?.()
     }
   }
   const handleUpdatePlan = (id, form) => setPlans(ps => ps.map(p => p.id===id ? { ...p, ...form } : p))
-  const handleDeletePlan = id   => setPlans(ps => ps.filter(p => p.id!==id))
+
+  const handleDeletePlan = id => {
+    const plan = plans.find(p => p.id === id)
+    if (plan?.taskId) {
+      setConfirmDelete({ planId: id, taskId: plan.taskId, planTitle: plan.title })
+    } else {
+      setPlans(ps => ps.filter(p => p.id !== id))
+    }
+  }
+
+  const handleConfirmDelete = (alsoTask) => {
+    if (!confirmDelete) return
+    setPlans(ps => ps.filter(p => p.id !== confirmDelete.planId))
+    if (alsoTask && confirmDelete.taskId) {
+      const tasks = load('home_tasks', [])
+      save('home_tasks', tasks.filter(t => t.id !== confirmDelete.taskId))
+    }
+    setConfirmDelete(null)
+  }
+
+  // ── Drag-to-reschedule ────────────────────────────────────────
+  const handlePillDragStart = (e, type, item) => {
+    e.stopPropagation()
+    setDragPill({ type, item, originDate: type==='plan' ? item.date : item.due })
+    e.dataTransfer.effectAllowed = 'move'
+  }
+
+  const handleCellDragOver = (e, ds) => {
+    if (!dragPill) return
+    e.preventDefault()
+    e.dataTransfer.dropEffect = 'move'
+    setDragOverDate(ds)
+  }
+
+  const handleCellDrop = (e, ds) => {
+    e.preventDefault()
+    if (!dragPill || dragPill.originDate === ds) { setDragPill(null); setDragOverDate(null); return }
+    setDupModal({ type: dragPill.type, item: dragPill.item, newDate: ds, oldDate: dragPill.originDate })
+    setDragPill(null)
+    setDragOverDate(null)
+  }
+
+  const applyReschedule = (duplicate) => {
+    if (!dupModal) return
+    const { type, item, newDate, oldDate } = dupModal
+    if (type === 'plan') {
+      if (duplicate) {
+        setPlans(ps => [...ps, { ...item, id: uid(), date: newDate, tasked: false, taskId: undefined }])
+      } else {
+        setPlans(ps => ps.map(p => p.id===item.id ? { ...p, date: newDate } : p))
+        // Also update linked task due date
+        if (item.taskId) {
+          const tasks = load('home_tasks', [])
+          save('home_tasks', tasks.map(t => t.id===item.taskId ? { ...t, due: newDate } : t))
+        }
+      }
+    } else if (type === 'assignment') {
+      // Update due date in terms_v1
+      const terms = loadTerms()
+      const updated = terms.map(term => ({
+        ...term,
+        courses: term.courses.map(c => ({
+          ...c,
+          assignments: c.assignments.map(a =>
+            a.id === item.id
+              ? duplicate ? null : { ...a, due: newDate }
+              : a
+          ).filter(Boolean)
+        }))
+      }))
+      if (duplicate) {
+        // Add a copy with new date to the correct course
+        const active = terms.find(t=>t.active)||terms[0]
+        const targetCourse = active?.courses.find(c=>c.name===item.courseName)
+        if (targetCourse) {
+          const finalTerms = updated.map(term => ({
+            ...term,
+            courses: term.courses.map(c =>
+              c.id===targetCourse.id ? { ...c, assignments: [...c.assignments, { ...item, id: uid(), due: newDate, _type: undefined, courseName: undefined, courseColor: undefined, courseId: undefined }] } : c
+            )
+          }))
+          saveTerms(finalTerms)
+        }
+      } else {
+        saveTerms(updated)
+      }
+      onDataChange?.()
+    }
+    setDupModal(null)
+  }
 
   // Add a calendar plan as a home task; marks the plan as tasked
   const handleAddPlanAsTask = (taskData, planId) => {
-    const tasks   = JSON.parse(localStorage.getItem('planner_v1_home_tasks') || '[]')
-    const newTask = { ...taskData, id: Date.now(), done: false }
-    localStorage.setItem('planner_v1_home_tasks', JSON.stringify([newTask, ...tasks]))
-    // Mark the plan as tasked so the pill shows "tasked" badge
-    if (planId) setPlans(ps => ps.map(p => p.id===planId ? {...p, tasked:true} : p))
+    const taskId  = Date.now()
+    const tasks   = load('home_tasks', [])
+    const newTask = { ...taskData, text: '📅 '+taskData.text, id: taskId, done: false, calendarPlanId: planId }
+    save('home_tasks', [newTask, ...tasks])
+    // Mark the plan as tasked and store taskId link
+    if (planId) setPlans(ps => ps.map(p => p.id===planId ? {...p, tasked:true, taskId} : p))
     onDataChange?.()
   }
 
@@ -618,17 +721,21 @@ export default function CalendarPage({ onDataChange }) {
 
             return (
               <div key={ds} className="cal-day-cell"
+                onClick={e=>{ const r=e.currentTarget.getBoundingClientRect(); setDayOverlay({ds,x:r.left,y:r.bottom+2}) }}
+                onDoubleClick={e=>{ e.stopPropagation(); setAddModal(ds) }}
+                onDragOver={e=>handleCellDragOver(e,ds)}
+                onDragLeave={()=>setDragOverDate(null)}
+                onDrop={e=>handleCellDrop(e,ds)}
+                onMouseEnter={e=>{ if(!isToday&&!dragPill) e.currentTarget.style.background='var(--glass-bg-2)' }}
+                onMouseLeave={e=>{ e.currentTarget.style.background=isToday?'var(--accent-dim)':isPast?'rgba(0,0,0,.07)':'transparent' }}
                 style={{
                   minHeight:cellH, maxHeight:200, overflowY:'auto',
                   borderRight:'1px solid var(--glass-border)', borderBottom:'1px solid var(--glass-border)',
                   padding:'6px 5px 5px', position:'relative',
-                  background:isToday?'var(--accent-dim)':isPast?'rgba(0,0,0,.07)':'transparent',
+                  background:dragOverDate===ds?'var(--accent-dim)':isToday?'var(--accent-dim)':isPast?'rgba(0,0,0,.07)':'transparent',
                   cursor:'pointer', transition:'background .1s',
+                  outline: dragOverDate===ds ? '2px solid var(--accent)' : 'none',
                 }}
-                onClick={e=>{ const r=e.currentTarget.getBoundingClientRect(); setDayOverlay({ds,x:r.left,y:r.bottom+2}) }}
-                onDoubleClick={e=>{ e.stopPropagation(); setAddModal(ds) }}
-                onMouseEnter={e=>{ if(!isToday) e.currentTarget.style.background='var(--glass-bg-2)' }}
-                onMouseLeave={e=>{ e.currentTarget.style.background=isToday?'var(--accent-dim)':isPast?'rgba(0,0,0,.07)':'transparent' }}
               >
                 {/* Day number */}
                 <div className="cal-day-num"
@@ -655,7 +762,10 @@ export default function CalendarPage({ onDataChange }) {
                   const badge=PRIORITY_BADGE[a.priority||'none']
                   const isDone=a.status==='Done'
                   return (
-                    <button key={`d-${a.id}-${di}`} className="cal-pill cal-pill-nomobile" onClick={e=>{e.stopPropagation();handleAssignClick(e,a)}} style={{display:'flex',alignItems:'center',gap:3,width:'100%',border:'none',cursor:'pointer',padding:'2px 5px',borderRadius:4,marginBottom:2,background:isDone?`${a.courseColor}15`:`${a.courseColor}30`,borderLeft:`3px solid ${isDone?a.courseColor+'44':a.courseColor}`,opacity:isDone?.5:1,transition:'all .1s'}}
+                    <button key={`d-${a.id}-${di}`} className="cal-pill cal-pill-nomobile"
+                      draggable={!isDone}
+                      onDragStart={e=>handlePillDragStart(e,'assignment',a)}
+                      onClick={e=>{e.stopPropagation();handleAssignClick(e,a)}} style={{display:'flex',alignItems:'center',gap:3,width:'100%',border:'none',cursor:isDone?'default':'grab',padding:'2px 5px',borderRadius:4,marginBottom:2,background:isDone?`${a.courseColor}15`:`${a.courseColor}30`,borderLeft:`3px solid ${isDone?a.courseColor+'44':a.courseColor}`,opacity:isDone?.5:1,transition:'all .1s'}}
                       onMouseEnter={e=>{if(!isDone)e.currentTarget.style.background=`${a.courseColor}50`}}
                       onMouseLeave={e=>{e.currentTarget.style.background=isDone?`${a.courseColor}15`:`${a.courseColor}30`}}>
                       <div style={{width:5,height:5,borderRadius:'50%',background:a.courseColor,flexShrink:0,boxShadow:`0 0 4px ${a.courseColor}`}}/>
@@ -668,13 +778,16 @@ export default function CalendarPage({ onDataChange }) {
 
                 {/* Plan pills — click=popup, double-click=edit, X=delete */}
                 {dayPlan.map((p,pi)=>(
-                  <div key={`p-${p.id}-${pi}`} style={{display:'flex',alignItems:'center',gap:2,marginBottom:2,borderRadius:4,background:`${p.color}25`,borderLeft:`3px solid ${p.color}`,transition:'all .1s'}}
+                  <div key={`p-${p.id}-${pi}`}
+                    draggable
+                    onDragStart={e=>handlePillDragStart(e,'plan',p)}
+                    style={{display:'flex',alignItems:'center',gap:2,marginBottom:2,borderRadius:4,background:`${p.color}25`,borderLeft:`3px solid ${p.color}`,transition:'all .1s',cursor:'grab'}}
                     onMouseEnter={e=>e.currentTarget.style.background=`${p.color}40`}
                     onMouseLeave={e=>e.currentTarget.style.background=`${p.color}25`}
                   >
                     <button
                       onClick={e=>{ e.stopPropagation(); const r=e.currentTarget.getBoundingClientRect(); setPlanPopup({plan:p,x:r.left+r.width/2,y:r.bottom}) }}
-                      onDoubleClick={e=>{ e.stopPropagation(); setEditPlan(p) }}
+                      onDoubleClick={e=>{ e.stopPropagation(); setPlanPopup(null); setEditPlan(p) }}
                       style={{display:'flex',alignItems:'center',gap:3,flex:1,border:'none',cursor:'pointer',padding:'2px 5px',background:'transparent',borderRadius:4}}
                     >
                       <span style={{fontSize:9}}>📅</span>
@@ -742,6 +855,54 @@ export default function CalendarPage({ onDataChange }) {
           onDelete={()=>handleDeletePlan(editPlan.id)}
           onAddAsTask={(taskData)=>handleAddPlanAsTask(taskData, editPlan.id)}
         />
+      )}
+
+      {/* Drag-to-reschedule: duplicate? modal */}
+      {dupModal && (
+        <div style={{position:'fixed',inset:0,zIndex:1000,display:'flex',alignItems:'center',justifyContent:'center',padding:16,background:'rgba(0,0,0,.6)',backdropFilter:'blur(4px)'}}>
+          <div className="card" style={{maxWidth:360,width:'100%',padding:24,textAlign:'center'}}>
+            <div style={{fontSize:24,marginBottom:12}}>📋</div>
+            <div style={{fontWeight:700,fontSize:15,marginBottom:8}}>Moved to {new Date(dupModal.newDate+'T12:00:00').toLocaleDateString('en-US',{month:'short',day:'numeric'})}</div>
+            <div style={{fontSize:13,color:'var(--text-2)',marginBottom:20,lineHeight:1.6}}>
+              Do you want to <strong>duplicate</strong> "{dupModal.item.title||dupModal.item.title}" on the new date, or <strong>reschedule</strong> (move it)?
+            </div>
+            <div style={{display:'flex',flexDirection:'column',gap:8}}>
+              <button className="btn btn-ghost" style={{justifyContent:'center'}} onClick={()=>applyReschedule(true)}>
+                📋 Duplicate — keep original + add copy
+              </button>
+              <button className="btn btn-primary" style={{justifyContent:'center'}} onClick={()=>applyReschedule(false)}>
+                📅 Reschedule — move to new date
+              </button>
+              <button className="btn btn-ghost" style={{justifyContent:'center',color:'var(--text-3)'}} onClick={()=>setDupModal(null)}>
+                Cancel
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Delete plan confirm — when plan has a linked task */}
+      {confirmDelete && (
+        <div style={{position:'fixed',inset:0,zIndex:1000,display:'flex',alignItems:'center',justifyContent:'center',padding:16,background:'rgba(0,0,0,.6)',backdropFilter:'blur(4px)'}}>
+          <div className="card" style={{maxWidth:360,width:'100%',padding:24,textAlign:'center'}}>
+            <div style={{fontSize:24,marginBottom:12}}>🔗</div>
+            <div style={{fontWeight:700,fontSize:15,marginBottom:8}}>Linked task exists</div>
+            <div style={{fontSize:13,color:'var(--text-2)',marginBottom:20,lineHeight:1.6}}>
+              "{confirmDelete.planTitle}" has a linked task in Today's Focus. Delete that too?
+            </div>
+            <div style={{display:'flex',flexDirection:'column',gap:8}}>
+              <button className="btn btn-primary" style={{justifyContent:'center'}} onClick={()=>handleConfirmDelete(true)}>
+                Yes, delete both
+              </button>
+              <button className="btn btn-ghost" style={{justifyContent:'center'}} onClick={()=>handleConfirmDelete(false)}>
+                Delete plan only
+              </button>
+              <button className="btn btn-ghost" style={{justifyContent:'center',color:'var(--text-3)'}} onClick={()=>setConfirmDelete(null)}>
+                Cancel
+              </button>
+            </div>
+          </div>
+        </div>
       )}
     </>
   )

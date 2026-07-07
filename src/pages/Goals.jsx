@@ -99,6 +99,20 @@ export default function Goals({ onDataChange }) {
   useEffect(() => { save('habit_grid',      grid);      onDataChange?.() }, [grid])
   useEffect(() => { save('habit_history',   history) }, [history])
   useEffect(() => { save('rec_history',     recHistory) }, [recHistory])
+  useEffect(() => {
+    const h = () => {
+      const h2 = load('habits_config', DEFAULT_HABITS)
+      setHabits(h2)
+      setRecurring(load('recurring_tasks', DEFAULT_RECURRING))
+      setGoals(load('goals_config', DEFAULT_GOALS))
+      setHistory(load('habit_history', {}))
+      setRecHistory(load('rec_history', {}))
+      const s = load('habit_grid', null)
+      setGrid(s ? { ...makeEmptyGrid(h2), ...s } : makeEmptyGrid(h2))
+    }
+    window.addEventListener('drive-loaded', h)
+    return () => window.removeEventListener('drive-loaded', h)
+  }, [])
 
   // Save today to history
   useEffect(() => {

@@ -29,6 +29,11 @@ export default function StudySessions({ onDataChange }) {
 
   useEffect(() => { save('study_sessions', sessions); onDataChange?.() }, [sessions])
   useEffect(() => { save('study_week_goal', weekGoal) }, [weekGoal])
+  useEffect(() => {
+    const h = () => { setSessions(load('study_sessions', [])); setWeekGoal(load('study_week_goal', 10)) }
+    window.addEventListener('drive-loaded', h)
+    return () => window.removeEventListener('drive-loaded', h)
+  }, [])
 
   useEffect(() => {
     setSecs(DURATIONS[mode])

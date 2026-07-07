@@ -37,6 +37,11 @@ export default function NotesPage({ onDataChange }) {
     const t = setTimeout(() => setSaved(false), 1500)
     return () => clearTimeout(t)
   }, [notes])
+  useEffect(() => {
+    const h = () => setNotes(load('full_course_notes_v2', {}))
+    window.addEventListener('drive-loaded', h)
+    return () => window.removeEventListener('drive-loaded', h)
+  }, [])
 
   const course = courses.find(c => c.id === active)
 

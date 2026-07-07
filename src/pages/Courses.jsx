@@ -49,6 +49,16 @@ export default function Courses({ onDataChange }) {
   // Persist accordion state whenever it changes
   useEffect(()=>{ save(ACCORDION_KEY, expanded) },[expanded])
   useEffect(()=>{ saveTerms(terms); onDataChange?.(); triggerCoursesHalo('green') },[terms])
+  useEffect(() => {
+    const h = () => {
+      const t = loadTerms()
+      setTerms(t)
+      const active = t.find(x => x.active)
+      setActiveTermId(active?.id || t[0]?.id)
+    }
+    window.addEventListener('drive-loaded', h)
+    return () => window.removeEventListener('drive-loaded', h)
+  }, [])
 
   // Calendar jump
   useEffect(()=>{

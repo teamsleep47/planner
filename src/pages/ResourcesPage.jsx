@@ -53,6 +53,11 @@ export default function ResourcesPage({ onDataChange }) {
   useEffect(() => { save('saved_resources', saved); onDataChange?.() }, [saved])
   useEffect(() => { save('resource_sort', sortBy) }, [sortBy])
   useEffect(() => { save('resource_last_course', activeCourse) }, [activeCourse])
+  useEffect(() => {
+    const h = () => setSaved(load('saved_resources', []))
+    window.addEventListener('drive-loaded', h)
+    return () => window.removeEventListener('drive-loaded', h)
+  }, [])
 
   const doSearch = useCallback(async (q) => {
     const token = getToken()
