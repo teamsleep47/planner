@@ -395,6 +395,15 @@ export default function WeeklyHome({ onDataChange }) {
           save('calendar_plans',[...existing,{id:'task_'+t.id,title:editText,date:editDue,notes:'',color:'#6366f1',_type:'plan'}])
         }
       }
+      // Sync task text change to linked calendar plan title
+      if(t.calendarPlanId) {
+        const cleanText = editText.replace(/^📅 /,'')
+        const plans = load('calendar_plans',[])
+        const plan = plans.find(p=>p.id===t.calendarPlanId)
+        if(plan && cleanText !== plan.title) {
+          save('calendar_plans', plans.map(p=>p.id===t.calendarPlanId ? {...p,title:cleanText} : p))
+        }
+      }
       return updated
     }))
     setEditId(null)

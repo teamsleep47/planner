@@ -9,7 +9,20 @@ import { formatRelativeDue } from '../utils/timeFormat.js'
 const MONTHS  = ['January','February','March','April','May','June','July','August','September','October','November','December']
 const DAYS_S  = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat']
 
-const PLAN_COLORS = ['#6366f1','#14b8a6','#f59e0b','#f43f5e','#22c55e','#8b5cf6','#06b6d4','#ec4899']
+const PLAN_COLORS = [
+  '#6366f1','#8b5cf6','#ec4899','#f43f5e',
+  '#f59e0b','#f97316','#22c55e','#14b8a6',
+  '#06b6d4','#3b82f6','#a855f7','#84cc16',
+  '#e11d48','#0ea5e9','#10b981','#64748b',
+]
+
+// Returns a darkened/saturated version of a hex color for text on tinted backgrounds
+function darkenColor(hex) {
+  const r = parseInt(hex.slice(1,3),16)
+  const g = parseInt(hex.slice(3,5),16)
+  const b = parseInt(hex.slice(5,7),16)
+  return `rgb(${Math.round(r*.55)},${Math.round(g*.55)},${Math.round(b*.55)})`
+}
 
 const PRIORITY_BADGE = {
   urgent: { label:'🔴 Urgent', color:'#ef4444' },
@@ -153,7 +166,7 @@ function PlanEditModal({ plan, onClose, onSave, onDelete, onAddAsTask }) {
           <div style={{marginBottom:14}}><label style={lbl}>Date</label><input type="date" style={inp} value={form.date} onChange={e=>setForm(f=>({...f,date:e.target.value}))}/></div>
           <div style={{marginBottom:14}}>
             <label style={lbl}>Color</label>
-            <div style={{display:'flex',gap:8,flexWrap:'wrap',marginTop:4}}>
+            <div style={{display:'grid',gridTemplateColumns:'repeat(8,1fr)',gap:6,marginTop:4}}>
               {PLAN_COLORS.map(c=>(
                 <button key={c} onClick={()=>setForm(f=>({...f,color:c}))} style={{width:28,height:28,borderRadius:'50%',background:c,cursor:'pointer',border:`3px solid ${form.color===c?'white':'transparent'}`,boxShadow:form.color===c?`0 0 8px ${c}`:'none'}}/>
               ))}
@@ -328,7 +341,7 @@ function AddModal({ date, onClose, onSaveAssignment, onSavePlan }) {
               <div style={row}><label style={lbl}>Date *</label><input type="date" style={inp} value={pForm.date} onChange={e=>setPForm(f=>({...f,date:e.target.value}))}/></div>
               <div style={{marginBottom:14}}>
                 <label style={lbl}>Color</label>
-                <div style={{display:'flex',gap:8,flexWrap:'wrap',marginTop:4}}>
+                <div style={{display:'grid',gridTemplateColumns:'repeat(8,1fr)',gap:6,marginTop:4}}>
                   {PLAN_COLORS.map(c=>(
                     <button key={c} onClick={()=>setPForm(f=>({...f,color:c}))} style={{width:28,height:28,borderRadius:'50%',background:c,cursor:'pointer',border:`3px solid ${pForm.color===c?'white':'transparent'}`,boxShadow:pForm.color===c?`0 0 8px ${c}`:'none'}}/>
                   ))}
@@ -562,7 +575,21 @@ export default function CalendarPage({ onDataChange }) {
       onDataChange?.()
     }
   }
-  const handleUpdatePlan = (id, form) => setPlans(ps => ps.map(p => p.id===id ? { ...p, ...form } : p))
+  const handleUpdatePlan = (id, form) => {
+    const oldPlan = plans.find(p => p.id === id)
+    setPlans(ps => ps.map(p => p.id===id ? { ...p, ...form } : p))
+    // Sync title change to linked task
+    if (oldPlan?.taskId && form.title && form.title !== oldPlan.title) {
+      const tasks = load('home_tasks', [])
+      const updated = tasks.map(t => {
+        if (t.id !== oldPlan.taskId) return t
+        const prefix = t.text.startsWith('📅 ') ? '📅 ' : ''
+        return { ...t, text: prefix + form.title }
+      })
+      save('home_tasks', updated)
+      onDataChange?.()
+    }
+  }
 
   const handleDeletePlan = id => {
     const plan = plans.find(p => p.id === id)
@@ -765,7 +792,7 @@ export default function CalendarPage({ onDataChange }) {
                     <button key={`d-${a.id}-${di}`} className="cal-pill cal-pill-nomobile"
                       draggable={!isDone}
                       onDragStart={e=>handlePillDragStart(e,'assignment',a)}
-                      onClick={e=>{e.stopPropagation();handleAssignClick(e,a)}} style={{display:'flex',alignItems:'center',gap:3,width:'100%',border:'none',cursor:isDone?'default':'grab',padding:'2px 5px',borderRadius:4,marginBottom:2,background:isDone?`${a.courseColor}15`:`${a.courseColor}30`,borderLeft:`3px solid ${isDone?a.courseColor+'44':a.courseColor}`,opacity:isDone?.5:1,transition:'all .1s'}}
+                      onClick={e=>{e.stopPropagation();handleAssignClick(e,a)}} style={{display:'flex',alignItems:'center',gap:3,width:'100%',border:`2px solid rgba(0,0,0,${isDone?.15:.55})`,cursor:isDone?'default':'grab',padding:'2px 5px',borderRadius:4,marginBottom:2,background:isDone?`${a.courseColor}15`:`${a.courseColor}30`,borderLeft:`4px solid ${isDone?a.courseColor+'44':a.courseColor}`,boxShadow:isDone?'none':`0 1px 3px rgba(0,0,0,.25)`,opacity:isDone?.5:1,transition:'all .1s'}}
                       onMouseEnter={e=>{if(!isDone)e.currentTarget.style.background=`${a.courseColor}50`}}
                       onMouseLeave={e=>{e.currentTarget.style.background=isDone?`${a.courseColor}15`:`${a.courseColor}30`}}>
                       <div style={{width:5,height:5,borderRadius:'50%',background:a.courseColor,flexShrink:0,boxShadow:`0 0 4px ${a.courseColor}`}}/>
@@ -790,9 +817,9 @@ export default function CalendarPage({ onDataChange }) {
                       onDoubleClick={e=>{ e.stopPropagation(); setPlanPopup(null); setEditPlan(p) }}
                       style={{display:'flex',alignItems:'center',gap:3,flex:1,border:'none',cursor:'pointer',padding:'2px 5px',background:'transparent',borderRadius:4}}
                     >
-                      <span style={{fontSize:9}}>📅</span>
-                      <span style={{fontSize:9,fontWeight:700,color:p.color,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap',flex:1}}>{p.title}</span>
-                      {p.tasked && <span style={{fontSize:7,padding:'0 3px',borderRadius:3,background:`${p.color}44`,color:p.color,fontWeight:700,flexShrink:0}}>tasked</span>}
+                      <span style={{fontSize:9}}>☑️</span>
+                      <span style={{fontSize:9,fontWeight:700,color:darkenColor(p.color),overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap',flex:1}}>{p.title}</span>
+                      {p.tasked && <span style={{fontSize:7,padding:'0 3px',borderRadius:3,background:`${p.color}44`,color:darkenColor(p.color),fontWeight:700,flexShrink:0}}>tasked</span>}
                     </button>
                     <button onClick={e=>{ e.stopPropagation(); handleDeletePlan(p.id) }}
                       style={{background:'none',border:'none',cursor:'pointer',padding:'2px 4px',color:'var(--text-3)',display:'flex',flexShrink:0,borderRadius:3}}
