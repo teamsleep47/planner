@@ -73,11 +73,20 @@ export function useDriveSync() {
         // Remove internal metadata key before writing to localStorage
         const { __sync_ts, ...payload } = data
 
-        Object.entries(payload).forEach(([key, value]) => {
-          if (value !== null && value !== undefined) save(key, value)
-        })
+        // Only overwrite local data if Drive is newer than what we last saved locally.
+        // This prevents an old Drive file (e.g. from a stale device) from clobbering
+        // newer local edits made on this device since the last sync.
+        const driveTs = Number(__sync_ts || 0)
+        const localTs = Number(localStorage.getItem('planner_v1_last_save_ts') || 0)
 
-        console.log('[drive] loaded — Drive wins')
+        if (driveTs >= localTs) {
+          Object.entries(payload).forEach(([key, value]) => {
+            if (value !== null && value !== undefined) save(key, value)
+          })
+          console.log('[drive] loaded — Drive wins (Drive ts:', driveTs, '> local ts:', localTs, ')')
+        } else {
+          console.log('[drive] loaded — local is newer, keeping local (local ts:', localTs, '> Drive ts:', driveTs, ')')
+        }
         setSynced(true)
         window.dispatchEvent(new Event('drive-loaded'))
       } catch(e) {
