@@ -21,10 +21,10 @@ const ALL_KEYS = [
   'course_notes', 'full_course_notes', 'full_course_notes_v2',
   'quick_links', 'page_links', 'weather_city', 'scheme', 'theme',
   'flashcard_decks', 'flashcard_cards',
-  'calendar_blocks',
+  'calendar_blocks', 'calendar_plans',
   'notification_settings',
   'saved_resources', 'resource_sort', 'resource_last_course',
-  'bing_wallpaper_cache',
+  'bing_wallpaper_cache', 'hidden_tabs',
 ]
 
 const THEME_CYCLE = ['dark', 'light', 'bing']
