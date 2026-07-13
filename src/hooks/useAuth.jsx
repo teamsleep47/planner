@@ -24,17 +24,29 @@ export function AuthProvider({ children }) {
   const [error,   setError]   = useState(null)
 
   useEffect(() => {
-    // Surface errors from the redirect round-trip (e.g. popup/redirect closed, access denied)
-    getRedirectResult(auth).catch(e => {
-      console.error('[auth] redirect result error:', e)
-      setError(e.code || e.message)
-    })
+    let unsub = () => {}
+    let cancelled = false
 
-    const unsub = onAuthStateChanged(auth, u => {
-      setUser(u)
-      setLoading(false)
-    })
-    return unsub
+    // Resolve the pending redirect result FIRST. onAuthStateChanged's very
+    // first callback can otherwise fire with user:null before the SDK has
+    // finished processing the redirect credential, which flips loading to
+    // false with no user and bounces a just-signed-in user back to the
+    // login page. Subscribing only after the redirect has settled avoids
+    // that race.
+    getRedirectResult(auth)
+      .catch(e => {
+        console.error('[auth] redirect result error:', e)
+        setError(e.code || e.message)
+      })
+      .finally(() => {
+        if (cancelled) return
+        unsub = onAuthStateChanged(auth, u => {
+          setUser(u)
+          setLoading(false)
+        })
+      })
+
+    return () => { cancelled = true; unsub() }
   }, [])
 
   const signIn = useCallback(() => {
