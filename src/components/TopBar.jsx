@@ -67,7 +67,7 @@ export default function TopBar({ theme, scheme, toggleTheme, setScheme, SCHEMES,
       <div className="top-bar-left">
         <FlipClock/>
         <span className={`save-pill ${isOk||isErr ? 'visible' : ''} ${isErr ? 'error visible' : ''}`}>
-          {saveState==='saving'?'⟳ Saving…':isOk?'✓ Saved to Drive':isErr?'⚠ Save failed':''}
+          {saveState==='saving'?'⟳ Saving…':isOk?'✓ Saved':isErr?'⚠ Save failed':''}
         </span>
       </div>
 

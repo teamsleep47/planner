@@ -3,6 +3,8 @@ import { Eye, EyeOff, Lock, Check, X, RefreshCw, AlertTriangle, ExternalLink } f
 import { load, save } from '../utils/storage.js'
 import { useTheme } from '../hooks/useTheme.js'
 import Tooltip from '../components/Tooltip.jsx'
+import { auth as fbAuth } from '../firebase.js'
+import { signOut as fbSignOut } from 'firebase/auth'
 
 const LS_CANVAS_TOKEN  = 'canvas_token_v1'
 const LS_CANVAS_URL    = 'canvas_url_v1'
@@ -264,10 +266,11 @@ export default function SettingsPage({ onDataChange, allNav=[], hiddenTabs=[], s
             }}>📤 Import backup</button>
             <button className="btn btn-ghost" style={{color:'var(--coral)'}} onClick={()=>{
               if(!confirm('Wipe ALL data? Cannot be undone.')) return
-              const prefixes=['planner_v1_']; const exactKeys=['planner_profile_v1','planner_hint_v1','planner_token_v1','canvas_token_v1','canvas_url_v1','canvas_ical_v1','canvas_warned_v1']
+              const prefixes=['planner_v1_']; const exactKeys=['canvas_token_v1','canvas_url_v1','canvas_ical_v1','canvas_warned_v1']
               Object.keys(localStorage).filter(k=>prefixes.some(p=>k.startsWith(p))).forEach(k=>localStorage.removeItem(k))
               exactKeys.forEach(k=>localStorage.removeItem(k))
-              sessionStorage.clear(); window.location.reload()
+              sessionStorage.clear()
+              fbSignOut(fbAuth).catch(()=>{}).finally(()=>window.location.reload())
             }}>🗑 Wipe all data</button>
           </div>
         </div>

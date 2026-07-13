@@ -2,16 +2,18 @@ import { useState, useCallback, useEffect, useRef } from 'react'
 import { HashRouter, Routes, Route, NavLink, useNavigate, useLocation } from 'react-router-dom'
 import {
   LayoutDashboard, BookOpen, Clock, Target, Link, Menu, X,
-  HardDrive, LogOut, Trash2, BookText, GraduationCap, Settings,
+  Cloud, LogOut, Trash2, BookText, GraduationCap, Settings,
   Layers, Calendar, FolderOpen
 } from 'lucide-react'
 
 import { useAuth }          from './hooks/useAuth.jsx'
 import { useTheme }         from './hooks/useTheme.js'
-import { useDriveSync }     from './hooks/useDriveSync.js'
+import { useFirestoreSync } from './hooks/useFirestoreSync.js'
 import { useNotifications } from './hooks/useNotifications.js'
 import { useBingWallpaper } from './hooks/useBingWallpaper.js'
 import { load, save }       from './utils/storage.js'
+import { auth as fbAuth }   from './firebase.js'
+import { signOut as fbSignOut } from 'firebase/auth'
 
 import LoginPage      from './pages/LoginPage.jsx'
 import WeeklyHome     from './pages/WeeklyHome.jsx'
@@ -82,11 +84,11 @@ function getAllData() {
 function wipeAllSettings() {
   if (!confirm('Wipe ALL data? Cannot be undone.')) return
   const prefixes  = ['planner_v1_']
-  const exactKeys = ['planner_profile_v1','planner_hint_v1','planner_token_v1','canvas_token_v1','canvas_url_v1','canvas_ical_v1','canvas_warned_v1']
+  const exactKeys = ['canvas_token_v1','canvas_url_v1','canvas_ical_v1','canvas_warned_v1']
   Object.keys(localStorage).filter(k => prefixes.some(p => k.startsWith(p))).forEach(k => localStorage.removeItem(k))
   exactKeys.forEach(k => localStorage.removeItem(k))
   sessionStorage.clear()
-  window.location.reload()
+  fbSignOut(fbAuth).catch(() => {}).finally(() => window.location.reload())
 }
 
 const chipBorder = { border:'1.5px solid rgba(0,0,0,0.55)', boxShadow:'0 1px 4px rgba(0,0,0,0.18)' }
@@ -267,9 +269,9 @@ function MobileHeader({ profile, signOut, sidebarOpen, setSidebarOpen, theme, to
 }
 
 export default function App() {
-  const { token, profile, loading, error, signIn, signOut, isAuthed, sessionExpired, refreshNow } = useAuth()
+  const { profile, loading, error, signIn, signOut, isAuthed } = useAuth()
   const { theme, scheme, toggleTheme, setScheme, SCHEMES, SCHEME_COLORS } = useTheme()
-  const { syncToDrive, saveState }                                         = useDriveSync()
+  const { syncToCloud, saveState }                                         = useFirestoreSync(getAllData)
   const { notifs, unread, markAllRead, clearNotif }                        = useNotifications()
   const { wallpaper }                                                       = useBingWallpaper(theme === 'bing')
   const [sidebarOpen, setSidebarOpen] = useState(false)
@@ -290,8 +292,8 @@ export default function App() {
   }, [])
 
   const handleDataChange = useCallback(() => {
-    syncToDrive(getAllData())
-  }, [syncToDrive])
+    syncToCloud(getAllData())
+  }, [syncToCloud])
 
   // Show full-page red background when Drive save fails
   useEffect(() => {
@@ -318,45 +320,13 @@ export default function App() {
 
   if (!isAuthed) return <LoginPage onSignIn={signIn} error={error} loading={loading}/>
 
-  // Session expired overlay — shown instead of white screen when token dies
-  // The app stays visible underneath so data isn't lost
-  const SessionExpiredBanner = sessionExpired ? (
-    <div style={{
-      position:'fixed', inset:0, zIndex:9000,
-      background:'rgba(0,0,0,0.75)', backdropFilter:'blur(8px)',
-      display:'flex', alignItems:'center', justifyContent:'center',
-      padding:24,
-    }}>
-      <div style={{
-        background:'var(--glass-bg)', border:'1px solid var(--glass-border)',
-        borderRadius:'var(--radius-lg)', padding:'32px 28px', maxWidth:380, width:'100%',
-        textAlign:'center', boxShadow:'0 24px 64px rgba(0,0,0,0.5)',
-      }}>
-        <div style={{fontSize:40, marginBottom:16}}>🔐</div>
-        <div style={{fontWeight:700, fontSize:18, marginBottom:8}}>Session expired</div>
-        <div style={{fontSize:13, color:'var(--text-3)', lineHeight:1.6, marginBottom:24}}>
-          Your Google session expired while the tab was idle. Your data is safe — just sign back in to continue.
-        </div>
-        <button className="btn btn-primary" onClick={refreshNow}
-          style={{width:'100%', justifyContent:'center', fontSize:14, padding:'12px', marginBottom:10}}>
-          🔄 Sign back in
-        </button>
-        <button className="btn btn-ghost" onClick={signOut}
-          style={{width:'100%', justifyContent:'center', fontSize:13}}>
-          Sign out completely
-        </button>
-      </div>
-    </div>
-  ) : null
-
   return (
     <HashRouter>
-      {SessionExpiredBanner}
       {/* Full-page error flash */}
       {/* ── Floating mobile save toast ─────────────────────────── */}
       <div className={`mobile-save-toast ${saveState==='saving'?'saving':saveState==='saved'?'saved':saveState==='error'?'error':''}`}>
         {saveState==='saving' && <><span style={{fontSize:14}}>⟳</span> Saving…</>}
-        {saveState==='saved'  && <><span style={{fontSize:14}}>✓</span> Saved to Drive</>}
+        {saveState==='saved'  && <><span style={{fontSize:14}}>✓</span> Saved</>}
         {saveState==='error'  && <><span style={{fontSize:14}}>⚠</span> Save failed — check connection</>}
       </div>
 
@@ -407,9 +377,9 @@ export default function App() {
             </div>
             <div className={`drive-pill ${saveState==='saved'||saveState==='idle'?'':'error'}`}>
               <div className={`drive-dot ${saveState==='saved'||saveState==='idle'?'connected':''}`}/>
-              <HardDrive size={12}/>
+              <Cloud size={12}/>
               <span style={{flex:1,fontSize:11}}>
-                {saveState==='saving'?'Saving…':saveState==='saved'?'Saved':saveState==='error'?'Error':'Drive ready'}
+                {saveState==='saving'?'Saving…':saveState==='saved'?'Saved':saveState==='error'?'Error':'Ready'}
               </span>
             </div>
             <div style={{display:'flex',gap:6,marginTop:8,padding:'0 2px'}}>

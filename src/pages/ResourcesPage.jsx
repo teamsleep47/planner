@@ -1,10 +1,8 @@
-import { useState, useEffect, useCallback } from 'react'
-import { Search, FileText, ExternalLink, Upload, X, RefreshCw, Trash2 } from 'lucide-react'
+import { useState, useEffect } from 'react'
+import { FileText, ExternalLink, Plus, Trash2 } from 'lucide-react'
+import { useAuth } from '../hooks/useAuth.jsx'
 import { load, save } from '../utils/storage.js'
 import Tooltip from '../components/Tooltip.jsx'
-
-const LS_TOKEN = 'planner_token_v1'
-function getToken() { try { return localStorage.getItem(LS_TOKEN)||'' } catch(e){ return '' } }
 
 function getCourseList() {
   try {
@@ -20,35 +18,20 @@ function getCourseList() {
   } catch(e) { return [] }
 }
 
-async function searchDriveFiles(query, token) {
-  const MIME = "and (mimeType='application/pdf' or mimeType='application/vnd.openxmlformats-officedocument.presentationml.presentation' or mimeType='application/vnd.openxmlformats-officedocument.wordprocessingml.document' or name contains '.pdf' or name contains '.pptx' or name contains '.docx')"
-  const q    = query
-    ? `name contains '${query.replace(/'/g,"\\'")}' and trashed=false ${MIME}`
-    : `trashed=false ${MIME}`
-  const url  = `https://www.googleapis.com/drive/v3/files?q=${encodeURIComponent(q)}&fields=files(id,name,mimeType,size,modifiedTime,webViewLink)&pageSize=30&orderBy=modifiedTime desc`
-  const res  = await fetch(url, { headers:{ Authorization:`Bearer ${token}` } })
-  if (res.status===401) throw new Error('TOKEN_EXPIRED')
-  if (!res.ok) throw new Error(`HTTP ${res.status}`)
-  return (await res.json()).files || []
-}
-
 function getSaved()       { return load('saved_resources', []) }
 function pinFile(r)       { const s=getSaved(); if(!s.find(x=>x.fileId===r.fileId)) save('saved_resources',[...s,r]) }
 function unpinFile(id)    { save('saved_resources', getSaved().filter(r=>r.fileId!==id)) }
 
 export default function ResourcesPage({ onDataChange }) {
+  const { user } = useAuth()
   const courses  = getCourseList()
-  const hasToken = !!getToken()
 
-  const [query,        setQuery]        = useState('')
-  const [results,      setResults]      = useState([])
-  const [hasSearched,  setHasSearched]  = useState(false)  // drive panel only shows after a search
-  const [loading,      setLoading]      = useState(false)
-  const [error,        setError]        = useState('')
   const [saved,        setSaved]        = useState(getSaved)
   const [activeCourse, setActiveCourse] = useState(() => load('resource_last_course', courses[0]?.name || 'all'))
   const [sortBy,       setSortBy]       = useState(() => load('resource_sort', 'date'))
-  const [uploading,    setUploading]    = useState(false)
+  const [showAdd,      setShowAdd]      = useState(false)
+  const [addForm,      setAddForm]      = useState({ name:'', url:'' })
+  const [error,        setError]        = useState('')
 
   useEffect(() => { save('saved_resources', saved); onDataChange?.() }, [saved])
   useEffect(() => { save('resource_sort', sortBy) }, [sortBy])
@@ -59,73 +42,29 @@ export default function ResourcesPage({ onDataChange }) {
     return () => window.removeEventListener('drive-loaded', h)
   }, [])
 
-  const doSearch = useCallback(async (q) => {
-    const token = getToken()
-    if (!token) return
-    setLoading(true); setError(''); setHasSearched(true)
-    try {
-      setResults(await searchDriveFiles(q, token))
-    } catch(e) {
-      if (e.message==='TOKEN_EXPIRED') {
-        setError('Your Google session expired. Please sign out and sign back in.')
-        window.dispatchEvent(new Event('token-expired'))
-      } else {
-        setError(`Search failed: ${e.message}`)
-      }
-    }
-    setLoading(false)
-  }, [])
-
-  const handleSearch = (e) => { e.preventDefault(); doSearch(query) }
-
-  const pinResource = (file, courseName) => {
-    pinFile({
-      fileId:   file.id,
-      name:     file.name,
-      course:   courseName,
-      link:     file.webViewLink,
-      size:     file.size,
-      modified: file.modifiedTime,
-      pinned:   new Date().toISOString(),
-    })
+  const pinResource = (entry, courseName) => {
+    pinFile({ ...entry, course: courseName, pinned: new Date().toISOString() })
     setSaved(getSaved())
     onDataChange?.()
   }
 
-  const unpin = (fileId) => { unpinFile(fileId); setSaved(getSaved()) }
-
-  const uploadFile = async (file, courseName) => {
-    const token = getToken()
-    if (!token || !file) return
-    setUploading(true)
-    try {
-      const meta = JSON.stringify({ name: file.name, mimeType: file.type||'application/pdf' })
-      const form = new FormData()
-      form.append('metadata', new Blob([meta], {type:'application/json'}))
-      form.append('file', file)
-      const res = await fetch('https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart&fields=id,name,webViewLink,size,modifiedTime', {
-        method:'POST', headers:{ Authorization:`Bearer ${token}` }, body:form,
-      })
-      if (!res.ok) throw new Error(`Upload failed: ${res.status}`)
-      pinResource(await res.json(), courseName)
-      if (hasSearched) doSearch(query)
-    } catch(e) { setError(`Upload failed: ${e.message}`) }
-    setUploading(false)
+  const unpin = (fileId) => {
+    unpinFile(fileId)
+    setSaved(getSaved())
+    onDataChange?.()
   }
 
-  const handleFileInput = (e, courseName) => {
-    const file = e.target.files[0]
-    if (file) uploadFile(file, courseName)
-    e.target.value = ''
+  const addLink = (e) => {
+    e.preventDefault()
+    setError('')
+    const name = addForm.name.trim()
+    let url    = addForm.url.trim()
+    if (!name || !url) return
+    if (!/^https?:\/\//i.test(url)) url = 'https://' + url
+    pinResource({ fileId: `${Date.now()}_${name}`, name, link: url }, activeCourse)
+    setAddForm({ name:'', url:'' })
+    setShowAdd(false)
   }
-
-  const fmtSize = bytes => {
-    if (!bytes) return ''
-    const kb = bytes/1024
-    return kb > 1024 ? `${(kb/1024).toFixed(1)} MB` : `${Math.round(kb)} KB`
-  }
-
-  const isPinned = id => saved.some(r=>r.fileId===id)
 
   // Pinned resources for the active course only
   const courseColor = courses.find(c=>c.name===activeCourse)?.color || 'var(--accent)'
@@ -134,22 +73,21 @@ export default function ResourcesPage({ onDataChange }) {
     .sort((a,b) => {
       if (sortBy==='date') return new Date(b.pinned)-new Date(a.pinned)
       if (sortBy==='name') return a.name.localeCompare(b.name)
-      if (sortBy==='size') return Number(b.size||0)-Number(a.size||0)
       return 0
     })
 
   const inputStyle = { padding:'8px 11px', background:'var(--glass-bg-2)', border:'1px solid var(--glass-border)', borderRadius:'var(--radius-md)', color:'var(--text-1)', fontSize:13, fontFamily:'inherit' }
 
-  if (!hasToken) return (
+  if (!user) return (
     <>
       <div className="page-header">
-        <div><div className="page-title">Resources</div><div className="page-subtitle">PDF files from Google Drive, organized by course</div></div>
+        <div><div className="page-title">Resources</div><div className="page-subtitle">Links organized by course</div></div>
       </div>
       <div className="page-body">
         <div className="card" style={{textAlign:'center',padding:'48px 24px',color:'var(--text-3)'}}>
           <FileText size={36} style={{margin:'0 auto 12px',opacity:.3}}/>
-          <div style={{fontWeight:600,marginBottom:6}}>Google sign-in required</div>
-          <div style={{fontSize:13}}>Sign in with Google to browse and search your Drive files.</div>
+          <div style={{fontWeight:600,marginBottom:6}}>Sign-in required</div>
+          <div style={{fontSize:13}}>Sign in to save and organize links.</div>
         </div>
       </div>
     </>
@@ -158,153 +96,77 @@ export default function ResourcesPage({ onDataChange }) {
   return (
     <>
       <div className="page-header">
-        <div><div className="page-title">Resources</div><div className="page-subtitle">Drive files pinned by course</div></div>
+        <div><div className="page-title">Resources</div><div className="page-subtitle">Links pinned by course</div></div>
       </div>
 
       <div className="page-body" style={{display:'flex',flexDirection:'column',gap:20}}>
 
-        {/* Search */}
-        <div className="card" style={{padding:'14px 16px'}}>
-          <form onSubmit={handleSearch} style={{display:'flex',gap:8,alignItems:'center'}}>
-            <div style={{position:'relative',flex:1}}>
-              <Search size={14} style={{position:'absolute',left:12,top:'50%',transform:'translateY(-50%)',color:'var(--text-3)'}}/>
-              <input style={{...inputStyle,width:'100%',paddingLeft:34}} placeholder="Search Google Drive for PDFs…" value={query} onChange={e=>setQuery(e.target.value)}/>
-            </div>
-            <button type="submit" className="btn btn-primary" disabled={loading} style={{gap:6,fontSize:13}}>
-              {loading ? <RefreshCw size={13} style={{animation:'spin 1s linear infinite'}}/> : <Search size={13}/>}
-              {loading ? 'Searching…' : 'Search'}
+        {error && (
+          <div style={{padding:'8px 12px',borderRadius:'var(--radius-md)',background:'var(--coral-dim)',color:'var(--coral)',fontSize:12,border:'1px solid var(--coral)'}}>⚠ {error}</div>
+        )}
+
+        {/* Course tabs */}
+        <div style={{display:'flex',gap:6,flexWrap:'wrap',alignItems:'center'}}>
+          <span style={{fontSize:11,fontWeight:700,color:'var(--text-3)',textTransform:'uppercase',letterSpacing:'.08em',marginRight:4}}>Course</span>
+          {courses.map(c => (
+            <button key={c.name} onClick={()=>setActiveCourse(c.name)} style={{
+              padding:'4px 12px', borderRadius:20, border:`1.5px solid ${activeCourse===c.name?c.color:'var(--glass-border)'}`,
+              background: activeCourse===c.name ? `${c.color}22` : 'transparent',
+              color: activeCourse===c.name ? c.color : 'var(--text-2)',
+              fontSize:11, fontWeight:600, cursor:'pointer', transition:'all .15s',
+            }}>
+              {c.name}
             </button>
-            {hasSearched && (
-              <Tooltip text="Clear search results">
-                <button type="button" className="btn-icon" onClick={()=>{setResults([]);setHasSearched(false);setQuery('')}} style={{padding:8}}>
-                  <X size={14}/>
-                </button>
-              </Tooltip>
-            )}
-          </form>
-          {error && (
-            <div style={{marginTop:10,padding:'8px 12px',borderRadius:'var(--radius-md)',background:'var(--coral-dim)',color:'var(--coral)',fontSize:12,border:'1px solid var(--coral)'}}>⚠ {error}</div>
-          )}
+          ))}
         </div>
 
-        <div style={{display:'grid',gridTemplateColumns: hasSearched ? '1fr 1.5fr' : '1fr',gap:20,alignItems:'start'}}>
-
-          {/* Left: course selector + pinned files */}
-          <div style={{display:'flex',flexDirection:'column',gap:12}}>
-
-            {/* Course tabs */}
-            <div style={{display:'flex',gap:6,flexWrap:'wrap',alignItems:'center'}}>
-              <span style={{fontSize:11,fontWeight:700,color:'var(--text-3)',textTransform:'uppercase',letterSpacing:'.08em',marginRight:4}}>Course</span>
-              {courses.map(c => (
-                <button key={c.name} onClick={()=>setActiveCourse(c.name)} style={{
-                  padding:'4px 12px', borderRadius:20, border:`1.5px solid ${activeCourse===c.name?c.color:'var(--glass-border)'}`,
-                  background: activeCourse===c.name ? `${c.color}22` : 'transparent',
-                  color: activeCourse===c.name ? c.color : 'var(--text-2)',
-                  fontSize:11, fontWeight:600, cursor:'pointer', transition:'all .15s',
-                }}>
-                  {c.name}
+        {/* Pinned links for active course */}
+        <div className="card" style={{padding:'14px 16px',borderLeft:`3px solid ${courseColor}`}}>
+          <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:12}}>
+            <span style={{fontWeight:700,fontSize:13,color:courseColor}}>{activeCourse}</span>
+            <div style={{display:'flex',gap:6,alignItems:'center'}}>
+              <select style={{...inputStyle,fontSize:11,padding:'3px 7px'}} value={sortBy} onChange={e=>setSortBy(e.target.value)}>
+                <option value="date">Newest</option>
+                <option value="name">A–Z</option>
+              </select>
+              <Tooltip text={`Pin a link to ${activeCourse}`}>
+                <button onClick={()=>setShowAdd(s=>!s)} style={{cursor:'pointer',display:'flex',alignItems:'center',gap:4,fontSize:11,color:'var(--accent)',fontWeight:600,padding:'4px 9px',borderRadius:'var(--radius-sm)',border:'1px solid var(--accent)',background:'var(--accent-dim)'}}>
+                  <Plus size={11}/> Add link
                 </button>
-              ))}
-            </div>
-
-            {/* Pinned files for active course */}
-            <div className="card" style={{padding:'14px 16px',borderLeft:`3px solid ${courseColor}`}}>
-              <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:12}}>
-                <span style={{fontWeight:700,fontSize:13,color:courseColor}}>{activeCourse}</span>
-                <div style={{display:'flex',gap:6,alignItems:'center'}}>
-                  <select style={{...inputStyle,fontSize:11,padding:'3px 7px'}} value={sortBy} onChange={e=>setSortBy(e.target.value)}>
-                    <option value="date">Newest</option>
-                    <option value="name">A–Z</option>
-                    <option value="size">Size</option>
-                  </select>
-                  {/* Upload to this course */}
-                  <Tooltip text={`Upload a file to Drive and pin to ${activeCourse}`}>
-                    <label style={{cursor:'pointer',display:'flex',alignItems:'center',gap:4,fontSize:11,color:'var(--accent)',fontWeight:600,padding:'4px 9px',borderRadius:'var(--radius-sm)',border:'1px solid var(--accent)',background:'var(--accent-dim)'}}>
-                      <Upload size={11}/> Upload
-                      <input type="file" accept=".pdf,.pptx,.docx" style={{display:'none'}} onChange={e=>handleFileInput(e,activeCourse)} disabled={uploading}/>
-                    </label>
-                  </Tooltip>
-                </div>
-              </div>
-
-              {pinnedForCourse.length === 0 ? (
-                <div style={{fontSize:12,color:'var(--text-3)',textAlign:'center',padding:'16px 0'}}>
-                  No pinned files for {activeCourse}.<br/>Search Drive and pin files here.
-                </div>
-              ) : (
-                <div style={{display:'flex',flexDirection:'column',gap:2}}>
-                  {pinnedForCourse.map(r => (
-                    <div key={r.fileId} style={{display:'flex',alignItems:'center',gap:8,padding:'7px 0',borderBottom:'1px solid var(--glass-border)'}}>
-                      <span style={{fontSize:14,flexShrink:0}}>
-                        {r.name.endsWith('.pdf')?'📄':r.name.endsWith('.pptx')?'📊':r.name.endsWith('.docx')?'📝':'📎'}
-                      </span>
-                      <div style={{flex:1,minWidth:0}}>
-                        <div style={{fontSize:12,fontWeight:500,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{r.name}</div>
-                        {r.size&&<div style={{fontSize:10,color:'var(--text-3)'}}>{fmtSize(Number(r.size))}</div>}
-                      </div>
-                      <div style={{display:'flex',gap:3,flexShrink:0}}>
-                        <Tooltip text="Open in Google Drive">
-                          <a href={r.link} target="_blank" rel="noreferrer" className="btn-icon" style={{padding:5,display:'flex'}}><ExternalLink size={11}/></a>
-                        </Tooltip>
-                        <Tooltip text="Delete / unpin this file">
-                          <button className="btn-icon" onClick={()=>unpin(r.fileId)} style={{padding:5,color:'var(--coral)'}}><Trash2 size={11}/></button>
-                        </Tooltip>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              )}
+              </Tooltip>
             </div>
           </div>
 
-          {/* Right: Drive search results — only visible after a search */}
-          {hasSearched && (
-            <div style={{display:'flex',flexDirection:'column',gap:8}}>
-              <span style={{fontSize:11,fontWeight:700,color:'var(--text-3)',textTransform:'uppercase',letterSpacing:'.08em'}}>
-                Drive results {results.length>0&&`(${results.length})`}
-              </span>
+          {showAdd && (
+            <form onSubmit={addLink} style={{display:'flex',gap:6,marginBottom:12,flexWrap:'wrap'}}>
+              <input style={{...inputStyle,flex:'1 1 140px'}} placeholder="Name" value={addForm.name} onChange={e=>setAddForm(f=>({...f,name:e.target.value}))} autoFocus/>
+              <input style={{...inputStyle,flex:'2 1 200px'}} placeholder="https://…" value={addForm.url} onChange={e=>setAddForm(f=>({...f,url:e.target.value}))}/>
+              <button type="submit" className="btn btn-primary" style={{fontSize:12}}>Add</button>
+            </form>
+          )}
 
-              {results.length===0&&!loading&&(
-                <div className="card" style={{textAlign:'center',padding:'32px',color:'var(--text-3)'}}>
-                  <Search size={24} style={{margin:'0 auto 10px',opacity:.3}}/>
-                  <div style={{fontSize:13}}>No files found</div>
-                  <div style={{fontSize:11,marginTop:4}}>Try a different search term</div>
-                </div>
-              )}
-
-              {results.map(file => {
-                const name  = file.name.toLowerCase()
-                const color = name.endsWith('.pdf')?'var(--coral)':name.endsWith('.pptx')||name.endsWith('.ppt')?'var(--amber)':'var(--accent)'
-                const pinned = isPinned(file.id)
-                return (
-                  <div key={file.id} className="card" style={{padding:'12px 14px',display:'flex',alignItems:'center',gap:10}}>
-                    <FileText size={18} style={{color,flexShrink:0}}/>
-                    <div style={{flex:1,minWidth:0}}>
-                      <div style={{fontWeight:600,fontSize:13,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{file.name}</div>
-                      <div style={{fontSize:11,color:'var(--text-3)',marginTop:2,display:'flex',gap:8}}>
-                        {file.size&&<span>{fmtSize(Number(file.size))}</span>}
-                        {file.modifiedTime&&<span>{new Date(file.modifiedTime).toLocaleDateString()}</span>}
-                      </div>
-                    </div>
-                    <div style={{display:'flex',gap:6,flexShrink:0,alignItems:'center'}}>
-                      {pinned ? (
-                        <span style={{fontSize:11,color:'var(--green)',fontWeight:600,padding:'4px 8px'}}>✓ Pinned</span>
-                      ) : (
-                        <select defaultValue="" onChange={e=>{ if(e.target.value) pinResource(file,e.target.value) }}
-                          style={{...inputStyle,fontSize:11,padding:'4px 8px',maxWidth:140}}>
-                          <option value="" disabled>Pin to course…</option>
-                          {courses.map(c=><option key={c.name} value={c.name}>{c.name}</option>)}
-                        </select>
-                      )}
-                      <Tooltip text="Open in Drive">
-                        <a href={file.webViewLink} target="_blank" rel="noreferrer" className="btn-icon" style={{padding:6,display:'flex'}}>
-                          <ExternalLink size={13}/>
-                        </a>
-                      </Tooltip>
-                    </div>
+          {pinnedForCourse.length === 0 ? (
+            <div style={{fontSize:12,color:'var(--text-3)',textAlign:'center',padding:'16px 0'}}>
+              No links for {activeCourse} yet.<br/>Add a link to get started.
+            </div>
+          ) : (
+            <div style={{display:'flex',flexDirection:'column',gap:2}}>
+              {pinnedForCourse.map(r => (
+                <div key={r.fileId} style={{display:'flex',alignItems:'center',gap:8,padding:'7px 0',borderBottom:'1px solid var(--glass-border)'}}>
+                  <span style={{fontSize:14,flexShrink:0}}>🔗</span>
+                  <div style={{flex:1,minWidth:0}}>
+                    <div style={{fontSize:12,fontWeight:500,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{r.name}</div>
                   </div>
-                )
-              })}
+                  <div style={{display:'flex',gap:3,flexShrink:0}}>
+                    <Tooltip text="Open link">
+                      <a href={r.link} target="_blank" rel="noreferrer" className="btn-icon" style={{padding:5,display:'flex'}}><ExternalLink size={11}/></a>
+                    </Tooltip>
+                    <Tooltip text="Delete / unpin this link">
+                      <button className="btn-icon" onClick={()=>unpin(r.fileId)} style={{padding:5,color:'var(--coral)'}}><Trash2 size={11}/></button>
+                    </Tooltip>
+                  </div>
+                </div>
+              ))}
             </div>
           )}
         </div>

@@ -75,7 +75,7 @@ export default function LoginPage({ onSignIn, error, loading }) {
         </button>
 
         <p style={{fontSize:12,color:'var(--text-3)',marginTop:24,lineHeight:1.6}}>
-          Your data is stored privately in your own Google Drive.<br/>No servers, no sharing.
+          Your data is synced privately and securely to the cloud.<br/>No sharing with anyone else.
         </p>
       </div>
     </div>
