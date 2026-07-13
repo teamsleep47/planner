@@ -1,8 +1,7 @@
 import { createContext, useContext, useEffect, useState, useCallback } from 'react'
 import {
   onAuthStateChanged,
-  getRedirectResult,
-  signInWithRedirect,
+  signInWithPopup,
   signOut as fbSignOut,
 } from 'firebase/auth'
 import { auth, googleProvider } from '../firebase.js'
@@ -24,34 +23,26 @@ export function AuthProvider({ children }) {
   const [error,   setError]   = useState(null)
 
   useEffect(() => {
-    let unsub = () => {}
-    let cancelled = false
-
-    // Resolve the pending redirect result FIRST. onAuthStateChanged's very
-    // first callback can otherwise fire with user:null before the SDK has
-    // finished processing the redirect credential, which flips loading to
-    // false with no user and bounces a just-signed-in user back to the
-    // login page. Subscribing only after the redirect has settled avoids
-    // that race.
-    getRedirectResult(auth)
-      .catch(e => {
-        console.error('[auth] redirect result error:', e)
-        setError(e.code || e.message)
-      })
-      .finally(() => {
-        if (cancelled) return
-        unsub = onAuthStateChanged(auth, u => {
-          setUser(u)
-          setLoading(false)
-        })
-      })
-
-    return () => { cancelled = true; unsub() }
+    const unsub = onAuthStateChanged(auth, u => {
+      setUser(u)
+      setLoading(false)
+    })
+    return unsub
   }, [])
 
+  // Popup instead of redirect: the app isn't served from Firebase Hosting,
+  // so the authDomain's redirect-relay iframe can't self-configure via
+  // /__/firebase/init.json (that path only exists once Hosting has been
+  // deployed for the project), which breaks signInWithRedirect entirely.
+  // Popup resolves the credential directly through its promise, in the
+  // same page lifecycle, without depending on that relay.
   const signIn = useCallback(() => {
     setError(null)
-    signInWithRedirect(auth, googleProvider)
+    signInWithPopup(auth, googleProvider).catch(e => {
+      if (e.code === 'auth/popup-closed-by-user' || e.code === 'auth/cancelled-popup-request') return
+      console.error('[auth] sign-in error:', e)
+      setError(e.code || e.message)
+    })
   }, [])
 
   const signOut = useCallback(() => {
