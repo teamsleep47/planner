@@ -4,11 +4,11 @@ import { AuthProvider } from './hooks/useAuth.jsx'
 import App from './App.jsx'
 import './index.css'
 
-// ── Apply saved theme/scheme before first render (prevents flash) ──
-const theme  = localStorage.getItem('planner_v1_theme')  || 'dark'
-const scheme = localStorage.getItem('planner_v1_scheme') || 'indigo'
-document.documentElement.setAttribute('data-theme',  theme)
-document.documentElement.setAttribute('data-scheme', scheme)
+// ── Apply saved theme before first render (prevents flash) ──
+const theme = localStorage.getItem('planner_v1_theme') || 'dark'
+document.documentElement.setAttribute('data-theme', theme)
+// Accent scheme is always indigo
+document.documentElement.setAttribute('data-scheme', 'indigo')
 
 // ── One-time migrations ────────────────────────────────────────────
 // Run before React mounts so no component ever sees stale data.

@@ -1,8 +1,7 @@
 import { useState } from 'react'
-import { Eye, EyeOff, Lock, Check, X, RefreshCw, AlertTriangle, ExternalLink } from 'lucide-react'
+import { Eye, EyeOff, Lock, RefreshCw, AlertTriangle, ExternalLink } from 'lucide-react'
 import { load, save } from '../utils/storage.js'
 import { useTheme } from '../hooks/useTheme.js'
-import Tooltip from '../components/Tooltip.jsx'
 import { auth as fbAuth } from '../firebase.js'
 import { signOut as fbSignOut } from 'firebase/auth'
 
@@ -29,12 +28,12 @@ const ALL_EXPORT_KEYS = [
   'timer_settings','streak','study_week_goal','sem_end_date',
   'terms_v1','assignments','habits_config','recurring_tasks','rec_history','goals_config',
   'course_notes','full_course_notes','full_course_notes_v2',
-  'quick_links','page_links','weather_city','scheme','theme',
+  'quick_links','page_links','weather_city','theme',
   'flashcard_decks','flashcard_cards',
   'calendar_blocks','calendar_plans',
   'notification_settings',
   'saved_resources','resource_sort','resource_last_course',
-  'bing_wallpaper_cache','hidden_tabs',
+  'hidden_tabs',
 ]
 
 function ToggleSwitch({ on, onChange, disabled }) {
@@ -52,7 +51,7 @@ function ToggleSwitch({ on, onChange, disabled }) {
 }
 
 export default function SettingsPage({ onDataChange, allNav=[], hiddenTabs=[], setHiddenTabs=()=>{} }) {
-  const { theme, scheme, setTheme, setScheme, SCHEMES, SCHEME_COLORS } = useTheme()
+  const { theme, setTheme } = useTheme()
 
   const [token,      setToken]      = useState('')
   const [showToken,  setShowToken]  = useState(false)
@@ -63,9 +62,11 @@ export default function SettingsPage({ onDataChange, allNav=[], hiddenTabs=[], s
   const [connMsg,    setConnMsg]    = useState('')
   const [showWarn,   setShowWarn]   = useState(!hasWarned())
   const [saved,      setSaved]      = useState(false)
+  const [flashMsg,   setFlashMsg]   = useState(null)
 
   const hasToken = !!getCanvasToken()
 
+  const flash = (text, type='error') => { setFlashMsg({text,type}); setTimeout(()=>setFlashMsg(null),3000) }
   const flashSaved = () => { setSaved(true); setTimeout(()=>setSaved(false),2000) }
   const saveFeature = (key, val) => { setFeatures(f=>({...f,[key]:val})); save(key,val); onDataChange?.() }
 
@@ -87,7 +88,6 @@ export default function SettingsPage({ onDataChange, allNav=[], hiddenTabs=[], s
     } catch(e) { setConnStatus('error'); setConnMsg('Network error') }
   }
 
-  // Tab visibility
   const toggleTab = (key) => {
     const next = hiddenTabs.includes(key)
       ? hiddenTabs.filter(k => k !== key)
@@ -97,16 +97,14 @@ export default function SettingsPage({ onDataChange, allNav=[], hiddenTabs=[], s
     onDataChange?.()
   }
 
-  // Flatten all nav items for the toggle list (exclude settings itself)
   const allTabItems = allNav.flatMap(g => g.items).filter(item => item.key !== 'settings')
 
-  const inp = { padding:'9px 12px',background:'var(--glass-bg-2)',border:'1px solid var(--glass-border)',borderRadius:'var(--radius-md)',color:'var(--text-1)',fontSize:13,fontFamily:'inherit',width:'100%' }
+  const inp = { padding:'9px 12px',background:'var(--glass-bg-2)',border:'1px solid var(--glass-border)',color:'var(--text-1)',fontSize:13,fontFamily:'inherit',width:'100%' }
   const sh  = { fontSize:11,fontWeight:700,color:'var(--text-3)',textTransform:'uppercase',letterSpacing:'.08em',marginBottom:12,marginTop:4 }
 
   const THEMES = [
     { key:'dark',  icon:'🌙', label:'Dark'  },
     { key:'light', icon:'☀️', label:'Light' },
-    { key:'bing',  icon:'🌄', label:'Bing'  },
   ]
 
   return (
@@ -121,28 +119,14 @@ export default function SettingsPage({ onDataChange, allNav=[], hiddenTabs=[], s
         {/* ── Appearance ───────────────────────────────── */}
         <div className="card">
           <div className="card-title">Appearance</div>
-
           <div style={sh}>Theme</div>
-          <div style={{display:'flex',gap:8,marginBottom:20}}>
+          <div style={{display:'flex',gap:8,marginBottom:8}}>
             {THEMES.map(t=>(
               <button key={t.key} onClick={()=>setTheme(t.key)}
                 className={theme===t.key?'btn btn-primary':'btn btn-ghost'}
                 style={{flex:1,justifyContent:'center',gap:6,fontSize:13}}>
                 {t.icon} {t.label}
               </button>
-            ))}
-          </div>
-
-          <div style={sh}>Accent color</div>
-          <div style={{display:'flex',gap:12}}>
-            {SCHEMES.map(s=>(
-              <Tooltip key={s} text={s.charAt(0).toUpperCase()+s.slice(1)}>
-                <button onClick={()=>setScheme(s)} style={{
-                  width:32,height:32,borderRadius:'50%',background:SCHEME_COLORS[s],
-                  border:`3px solid ${scheme===s?'var(--text-1)':'transparent'}`,
-                  cursor:'pointer',boxShadow:'0 2px 8px rgba(0,0,0,.2)',transition:'transform .15s',
-                }} onMouseEnter={e=>e.currentTarget.style.transform='scale(1.15)'} onMouseLeave={e=>e.currentTarget.style.transform='scale(1)'}/>
-              </Tooltip>
             ))}
           </div>
         </div>
@@ -160,7 +144,7 @@ export default function SettingsPage({ onDataChange, allNav=[], hiddenTabs=[], s
               return (
                 <div key={item.key} style={{display:'flex',alignItems:'center',gap:12,justifyContent:'space-between'}}>
                   <div style={{display:'flex',alignItems:'center',gap:10}}>
-                    <div style={{width:32,height:32,borderRadius:'var(--radius-sm)',background:isVisible?'var(--accent-dim)':'var(--glass-bg-2)',border:`1px solid ${isVisible?'var(--accent)':'var(--glass-border)'}`,display:'flex',alignItems:'center',justifyContent:'center',flexShrink:0,transition:'all .2s'}}>
+                    <div style={{width:32,height:32,background:isVisible?'var(--accent-dim)':'var(--glass-bg-2)',border:`1px solid ${isVisible?'var(--accent)':'var(--glass-border)'}`,display:'flex',alignItems:'center',justifyContent:'center',flexShrink:0,transition:'all .2s'}}>
                       <Icon size={14} style={{color:isVisible?'var(--accent)':'var(--text-3)'}}/>
                     </div>
                     <div>
@@ -175,6 +159,37 @@ export default function SettingsPage({ onDataChange, allNav=[], hiddenTabs=[], s
           </div>
         </div>
 
+        {/* ── Data management ───────────────────────────── */}
+        <div className="card">
+          <div className="card-title">Data</div>
+          <div style={{display:'flex',gap:10,flexWrap:'wrap'}}>
+            <button className="btn btn-ghost" onClick={()=>{
+              const data=ALL_EXPORT_KEYS.reduce((a,k)=>({...a,[k]:load(k,null)}),{})
+              const blob=new Blob([JSON.stringify(data,null,2)],{type:'application/json'})
+              const url=URL.createObjectURL(blob)
+              const a=document.createElement('a'); a.href=url; a.download=`planner-backup-${new Date().toISOString().slice(0,10)}.json`; a.click()
+              URL.revokeObjectURL(url)
+            }}>📥 Export backup</button>
+            <button className="btn btn-ghost" onClick={()=>{
+              const input=document.createElement('input'); input.type='file'; input.accept='.json'
+              input.onchange=e=>{
+                const file=e.target.files[0]; if(!file) return
+                const reader=new FileReader()
+                reader.onload=ev=>{ try{ const d=JSON.parse(ev.target.result); Object.entries(d).forEach(([k,v])=>{ if(v!==null) save(k,v) }); window.dispatchEvent(new Event('drive-loaded')) }catch(err){ flash('Invalid JSON — could not import backup') } }
+                reader.readAsText(file)
+              }; input.click()
+            }}>📤 Import backup</button>
+            <button className="btn btn-ghost" style={{color:'var(--coral)'}} onClick={()=>{
+              if(!confirm('Wipe ALL data? Cannot be undone.')) return
+              const prefixes=['planner_v1_']; const exactKeys=['canvas_token_v1','canvas_url_v1','canvas_ical_v1','canvas_warned_v1']
+              Object.keys(localStorage).filter(k=>prefixes.some(p=>k.startsWith(p))).forEach(k=>localStorage.removeItem(k))
+              exactKeys.forEach(k=>localStorage.removeItem(k))
+              sessionStorage.clear()
+              fbSignOut(fbAuth).catch(()=>{}).finally(()=>window.location.reload())
+            }}>🗑 Wipe all data</button>
+          </div>
+        </div>
+
         {/* ── Canvas ───────────────────────────────────── */}
         <div className="card">
           <div style={{display:'flex',alignItems:'center',gap:8,marginBottom:16}}>
@@ -185,7 +200,7 @@ export default function SettingsPage({ onDataChange, allNav=[], hiddenTabs=[], s
           </div>
 
           {showWarn && (
-            <div style={{background:'var(--amber-dim)',border:'1px solid var(--amber)',borderRadius:'var(--radius-md)',padding:'10px 14px',marginBottom:16,fontSize:12,color:'var(--amber)',display:'flex',gap:10,alignItems:'flex-start'}}>
+            <div style={{background:'var(--amber-dim)',border:'1px solid var(--amber)',padding:'10px 14px',marginBottom:16,fontSize:12,color:'var(--amber)',display:'flex',gap:10,alignItems:'flex-start'}}>
               <AlertTriangle size={14} style={{flexShrink:0,marginTop:1}}/>
               <div><strong>Security:</strong> Your token gives read access to Canvas. It stays in this browser only. <button onClick={()=>{localStorage.setItem(LS_CANVAS_WARNED,'1');setShowWarn(false)}} style={{background:'none',border:'none',color:'var(--amber)',cursor:'pointer',fontSize:11,fontWeight:600,padding:0,marginTop:4,display:'block'}}>Got it — dismiss</button></div>
             </div>
@@ -243,38 +258,18 @@ export default function SettingsPage({ onDataChange, allNav=[], hiddenTabs=[], s
             })}
           </div>
         </div>
-
-        {/* ── Data management ───────────────────────────── */}
-        <div className="card">
-          <div className="card-title">Data management</div>
-          <div style={{display:'flex',gap:10,flexWrap:'wrap'}}>
-            <button className="btn btn-ghost" onClick={()=>{
-              const data=ALL_EXPORT_KEYS.reduce((a,k)=>({...a,[k]:load(k,null)}),{})
-              const blob=new Blob([JSON.stringify(data,null,2)],{type:'application/json'})
-              const url=URL.createObjectURL(blob)
-              const a=document.createElement('a'); a.href=url; a.download=`planner-backup-${new Date().toISOString().slice(0,10)}.json`; a.click()
-              URL.revokeObjectURL(url)
-            }}>📥 Export backup</button>
-            <button className="btn btn-ghost" onClick={()=>{
-              const input=document.createElement('input'); input.type='file'; input.accept='.json'
-              input.onchange=e=>{
-                const file=e.target.files[0]; if(!file) return
-                const reader=new FileReader()
-                reader.onload=ev=>{ try{ const d=JSON.parse(ev.target.result); Object.entries(d).forEach(([k,v])=>{ if(v!==null) save(k,v) }); window.dispatchEvent(new Event('drive-loaded')) }catch(e){ alert('Invalid JSON') } }
-                reader.readAsText(file)
-              }; input.click()
-            }}>📤 Import backup</button>
-            <button className="btn btn-ghost" style={{color:'var(--coral)'}} onClick={()=>{
-              if(!confirm('Wipe ALL data? Cannot be undone.')) return
-              const prefixes=['planner_v1_']; const exactKeys=['canvas_token_v1','canvas_url_v1','canvas_ical_v1','canvas_warned_v1']
-              Object.keys(localStorage).filter(k=>prefixes.some(p=>k.startsWith(p))).forEach(k=>localStorage.removeItem(k))
-              exactKeys.forEach(k=>localStorage.removeItem(k))
-              sessionStorage.clear()
-              fbSignOut(fbAuth).catch(()=>{}).finally(()=>window.location.reload())
-            }}>🗑 Wipe all data</button>
-          </div>
-        </div>
       </div>
+
+      {flashMsg && (
+        <div style={{
+          position:'fixed', bottom:20, left:'50%', transform:'translateX(-50%)',
+          padding:'10px 20px',
+          background: flashMsg.type==='error' ? 'var(--coral-dim)' : 'var(--green-dim)',
+          border: `1px solid ${flashMsg.type==='error' ? 'var(--coral)' : 'var(--green)'}`,
+          color: flashMsg.type==='error' ? 'var(--coral)' : 'var(--green)',
+          fontSize:13, fontWeight:600, zIndex:9999, boxShadow:'var(--shadow)',
+        }}>{flashMsg.text}</div>
+      )}
     </>
   )
 }

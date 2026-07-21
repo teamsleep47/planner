@@ -48,7 +48,7 @@ export default function Courses({ onDataChange }) {
 
   // Persist accordion state whenever it changes
   useEffect(()=>{ save(ACCORDION_KEY, expanded) },[expanded])
-  useEffect(()=>{ saveTerms(terms); onDataChange?.(); triggerCoursesHalo('green') },[terms])
+  useEffect(()=>{ saveTerms(terms); onDataChange?.(); triggerCoursesHalo('green'); window.dispatchEvent(new Event('assignments-updated')) },[terms])
   useEffect(() => {
     const h = () => {
       const t = loadTerms()

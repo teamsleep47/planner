@@ -10,7 +10,6 @@ import { useAuth }          from './hooks/useAuth.jsx'
 import { useTheme }         from './hooks/useTheme.js'
 import { useFirestoreSync } from './hooks/useFirestoreSync.js'
 import { useNotifications } from './hooks/useNotifications.js'
-import { useBingWallpaper } from './hooks/useBingWallpaper.js'
 import { load, save }       from './utils/storage.js'
 import { auth as fbAuth }   from './firebase.js'
 import { signOut as fbSignOut } from 'firebase/auth'
@@ -29,7 +28,6 @@ import CalendarPage   from './pages/CalendarPage.jsx'
 import ResourcesPage  from './pages/ResourcesPage.jsx'
 
 import TopBar                 from './components/TopBar.jsx'
-import BingHeader             from './components/BingHeader.jsx'
 import SidebarMiniTasks       from './components/SidebarMiniTasks.jsx'
 import SidebarMiniAssignments from './components/SidebarMiniAssignments.jsx'
 
@@ -68,12 +66,11 @@ const ALL_KEYS = [
   'course_notes', 'full_course_notes', 'full_course_notes_v2',
   'quick_links', 'page_links',
   'weather_city',
-  'scheme', 'theme',
+  'theme',
   'flashcard_decks', 'flashcard_cards',
   'calendar_blocks', 'calendar_plans',
   'notification_settings',
   'saved_resources', 'resource_sort', 'resource_last_course',
-  'bing_wallpaper_cache',
   'hidden_tabs',
 ]
 
@@ -119,6 +116,21 @@ function SidebarMiniWidgets({ hiddenTabs }) {
   )
 }
 
+function ThemeTogglePill({ theme, toggleTheme }) {
+  return (
+    <button onClick={toggleTheme} title={theme==='dark' ? 'Switch to light mode' : 'Switch to dark mode'} style={{
+      display:'flex', alignItems:'center', gap:4,
+      padding:'4px 8px',
+      background: theme==='dark' ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.06)',
+      border: '1px solid var(--glass-border)',
+      borderRadius: 0,
+      cursor:'pointer', fontSize:14, transition:'all .2s', color:'var(--text-1)',
+    }}>
+      {theme==='dark' ? '🌙' : '☀️'}
+    </button>
+  )
+}
+
 function MobileHeader({ profile, signOut, sidebarOpen, setSidebarOpen, theme, toggleTheme, saveState }) {
   const [showDropdown, setShowDropdown] = useState(false)
   const dropRef  = useRef(null)
@@ -130,14 +142,11 @@ function MobileHeader({ profile, signOut, sidebarOpen, setSidebarOpen, theme, to
     return () => document.removeEventListener('mousedown', h)
   }, [])
 
-  // Close dropdown when navigating
   const go = (path) => { navigate(path); setShowDropdown(false); }
-
   const ini = n => { const p=(n||'?').trim().split(/\s+/); return (p[0][0]+(p[1]?p[1][0]:'')).toUpperCase() }
 
   return (
     <header className="mobile-header">
-      {/* Hamburger — 44px touch target */}
       <button
         onClick={() => setSidebarOpen(o => !o)}
         style={{
@@ -145,16 +154,16 @@ function MobileHeader({ profile, signOut, sidebarOpen, setSidebarOpen, theme, to
           border: 'none',
           color: sidebarOpen ? 'var(--accent)' : 'var(--text-1)',
           display: 'flex', alignItems: 'center', justifyContent: 'center',
-          width: 44, height: 44, borderRadius: 12,
+          width: 44, height: 44, borderRadius: 0,
           cursor: 'pointer', flexShrink: 0,
           transition: 'background .2s, color .2s',
         }}>
         {sidebarOpen ? <X size={22}/> : <Menu size={22}/>}
       </button>
 
-      {/* Title */}
       <span style={{fontWeight:700,fontSize:16,letterSpacing:'-0.4px',flex:1,color:'var(--text-1)'}}>Planner</span>
 
+      <ThemeTogglePill theme={theme} toggleTheme={toggleTheme}/>
 
       {/* Avatar dropdown */}
       <div ref={dropRef} style={{position:'relative'}}>
@@ -180,10 +189,7 @@ function MobileHeader({ profile, signOut, sidebarOpen, setSidebarOpen, theme, to
             borderLeft:'1px solid var(--glass-border)',
             boxShadow:'-4px 0 32px rgba(0,0,0,0.35)',
             display:'flex', flexDirection:'column',
-            transform: showDropdown ? 'translateX(0)' : 'translateX(100%)',
-            transition: 'transform .25s cubic-bezier(0.4,0,0.2,1)',
           }}>
-            {/* Header */}
             <div style={{
               padding:'54px 20px 20px',
               borderBottom:'1px solid var(--glass-border)',
@@ -192,7 +198,7 @@ function MobileHeader({ profile, signOut, sidebarOpen, setSidebarOpen, theme, to
               <button onClick={()=>setShowDropdown(false)} style={{
                 position:'absolute', top:14, right:14,
                 background:'var(--glass-bg-2)', border:'1px solid var(--glass-border)',
-                borderRadius:10, width:36, height:36,
+                borderRadius:0, width:36, height:36,
                 display:'flex', alignItems:'center', justifyContent:'center',
                 color:'var(--text-2)', cursor:'pointer',
               }}><X size={16}/></button>
@@ -205,10 +211,9 @@ function MobileHeader({ profile, signOut, sidebarOpen, setSidebarOpen, theme, to
               <div style={{fontSize:12,color:'var(--text-3)',overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{profile?.email||''}</div>
             </div>
 
-            {/* Menu items */}
             <div style={{flex:1,overflow:'auto',padding:'10px 8px'}}>
               {[
-                { icon:'🌙', iconLight:'☀️', label: theme==='dark'?'Switch to light':'Switch to dark', action: toggleTheme },
+                { icon: theme==='dark'?'🌙':'☀️', label: theme==='dark'?'Switch to light':'Switch to dark', action: toggleTheme },
                 { icon:'⚙️', label:'Settings', action:()=>go('/settings') },
                 { icon:'📅', label:'Calendar', action:()=>go('/calendar') },
                 { icon:'📚', label:'Assignments', action:()=>go('/courses') },
@@ -216,7 +221,7 @@ function MobileHeader({ profile, signOut, sidebarOpen, setSidebarOpen, theme, to
                 <button key={i} onClick={item.action} style={{
                   width:'100%', display:'flex', alignItems:'center', gap:14,
                   padding:'14px 16px', background:'none', border:'none',
-                  borderRadius:12, color:'var(--text-1)',
+                  borderRadius:0, color:'var(--text-1)',
                   fontSize:14, fontWeight:500, cursor:'pointer', textAlign:'left',
                   marginBottom:2, transition:'background .15s',
                 }}
@@ -230,12 +235,11 @@ function MobileHeader({ profile, signOut, sidebarOpen, setSidebarOpen, theme, to
               ))}
             </div>
 
-            {/* Footer actions */}
             <div style={{padding:'12px 8px',borderTop:'1px solid var(--glass-border)'}}>
               <button onClick={signOut} style={{
                 width:'100%', display:'flex', alignItems:'center', gap:14,
                 padding:'14px 16px', background:'none', border:'none',
-                borderRadius:12, color:'var(--text-2)',
+                borderRadius:0, color:'var(--text-2)',
                 fontSize:14, cursor:'pointer', textAlign:'left', marginBottom:4,
               }}
                 onMouseEnter={e=>e.currentTarget.style.background='var(--glass-bg-2)'}
@@ -245,7 +249,7 @@ function MobileHeader({ profile, signOut, sidebarOpen, setSidebarOpen, theme, to
               <button onClick={()=>{setShowDropdown(false); wipeAllSettings()}} style={{
                 width:'100%', display:'flex', alignItems:'center', gap:14,
                 padding:'14px 16px', background:'none', border:'none',
-                borderRadius:12, color:'var(--coral)',
+                borderRadius:0, color:'var(--coral)',
                 fontSize:14, cursor:'pointer', textAlign:'left',
               }}
                 onMouseEnter={e=>e.currentTarget.style.background='rgba(248,113,113,0.08)'}
@@ -256,7 +260,6 @@ function MobileHeader({ profile, signOut, sidebarOpen, setSidebarOpen, theme, to
           </div>
         )}
 
-        {/* Backdrop for dropdown */}
         {showDropdown && (
           <div
             onClick={() => setShowDropdown(false)}
@@ -270,10 +273,9 @@ function MobileHeader({ profile, signOut, sidebarOpen, setSidebarOpen, theme, to
 
 export default function App() {
   const { profile, loading, error, signIn, signOut, isAuthed } = useAuth()
-  const { theme, scheme, toggleTheme, setScheme, SCHEMES, SCHEME_COLORS } = useTheme()
-  const { syncToCloud, saveState }                                         = useFirestoreSync(getAllData)
-  const { notifs, unread, markAllRead, clearNotif }                        = useNotifications()
-  const { wallpaper }                                                       = useBingWallpaper(theme === 'bing')
+  const { theme, toggleTheme }                                  = useTheme()
+  const { syncToCloud, saveState }                              = useFirestoreSync(getAllData)
+  const { notifs, unread, markAllRead, clearNotif }             = useNotifications()
   const [sidebarOpen, setSidebarOpen] = useState(false)
   const [errorOverlay, setErrorOverlay] = useState(false)
   const [hiddenTabs,  setHiddenTabs]  = useState(() => load('hidden_tabs', []))
@@ -295,7 +297,6 @@ export default function App() {
     syncToCloud(getAllData())
   }, [syncToCloud])
 
-  // Show full-page red background when Drive save fails
   useEffect(() => {
     if (saveState === 'error') {
       setErrorOverlay(true)
@@ -304,7 +305,6 @@ export default function App() {
     }
   }, [saveState])
 
-  // Filter NAV based on hidden tabs
   const visibleNav = ALL_NAV
     .map(group => ({
       ...group,
@@ -322,8 +322,6 @@ export default function App() {
 
   return (
     <HashRouter>
-      {/* Full-page error flash */}
-      {/* ── Floating mobile save toast ─────────────────────────── */}
       <div className={`mobile-save-toast ${saveState==='saving'?'saving':saveState==='saved'?'saved':saveState==='error'?'error':''}`}>
         {saveState==='saving' && <><span style={{fontSize:14}}>⟳</span> Saving…</>}
         {saveState==='saved'  && <><span style={{fontSize:14}}>✓</span> Saved</>}
@@ -342,11 +340,11 @@ export default function App() {
         <aside className={`sidebar ${sidebarOpen?'open':''}`}>
           <div className="sidebar-logo">
             <svg width="30" height="30" viewBox="0 0 32 32">
-              <rect width="32" height="32" rx="9" fill="var(--accent)"/>
-              <rect x="6"  y="6"  width="8" height="8" rx="2.5" fill="white" opacity="0.95"/>
-              <rect x="18" y="6"  width="8" height="8" rx="2.5" fill="white" opacity="0.55"/>
-              <rect x="6"  y="18" width="8" height="8" rx="2.5" fill="white" opacity="0.55"/>
-              <rect x="18" y="18" width="8" height="8" rx="2.5" fill="white" opacity="0.95"/>
+              <rect width="32" height="32" rx="0" fill="var(--accent)"/>
+              <rect x="6"  y="6"  width="8" height="8" rx="0" fill="white" opacity="0.95"/>
+              <rect x="18" y="6"  width="8" height="8" rx="0" fill="white" opacity="0.55"/>
+              <rect x="6"  y="18" width="8" height="8" rx="0" fill="white" opacity="0.55"/>
+              <rect x="18" y="18" width="8" height="8" rx="0" fill="white" opacity="0.95"/>
             </svg>
             <span className="sidebar-logo-text">Planner</span>
           </div>
@@ -402,14 +400,12 @@ export default function App() {
             theme={theme} toggleTheme={toggleTheme}
           />
           <TopBar
-            theme={theme} scheme={scheme}
-            toggleTheme={toggleTheme} setScheme={setScheme}
-            SCHEMES={SCHEMES} SCHEME_COLORS={SCHEME_COLORS}
+            theme={theme}
+            toggleTheme={toggleTheme}
             saveState={saveState}
             onLinksChange={handleDataChange}
             notifs={notifs} unread={unread} markAllRead={markAllRead} clearNotif={clearNotif}
           />
-          <BingHeader enabled={theme==='bing'} wallpaper={wallpaper}/>
           <Routes>
             <Route path="/"           element={<WeeklyHome     onDataChange={handleDataChange}/>}/>
             <Route path="/courses"    element={<Courses        onDataChange={handleDataChange}/>}/>

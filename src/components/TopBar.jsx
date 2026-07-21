@@ -1,10 +1,10 @@
-import { useState, useRef, useEffect } from 'react'
-import { Palette, Sun, Moon, Image, Plus, X, Check, Edit2, Download, Upload, FlaskConical } from 'lucide-react'
+import { useState, useEffect } from 'react'
+import { Settings, Plus, X, Check, Edit2, GripVertical } from 'lucide-react'
+import { useNavigate } from 'react-router-dom'
 import FlipClock from './FlipClock.jsx'
 import Tooltip from './Tooltip.jsx'
 import { load, save } from '../utils/storage.js'
 import NotificationBell from './NotificationBell.jsx'
-import { TEST_DATA } from '../utils/testData.js'
 
 const DEFAULT_LINKS = [
   { id: 1, label: 'SCF Planner', url: 'https://teamsleep47.github.io/scf-planner/', emoji: '🎓' },
@@ -19,184 +19,195 @@ const ALL_KEYS = [
   'terms_v1', 'assignments',
   'habits_config', 'recurring_tasks', 'rec_history', 'goals_config',
   'course_notes', 'full_course_notes', 'full_course_notes_v2',
-  'quick_links', 'page_links', 'weather_city', 'scheme', 'theme',
+  'quick_links', 'page_links', 'weather_city', 'theme',
   'flashcard_decks', 'flashcard_cards',
   'calendar_blocks', 'calendar_plans',
   'notification_settings',
   'saved_resources', 'resource_sort', 'resource_last_course',
-  'bing_wallpaper_cache', 'hidden_tabs',
+  'hidden_tabs',
 ]
 
-const THEME_CYCLE = ['dark', 'light', 'bing']
-const THEME_NEXT_LABEL = { dark: 'Switch to light', light: 'Bing wallpaper', bing: 'Switch to dark' }
-const THEME_NEXT_ICON  = { dark: Sun, light: Image, bing: Moon }
+function ThemeTogglePill({ theme, toggleTheme }) {
+  return (
+    <button onClick={toggleTheme} title={theme==='dark' ? 'Switch to light mode' : 'Switch to dark mode'} style={{
+      display:'flex', alignItems:'center', gap:4,
+      padding:'4px 8px',
+      background: theme==='dark' ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.06)',
+      border: '1px solid var(--glass-border)',
+      borderRadius: 0,
+      cursor:'pointer', fontSize:14, transition:'all .2s', color:'var(--text-1)',
+    }}>
+      {theme==='dark' ? '🌙' : '☀️'}
+    </button>
+  )
+}
 
-export default function TopBar({ theme, scheme, toggleTheme, setScheme, SCHEMES, SCHEME_COLORS, saveState, onLinksChange, notifs=[], unread=0, markAllRead=()=>{}, clearNotif=()=>{} }) {
-  const [showTheme, setShowTheme] = useState(false)
-  const [editMode,  setEditMode]  = useState(false)
-  const [links,     setLinks]     = useState(() => load('quick_links', DEFAULT_LINKS))
-  const [editId,    setEditId]    = useState(null)
-  const [editForm,  setEditForm]  = useState({ label: '', url: '', emoji: '' })
-  const [showAdd,   setShowAdd]   = useState(false)
-  const [addForm,   setAddForm]   = useState({ label: '', url: '', emoji: '' })
-  const themeRef = useRef(null)
+function QuickLinksModal({ links, setLinks, onClose }) {
+  const [localLinks, setLocalLinks] = useState(links)
+  const [editId,     setEditId]     = useState(null)
+  const [editForm,   setEditForm]   = useState({ label:'', url:'', emoji:'' })
+  const [showAdd,    setShowAdd]    = useState(false)
+  const [addForm,    setAddForm]    = useState({ label:'', url:'', emoji:'' })
+  const [dragIdx,    setDragIdx]    = useState(null)
+  const [dragOverIdx,setDragOverIdx]= useState(null)
 
-  useEffect(() => { save('quick_links', links); onLinksChange?.() }, [links])
-  useEffect(() => {
-    const handler = e => { if (themeRef.current && !themeRef.current.contains(e.target)) setShowTheme(false) }
-    document.addEventListener('mousedown', handler)
-    return () => document.removeEventListener('mousedown', handler)
-  }, [])
-
-  const startEdit  = l => { setEditId(l.id); setEditForm({ label: l.label, url: l.url, emoji: l.emoji }) }
-  const saveEdit   = () => { setLinks(ls => ls.map(l => l.id===editId ? {...l,...editForm} : l)); setEditId(null) }
-  const deleteLink = id => setLinks(ls => ls.filter(l => l.id!==id))
-  const addLink    = () => {
+  const startEdit = l => { setEditId(l.id); setEditForm({ label:l.label, url:l.url, emoji:l.emoji }) }
+  const saveEdit  = () => { setLocalLinks(ls => ls.map(l => l.id===editId ? {...l,...editForm} : l)); setEditId(null) }
+  const deleteLink = id => setLocalLinks(ls => ls.filter(l => l.id!==id))
+  const addLink   = () => {
     if (!addForm.label.trim() || !addForm.url.trim()) return
-    setLinks(ls => [...ls, { ...addForm, id: Date.now() }])
+    setLocalLinks(ls => [...ls, { ...addForm, id: Date.now() }])
     setAddForm({ label:'', url:'', emoji:'' }); setShowAdd(false)
+  }
+
+  const handleDragStart = (e, i) => { setDragIdx(i); e.dataTransfer.effectAllowed='move' }
+  const handleDragOver  = (e, i) => { e.preventDefault(); setDragOverIdx(i) }
+  const handleDrop      = (e, i) => {
+    e.preventDefault()
+    if (dragIdx === null || dragIdx === i) { setDragIdx(null); setDragOverIdx(null); return }
+    const arr = [...localLinks]
+    const [moved] = arr.splice(dragIdx, 1)
+    arr.splice(i, 0, moved)
+    setLocalLinks(arr); setDragIdx(null); setDragOverIdx(null)
+  }
+
+  const done = () => { setLinks(localLinks); save('quick_links', localLinks); onClose() }
+
+  const inp = { padding:'6px 8px', background:'var(--glass-bg)', border:'1px solid var(--glass-border)', color:'var(--text-1)', fontSize:13, fontFamily:'inherit' }
+
+  return (
+    <div style={{position:'fixed',inset:0,zIndex:2000,display:'flex',alignItems:'center',justifyContent:'center'}} onClick={onClose}>
+      <div style={{position:'absolute',inset:0,background:'rgba(0,0,0,0.55)',backdropFilter:'blur(4px)'}}/>
+      <div className="card" style={{position:'relative',zIndex:1,width:'100%',maxWidth:520,maxHeight:'80vh',overflow:'auto',padding:0}} onClick={e=>e.stopPropagation()}>
+        <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',padding:'16px 18px',borderBottom:'1px solid var(--glass-border)'}}>
+          <span style={{fontWeight:700,fontSize:15}}>Quick Links</span>
+          <button onClick={onClose} style={{background:'none',border:'none',color:'var(--text-3)',cursor:'pointer',display:'flex',padding:2}}><X size={16}/></button>
+        </div>
+
+        <div style={{padding:'12px 14px',display:'flex',flexDirection:'column',gap:6}}>
+          {localLinks.map((l, i) => (
+            editId === l.id ? (
+              <div key={l.id} style={{display:'flex',gap:6,alignItems:'center',padding:'8px 10px',background:'var(--glass-bg-2)',border:'1px solid var(--accent)'}}>
+                <input value={editForm.emoji} onChange={e=>setEditForm(f=>({...f,emoji:e.target.value}))} style={{...inp,width:38}} placeholder="🔗"/>
+                <input value={editForm.label} onChange={e=>setEditForm(f=>({...f,label:e.target.value}))} style={{...inp,flex:1}} placeholder="Label"/>
+                <input value={editForm.url}   onChange={e=>setEditForm(f=>({...f,url:e.target.value}))}   style={{...inp,flex:2}} placeholder="https://…" onKeyDown={e=>e.key==='Enter'&&saveEdit()}/>
+                <button className="btn-icon" onClick={saveEdit}><Check size={13}/></button>
+                <button className="btn-icon" onClick={()=>setEditId(null)}><X size={11}/></button>
+              </div>
+            ) : (
+              <div key={l.id}
+                draggable
+                onDragStart={e=>handleDragStart(e,i)}
+                onDragOver={e=>handleDragOver(e,i)}
+                onDrop={e=>handleDrop(e,i)}
+                onDragEnd={()=>{setDragIdx(null);setDragOverIdx(null)}}
+                style={{display:'flex',alignItems:'center',gap:10,padding:'8px 10px',background:dragOverIdx===i?'var(--accent-dim)':'var(--glass-bg-2)',border:dragOverIdx===i?'1px solid var(--accent)':'1px solid var(--glass-border)',cursor:'default',transition:'background .1s'}}>
+                <GripVertical size={14} style={{color:'var(--text-3)',cursor:'grab',flexShrink:0}}/>
+                <span style={{fontSize:16,flexShrink:0}}>{l.emoji}</span>
+                <div style={{flex:1,minWidth:0}}>
+                  <div style={{fontSize:13,fontWeight:600,color:'var(--text-1)',overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{l.label}</div>
+                  <div style={{fontSize:11,color:'var(--text-3)',overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{l.url}</div>
+                </div>
+                <button className="btn-icon" onClick={()=>startEdit(l)} style={{padding:4}}><Edit2 size={12}/></button>
+                <button className="btn-icon" onClick={()=>deleteLink(l.id)} style={{padding:4,color:'var(--coral)'}}><X size={12}/></button>
+              </div>
+            )
+          ))}
+
+          {showAdd ? (
+            <div style={{display:'flex',gap:6,alignItems:'center',padding:'8px 10px',background:'var(--glass-bg-2)',border:'1px solid var(--accent)'}}>
+              <input value={addForm.emoji} onChange={e=>setAddForm(f=>({...f,emoji:e.target.value}))} style={{...inp,width:38}} placeholder="🔗"/>
+              <input value={addForm.label} onChange={e=>setAddForm(f=>({...f,label:e.target.value}))} style={{...inp,flex:1}} placeholder="Label" autoFocus/>
+              <input value={addForm.url}   onChange={e=>setAddForm(f=>({...f,url:e.target.value}))}   style={{...inp,flex:2}} placeholder="https://…" onKeyDown={e=>e.key==='Enter'&&addLink()}/>
+              <button className="btn-icon" onClick={addLink}><Check size={13}/></button>
+              <button className="btn-icon" onClick={()=>setShowAdd(false)}><X size={11}/></button>
+            </div>
+          ) : (
+            <button onClick={()=>setShowAdd(true)} style={{display:'flex',alignItems:'center',gap:8,padding:'8px 12px',background:'none',border:'1px dashed var(--glass-border)',color:'var(--text-3)',cursor:'pointer',fontSize:13,transition:'all .15s'}}
+              onMouseEnter={e=>e.currentTarget.style.borderColor='var(--accent)'}
+              onMouseLeave={e=>e.currentTarget.style.borderColor='var(--glass-border)'}>
+              <Plus size={14}/> Add link
+            </button>
+          )}
+        </div>
+
+        <div style={{padding:'12px 14px',borderTop:'1px solid var(--glass-border)',display:'flex',justifyContent:'flex-end'}}>
+          <button className="btn btn-primary" onClick={done} style={{fontSize:13}}>Done</button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+export default function TopBar({ theme, toggleTheme, saveState, onLinksChange, notifs=[], unread=0, markAllRead=()=>{}, clearNotif=()=>{} }) {
+  const navigate = useNavigate()
+  const [links,    setLinks]    = useState(() => load('quick_links', DEFAULT_LINKS))
+  const [showModal,setShowModal]= useState(false)
+  const [dragIdx,    setDragIdx]    = useState(null)
+  const [dragOverIdx,setDragOverIdx]= useState(null)
+
+  useEffect(() => { onLinksChange?.() }, [links])
+
+  const handleLinkDragStart = (e, i) => { setDragIdx(i); e.dataTransfer.effectAllowed='move' }
+  const handleLinkDragOver  = (e, i) => { e.preventDefault(); setDragOverIdx(i) }
+  const handleLinkDrop      = (e, i) => {
+    e.preventDefault()
+    if (dragIdx === null || dragIdx === i) { setDragIdx(null); setDragOverIdx(null); return }
+    const arr = [...links]
+    const [moved] = arr.splice(dragIdx, 1)
+    arr.splice(i, 0, moved)
+    setLinks(arr); save('quick_links', arr)
+    setDragIdx(null); setDragOverIdx(null)
   }
 
   const isOk  = saveState === 'saved'
   const isErr = saveState === 'error'
 
-  const NextIcon = THEME_NEXT_ICON[theme] || Sun
-
   return (
-    <div className="top-bar">
-      <div className="top-bar-left">
-        <FlipClock/>
-        <span className={`save-pill ${isOk||isErr ? 'visible' : ''} ${isErr ? 'error visible' : ''}`}>
-          {saveState==='saving'?'⟳ Saving…':isOk?'✓ Saved':isErr?'⚠ Save failed':''}
-        </span>
-      </div>
+    <>
+      {showModal && <QuickLinksModal links={links} setLinks={setLinks} onClose={()=>setShowModal(false)}/>}
+      <div className="top-bar">
+        <div className="top-bar-left">
+          <FlipClock/>
+          <span className={`save-pill ${isOk||isErr ? 'visible' : ''} ${isErr ? 'error visible' : ''}`}>
+            {saveState==='saving'?'⟳ Saving…':isOk?'✓ Saved':isErr?'⚠ Save failed':''}
+          </span>
+        </div>
 
-      <div className="top-bar-right">
-        <NotificationBell notifs={notifs} unread={unread} markAllRead={markAllRead} clearNotif={clearNotif}/>
+        <div className="top-bar-right">
+          <NotificationBell notifs={notifs} unread={unread} markAllRead={markAllRead} clearNotif={clearNotif}/>
 
-        {/* Quick links */}
-        {!editMode ? (
+          {/* Quick links */}
           <div className="ql-bar">
-            {links.map(l => (
+            {links.map((l, i) => (
               <Tooltip key={l.id} text={`Open ${l.label} in a new tab`} position="bottom">
-                <a href={l.url} target="_blank" rel="noreferrer" className="ql-chip">
+                <a href={l.url} target="_blank" rel="noreferrer" className="ql-chip"
+                  draggable
+                  onDragStart={e=>handleLinkDragStart(e,i)}
+                  onDragOver={e=>handleLinkDragOver(e,i)}
+                  onDrop={e=>handleLinkDrop(e,i)}
+                  onDragEnd={()=>{setDragIdx(null);setDragOverIdx(null)}}
+                  style={{opacity:dragIdx===i?0.4:1,outline:dragOverIdx===i?'2px solid var(--accent)':'none'}}>
                   <span>{l.emoji}</span>{l.label}
                 </a>
               </Tooltip>
             ))}
             <Tooltip text="Edit quick links" position="bottom">
-              <button className="btn-icon" onClick={()=>setEditMode(true)} style={{padding:'4px 8px'}}>
+              <button className="btn-icon" onClick={()=>setShowModal(true)} style={{padding:'4px 8px'}}>
                 <Edit2 size={12}/>
               </button>
             </Tooltip>
           </div>
-        ) : (
-          <div style={{display:'flex',alignItems:'center',gap:6,flexWrap:'wrap',maxWidth:640}}>
-            {links.map(l => (
-              editId===l.id ? (
-                <div key={l.id} style={{display:'flex',gap:4,alignItems:'center'}}>
-                  <input value={editForm.emoji} onChange={e=>setEditForm(f=>({...f,emoji:e.target.value}))} className="input-sm" style={{width:38}} placeholder="🔗"/>
-                  <input value={editForm.label} onChange={e=>setEditForm(f=>({...f,label:e.target.value}))} className="input-sm" style={{width:90}} placeholder="Label"/>
-                  <input value={editForm.url}   onChange={e=>setEditForm(f=>({...f,url:e.target.value}))}   className="input-sm" style={{width:160}} placeholder="https://…" onKeyDown={e=>e.key==='Enter'&&saveEdit()}/>
-                  <button className="btn-icon" onClick={saveEdit}><Check size={11}/></button>
-                  <button className="btn-icon" onClick={()=>setEditId(null)}><X size={11}/></button>
-                </div>
-              ) : (
-                <div key={l.id} style={{display:'flex',alignItems:'center',gap:3}}>
-                  <span className="ql-chip" style={{cursor:'default'}}>{l.emoji} {l.label}</span>
-                  <Tooltip text="Edit this link"><button className="btn-icon" onClick={()=>startEdit(l)} style={{padding:3}}><Edit2 size={10}/></button></Tooltip>
-                  <Tooltip text="Remove this link"><button className="btn-icon" onClick={()=>deleteLink(l.id)} style={{padding:3}}><X size={10}/></button></Tooltip>
-                </div>
-              )
-            ))}
-            {showAdd ? (
-              <div style={{display:'flex',gap:4,alignItems:'center'}}>
-                <input value={addForm.emoji} onChange={e=>setAddForm(f=>({...f,emoji:e.target.value}))} className="input-sm" style={{width:38}} placeholder="🔗"/>
-                <input value={addForm.label} onChange={e=>setAddForm(f=>({...f,label:e.target.value}))} className="input-sm" style={{width:90}} placeholder="Label"/>
-                <input value={addForm.url}   onChange={e=>setAddForm(f=>({...f,url:e.target.value}))}   className="input-sm" style={{width:160}} placeholder="https://…" onKeyDown={e=>e.key==='Enter'&&addLink()}/>
-                <button className="btn-icon" onClick={addLink}><Check size={11}/></button>
-                <button className="btn-icon" onClick={()=>setShowAdd(false)}><X size={11}/></button>
-              </div>
-            ) : (
-              <Tooltip text="Add a new quick link"><button className="btn-icon" onClick={()=>setShowAdd(true)}><Plus size={12}/></button></Tooltip>
-            )}
-            <Tooltip text="Done editing links">
-              <button className="btn-icon" onClick={()=>{setEditMode(false);setEditId(null);setShowAdd(false)}} style={{color:'var(--accent)'}}>
-                <Check size={13}/>
-              </button>
-            </Tooltip>
-          </div>
-        )}
 
-        {/* Theme / settings panel */}
-        <div ref={themeRef} style={{position:'relative'}}>
-          <Tooltip text="Theme, color scheme, import/export data" position="bottom">
-            <button className="btn-icon" onClick={()=>setShowTheme(s=>!s)}>
-              <Palette size={15}/>
+          <ThemeTogglePill theme={theme} toggleTheme={toggleTheme}/>
+
+          <Tooltip text="Settings" position="bottom">
+            <button className="btn-icon" onClick={()=>navigate('/settings')} style={{padding:'4px 8px'}}>
+              <Settings size={15}/>
             </button>
           </Tooltip>
-
-          {showTheme && (
-            <div className="theme-panel dropdown-panel" style={{width:240}}>
-              <p style={{fontSize:10.5,fontWeight:700,color:'var(--text-3)',textTransform:'uppercase',letterSpacing:'.08em',marginBottom:8}}>Appearance</p>
-
-              {/* 3-way theme toggle */}
-              <button onClick={toggleTheme} className="btn btn-ghost" style={{width:'100%',justifyContent:'center',gap:8,marginBottom:14,fontSize:12.5}}>
-                <NextIcon size={13}/> {THEME_NEXT_LABEL[theme] || 'Toggle theme'}
-              </button>
-
-              <p style={{fontSize:10.5,fontWeight:700,color:'var(--text-3)',textTransform:'uppercase',letterSpacing:'.08em',marginBottom:8}}>Accent color</p>
-              <div style={{display:'flex',gap:10,marginBottom:18}}>
-                {SCHEMES.map(s => (
-                  <Tooltip key={s} text={s.charAt(0).toUpperCase()+s.slice(1)} position="bottom">
-                    <button onClick={()=>setScheme(s)} className={`scheme-dot ${scheme===s?'active':''}`}
-                      style={{background:SCHEME_COLORS[s]}}/>
-                  </Tooltip>
-                ))}
-              </div>
-
-              <p style={{fontSize:10.5,fontWeight:700,color:'var(--text-3)',textTransform:'uppercase',letterSpacing:'.08em',marginBottom:8}}>Data</p>
-              <div style={{display:'flex',gap:6}}>
-                <Tooltip text="Export all data as JSON backup" position="bottom">
-                  <button className="btn-icon" style={{padding:7,gap:5,flex:1,fontSize:11,borderRadius:'var(--radius-md)'}} onClick={()=>{
-                    const data = ALL_KEYS.reduce((a,k)=>({...a,[k]:load(k,null)}),{})
-                    const blob = new Blob([JSON.stringify(data,null,2)],{type:'application/json'})
-                    const url  = URL.createObjectURL(blob)
-                    const a    = document.createElement('a')
-                    a.href=url; a.download=`planner-backup-${new Date().toISOString().slice(0,10)}.json`; a.click()
-                    URL.revokeObjectURL(url)
-                  }}>
-                    <Download size={12}/> Export
-                  </button>
-                </Tooltip>
-                <Tooltip text="Import data from a JSON backup file" position="bottom">
-                  <button className="btn-icon" style={{padding:7,gap:5,flex:1,fontSize:11,borderRadius:'var(--radius-md)'}} onClick={()=>{
-                    const input=document.createElement('input'); input.type='file'; input.accept='.json'
-                    input.onchange=e=>{
-                      const file=e.target.files[0]; if(!file) return
-                      const reader=new FileReader()
-                      reader.onload=ev=>{ try { const d=JSON.parse(ev.target.result); Object.entries(d).forEach(([k,v])=>{ if(v!==null) load(k,null)!==null||true; save(k,v) }); window.dispatchEvent(new Event('drive-loaded')) } catch(e){ alert('Invalid JSON') } }
-                      reader.readAsText(file)
-                    }; input.click()
-                  }}>
-                    <Upload size={12}/> Import
-                  </button>
-                </Tooltip>
-                {import.meta.env.DEV && (
-                  <Tooltip text="Load test data (dev only)" position="bottom">
-                    <button className="btn-icon" style={{padding:7,flex:1,fontSize:11,borderRadius:'var(--radius-md)'}} onClick={()=>{
-                      Object.entries(TEST_DATA).forEach(([k,v])=>save(k,v))
-                      window.dispatchEvent(new Event('drive-loaded'))
-                    }}>
-                      <FlaskConical size={12}/>
-                    </button>
-                  </Tooltip>
-                )}
-              </div>
-            </div>
-          )}
         </div>
       </div>
-    </div>
+    </>
   )
 }

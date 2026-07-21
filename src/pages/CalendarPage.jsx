@@ -500,15 +500,21 @@ export default function CalendarPage({ onDataChange }) {
   const [dupModal,      setDupModal]      = useState(null)   // { type, item, newDate, oldDate }
   const [confirmDelete, setConfirmDelete] = useState(null)   // { planId, taskId, planTitle }
 
-  const assignments = getAllAssignments()
+  const [assignments, setAssignments] = useState(() => getAllAssignments())
 
   useEffect(() => { save('calendar_plans', plans); onDataChange?.(); triggerCalHalo('green') }, [plans])
 
-  // Re-read plans when Drive syncs
+  // Re-read plans and assignments when Drive syncs or assignments updated
   useEffect(() => {
-    const h = () => setPlans(load('calendar_plans', []))
-    window.addEventListener('drive-loaded', h)
-    return () => window.removeEventListener('drive-loaded', h)
+    const refreshPlans = () => setPlans(load('calendar_plans', []))
+    const refreshAssignments = () => setAssignments(getAllAssignments())
+    const refreshAll = () => { refreshPlans(); refreshAssignments() }
+    window.addEventListener('drive-loaded', refreshAll)
+    window.addEventListener('assignments-updated', refreshAssignments)
+    return () => {
+      window.removeEventListener('drive-loaded', refreshAll)
+      window.removeEventListener('assignments-updated', refreshAssignments)
+    }
   }, [])
 
   // Local date — avoids UTC offset bug (toISOString returns yesterday before 8pm EDT)

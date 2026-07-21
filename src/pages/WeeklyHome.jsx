@@ -200,65 +200,6 @@ function TaskRow({task,courseColors,courseOptions,editId,editText,editCourse,edi
   )
 }
 
-// ── weatherwidget.org embed ─────────────────────────────────────
-// The widget's script replaces our <a> with an <iframe> directly in the
-// DOM, outside React's control. If React ever re-renders this subtree
-// (e.g. from the parent's autosave/timer ticks) it tries to reconcile a
-// node the script already swapped out, and the script's own internal
-// lookups then hit a null element — hence the recurring
-// "Cannot read properties of null (reading 'getAttribute')" error.
-//
-// Fix: build the anchor imperatively in the effect and mount it into a
-// plain ref container. React only ever renders the empty wrapper <div>;
-// it never owns or diffs the anchor/iframe inside it, so re-renders of
-// the parent can no longer interfere with the widget.
-// ── weatherwidget.org embed ─────────────────────────────────────
-// New embed format (v1.3) uses a <div> with JSON config, not an <a> tag.
-// Widget ID: ww_2d7caf62b4815
-// Built imperatively so React never owns the subtree the script replaces.
-function WeatherWidget() {
-  const containerRef = useRef(null)
-
-  useEffect(() => {
-    const container = containerRef.current
-    if (!container) return
-
-    const WIDGET_ID = 'ww_2d7caf62b4815'
-    const SCRIPT_ID = 'weatherwidget-io-js'
-
-    // Build the widget div imperatively — React must never touch this subtree
-    const div = document.createElement('div')
-    div.id = WIDGET_ID
-    div.setAttribute('v', '1.3')
-    div.setAttribute('loc', 'auto')
-    div.setAttribute('a', JSON.stringify({
-      t: 'responsive', lang: 'en', sl_lpl: 1, ids: [],
-      font: 'Arial', sl_ics: 'one_a', sl_sot: 'fahrenheit',
-      cl_bkg: 'image', cl_font: '#FFFFFF', cl_cloud: '#FFFFFF',
-      cl_persp: '#81D4FA', cl_sun: '#FFC107', cl_moon: '#FFC107',
-      cl_thund: '#FF5722', cl_odd: 'rgba(0,0,0,0.135)',
-    }))
-    container.appendChild(div)
-
-    // Remove stale script first, then re-inject
-    const existing = document.getElementById(SCRIPT_ID)
-    if (existing) existing.remove()
-
-    const script = document.createElement('script')
-    script.id    = SCRIPT_ID
-    script.async = true
-    script.src   = 'https://app3.weatherwidget.org/js/?id=' + WIDGET_ID
-    document.body.appendChild(script)
-
-    return () => {
-      const s = document.getElementById(SCRIPT_ID)
-      if (s) s.remove()
-      container.innerHTML = ''
-    }
-  }, [])
-
-  return <div ref={containerRef} style={{borderRadius:'var(--radius-lg)',overflow:'hidden',marginBottom:0}} />
-}
 
 export default function WeeklyHome({ onDataChange }) {
   const [tasks,       setTasks]      = useState(()=>load('home_tasks',[]))
@@ -278,6 +219,7 @@ export default function WeeklyHome({ onDataChange }) {
   const [showSettings,setShowSettings]=useState(false)
   const [draftTimers, setDraftTimers]=useState(timerMins)
   const [weather,     setWeather]    = useState(null)
+  const [weatherError,setWeatherError]=useState(false)
   const [city,        setCity]       = useState(()=>load('weather_city','Bradenton'))
   const [cityDraft,   setCityDraft]  = useState(city)
   const [showCityEdit,setShowCityEdit]=useState(false)
@@ -328,14 +270,19 @@ export default function WeeklyHome({ onDataChange }) {
   const fetchWeather=async(c=city)=>{
     try{
       const cached=sessionStorage.getItem('planner_weather_cache')
-      if(cached){const p=JSON.parse(cached);if(p.city===c){setWeather(p);return}}
-      const geo=await fetch(`https://geocoding-api.open-meteo.com/v1/search?name=${encodeURIComponent(c)}&count=1`)
-      const gd=await geo.json();if(!gd.results?.length)return
-      const{latitude,longitude,name}=gd.results[0]
-      const wx=await fetch(`https://api.open-meteo.com/v1/forecast?latitude=${latitude}&longitude=${longitude}&daily=temperature_2m_max,temperature_2m_min,weathercode&temperature_unit=fahrenheit&timezone=auto&forecast_days=7`)
-      const wd=await wx.json();const d={...wd,city:name}
-      sessionStorage.setItem('planner_weather_cache',JSON.stringify(d));setWeather(d)
-    }catch(e){}
+      if(cached){const p=JSON.parse(cached);if(p.city===c){setWeather(p);setWeatherError(false);return}}
+      let lat=27.4989, lng=-82.5748
+      try{
+        const geo=await fetch(`https://geocoding-api.open-meteo.com/v1/search?name=${encodeURIComponent(c)}&count=1`)
+        const gd=await geo.json()
+        if(gd.results?.length){lat=gd.results[0].latitude;lng=gd.results[0].longitude}
+      }catch(e){ /* use fallback coords */ }
+      const wx=await fetch(`https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lng}&daily=weathercode,temperature_2m_max,temperature_2m_min&temperature_unit=fahrenheit&timezone=auto&forecast_days=7`)
+      const wd=await wx.json()
+      const res={city:c,daily:wd.daily}
+      setWeather(res);setWeatherError(false)
+      sessionStorage.setItem('planner_weather_cache',JSON.stringify(res))
+    }catch(e){setWeatherError(true)}
   }
   useEffect(()=>{ fetchWeather() },[])
 
@@ -462,8 +409,53 @@ export default function WeeklyHome({ onDataChange }) {
           <div className="stat-card"><div className="stat-label">Upcoming</div><div className="stat-value" style={{color:'var(--amber)',fontSize:22}}>{upcoming.length}</div><div className="stat-sub">due soon</div></div>
         </div>
 
-        {/* weatherwidget.org embed */}
-        <WeatherWidget/>
+        {/* Weather card */}
+        <div className="card" style={{padding:'16px 20px'}}>
+          <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:10}}>
+            <span className="card-title" style={{margin:0}}>
+              {weather ? `🌤 ${weather.city}` : '🌤 Weather'}
+            </span>
+            {!showCityEdit&&<button className="btn-icon" onClick={()=>{setShowCityEdit(true);setCityDraft(city)}} style={{padding:4,fontSize:11,color:'var(--text-3)'}}>edit city</button>}
+          </div>
+          {showCityEdit&&(
+            <div style={{display:'flex',gap:6,marginBottom:10}}>
+              <input value={cityDraft} onChange={e=>setCityDraft(e.target.value)} style={{flex:1,padding:'6px 10px',background:'var(--glass-bg-2)',border:'1px solid var(--accent)',color:'var(--text-1)',fontSize:13}} placeholder="City name" onKeyDown={e=>{if(e.key==='Enter'){setCity(cityDraft);save('weather_city',cityDraft);setShowCityEdit(false);setWeather(null);setWeatherError(false);sessionStorage.removeItem('planner_weather_cache');fetchWeather(cityDraft)}if(e.key==='Escape')setShowCityEdit(false)}} autoFocus/>
+              <button className="btn btn-primary" style={{fontSize:12}} onClick={()=>{setCity(cityDraft);save('weather_city',cityDraft);setShowCityEdit(false);setWeather(null);setWeatherError(false);sessionStorage.removeItem('planner_weather_cache');fetchWeather(cityDraft)}}>Go</button>
+              <button className="btn btn-ghost" style={{fontSize:12}} onClick={()=>setShowCityEdit(false)}>Cancel</button>
+            </div>
+          )}
+          {weatherError ? (
+            <div style={{fontSize:12,color:'var(--coral)',display:'flex',alignItems:'center',gap:8}}>
+              Weather unavailable — check city name
+              <button className="btn-icon" style={{fontSize:11,color:'var(--coral)'}} onClick={()=>{setShowCityEdit(true);setCityDraft(city)}}>edit</button>
+            </div>
+          ) : weather ? (
+            <div style={{display:'flex',gap:6,overflowX:'auto',paddingBottom:4}}>
+              {(weather.daily?.time||[]).map((date,i)=>{
+                const code=weather.daily?.weathercode?.[i]??0
+                const hi=Math.round(weather.daily?.temperature_2m_max?.[i]??0)
+                const lo=Math.round(weather.daily?.temperature_2m_min?.[i]??0)
+                const icon=WX_ICONS[code]||'🌤'
+                const d=new Date(date+'T12:00:00')
+                const label=i===0?'Today':DAYS_SHORT[d.getDay()]
+                return(
+                  <div key={date} style={{flexShrink:0,textAlign:'center',padding:'8px 10px',background:'var(--glass-bg-2)',border:'1px solid var(--glass-border)',minWidth:62}}>
+                    <div style={{fontSize:10,fontWeight:700,color:'var(--text-3)',marginBottom:4}}>{label}</div>
+                    <div style={{fontSize:20,marginBottom:4}}>{icon}</div>
+                    <div style={{fontSize:12,fontWeight:700,color:'var(--text-1)'}}>{hi}°</div>
+                    <div style={{fontSize:10,color:'var(--text-3)'}}>{lo}°</div>
+                  </div>
+                )
+              })}
+            </div>
+          ) : (
+            <div style={{display:'flex',gap:6,overflowX:'auto'}}>
+              {[0,1,2,3,4,5,6].map(i=>(
+                <div key={i} style={{flexShrink:0,width:62,height:84,background:'var(--glass-bg-2)',border:'1px solid var(--glass-border)',animation:'pulse 1.5s ease-in-out infinite',animationDelay:`${i*0.1}s'`}}/>
+              ))}
+            </div>
+          )}
+        </div>
 
         <div className="home-main-grid">
           <div className="card home-tasks-col" ref={taskHaloRef}>
