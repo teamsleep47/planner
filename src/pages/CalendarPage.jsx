@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { ChevronLeft, ChevronRight, X, ExternalLink, Edit2, Trash2, Check } from 'lucide-react'
+import { ChevronLeft, ChevronRight, X, ExternalLink, Edit2, Trash2, Check, Circle, CheckCircle2 } from 'lucide-react'
 import { load, save } from '../utils/storage.js'
 import { useNavigate } from 'react-router-dom'
 import { loadTerms, saveTerms, uid, ASSIGNMENT_TYPES, getCourseColorMap } from '../utils/termData.js'
@@ -9,12 +9,13 @@ import { formatRelativeDue } from '../utils/timeFormat.js'
 const MONTHS  = ['January','February','March','April','May','June','July','August','September','October','November','December']
 const DAYS_S  = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat']
 
-const PLAN_COLORS = [
-  '#6366f1','#8b5cf6','#ec4899','#f43f5e',
-  '#f59e0b','#f97316','#22c55e','#14b8a6',
-  '#06b6d4','#3b82f6','#a855f7','#84cc16',
-  '#e11d48','#0ea5e9','#10b981','#64748b',
+const BLOCK_COLORS = [
+  '#ef4444','#f97316','#eab308','#84cc16',
+  '#22c55e','#10b981','#06b6d4','#3b82f6',
+  '#6366f1','#8b5cf6','#a855f7','#ec4899',
+  '#f43f5e','#ffffff','#94a3b8','#1e293b',
 ]
+const PLAN_COLORS = BLOCK_COLORS
 
 // Returns a darkened/saturated version of a hex color for text on tinted backgrounds
 function darkenColor(hex) {
@@ -80,6 +81,11 @@ function PlanPopup({ plan, anchor, onClose, onEdit, onDelete }) {
         <div style={{padding:'12px 14px',display:'flex',flexDirection:'column',gap:8}}>
           {planDate && <div style={{display:'flex',alignItems:'center',gap:8}}><span style={{fontSize:11,color:'var(--text-3)',width:44}}>Date</span><span style={{fontSize:13,fontWeight:700,color:'var(--text-1)'}}>{planDate}</span></div>}
           {plan.notes && <div style={{fontSize:11,color:'var(--text-3)',lineHeight:1.5,background:'var(--glass-bg)',borderRadius:6,padding:'7px 9px',maxHeight:60,overflow:'hidden',WebkitMaskImage:'linear-gradient(to bottom,black 60%,transparent 100%)'}}>{plan.notes}</div>}
+          {plan.url && (
+            <a href={plan.url} target="_blank" rel="noreferrer" style={{display:'flex',alignItems:'center',gap:4,fontSize:12,color:'var(--accent)',textDecoration:'none'}}>
+              🔗 Open reference
+            </a>
+          )}
         </div>
         <div style={{padding:'0 14px 14px',display:'flex',gap:8}}>
           <button onClick={()=>{onEdit();onClose()}} className="btn btn-primary" style={{flex:1,justifyContent:'center',gap:6,fontSize:13}}>
@@ -135,7 +141,7 @@ function AssignmentPopup({ item, anchor, onClose, onJump }) {
 
 // ── Plan edit modal ──────────────────────────────────────────────
 function PlanEditModal({ plan, onClose, onSave, onDelete, onAddAsTask }) {
-  const [form,        setForm]        = useState({ title: plan.title, date: plan.date, notes: plan.notes || '', color: plan.color })
+  const [form,        setForm]        = useState({ title: plan.title, date: plan.date, notes: plan.notes || '', color: plan.color, url: plan.url || '' })
   const [showTaskForm,setShowTaskForm]= useState(false)
   const [taskCourse,  setTaskCourse]  = useState('OTHER')
   const [taskUrgency, setTaskUrgency] = useState('none')
@@ -166,13 +172,19 @@ function PlanEditModal({ plan, onClose, onSave, onDelete, onAddAsTask }) {
           <div style={{marginBottom:14}}><label style={lbl}>Date</label><input type="date" style={inp} value={form.date} onChange={e=>setForm(f=>({...f,date:e.target.value}))}/></div>
           <div style={{marginBottom:14}}>
             <label style={lbl}>Color</label>
-            <div style={{display:'grid',gridTemplateColumns:'repeat(8,1fr)',gap:6,marginTop:4}}>
-              {PLAN_COLORS.map(c=>(
-                <button key={c} onClick={()=>setForm(f=>({...f,color:c}))} style={{width:28,height:28,borderRadius:'50%',background:c,cursor:'pointer',border:`3px solid ${form.color===c?'white':'transparent'}`,boxShadow:form.color===c?`0 0 8px ${c}`:'none'}}/>
+            <div style={{display:'grid',gridTemplateColumns:'repeat(4,1fr)',gap:4,marginTop:4}}>
+              {BLOCK_COLORS.map(c=>(
+                <button key={c} onClick={()=>setForm(f=>({...f,color:c}))} style={{width:20,height:20,borderRadius:0,background:c,cursor:'pointer',border:`1px solid rgba(255,255,255,0.2)`,display:'flex',alignItems:'center',justifyContent:'center'}}>
+                  {form.color===c && <span style={{color:'white',fontSize:11,fontWeight:900,textShadow:'0 0 3px rgba(0,0,0,.8)',lineHeight:1}}>✓</span>}
+                </button>
               ))}
             </div>
           </div>
-          <div style={{marginBottom:16}}><label style={lbl}>Notes</label><textarea style={{...inp,minHeight:60,resize:'vertical',lineHeight:1.6,fontFamily:'var(--font-mono)'}} value={form.notes} onChange={e=>setForm(f=>({...f,notes:e.target.value}))} placeholder="What's this for?"/></div>
+          <div style={{marginBottom:14}}><label style={lbl}>Notes</label><textarea style={{...inp,minHeight:60,resize:'vertical',lineHeight:1.6,fontFamily:'var(--font-mono)'}} value={form.notes} onChange={e=>setForm(f=>({...f,notes:e.target.value}))} placeholder="What's this for?"/></div>
+          <div style={{marginBottom:16,display:'flex',alignItems:'center',gap:6}}>
+            <span style={{fontSize:13}}>🔗</span>
+            <input type="url" placeholder="https://… (optional)" value={form.url||''} onChange={e=>setForm(f=>({...f,url:e.target.value}))} style={inp}/>
+          </div>
 
           {/* ── Add as task mini-form ── */}
           <div style={{borderTop:'1px solid var(--glass-border)',paddingTop:14,marginBottom:16}}>
@@ -235,7 +247,7 @@ function AddModal({ date, onClose, onSaveAssignment, onSavePlan }) {
   const [step,   setStep]   = useState('pick')
   const [course, setCourse] = useState(null)
   const [aForm,  setAForm]  = useState({ title:'', type:'Essay', due:date, dueTime:'', startDate:'', status:'To do', priority:'none', notes:'', score:'', maxScore:'100', submissionType:'Canvas' })
-  const [pForm,  setPForm]  = useState({ title:'', date, notes:'', color: PLAN_COLORS[0] })
+  const [pForm,  setPForm]  = useState({ title:'', date, notes:'', color: BLOCK_COLORS[0], url:'' })
 
   const inp = { padding:'9px 11px', background:'var(--glass-bg-2)', border:'1px solid var(--glass-border)', borderRadius:'var(--radius-md)', color:'var(--text-1)', fontSize:13, fontFamily:'inherit', width:'100%' }
   const lbl = { fontSize:11, fontWeight:700, color:'var(--text-3)', textTransform:'uppercase', letterSpacing:'.05em', marginBottom:5, display:'block' }
@@ -341,13 +353,19 @@ function AddModal({ date, onClose, onSaveAssignment, onSavePlan }) {
               <div style={row}><label style={lbl}>Date *</label><input type="date" style={inp} value={pForm.date} onChange={e=>setPForm(f=>({...f,date:e.target.value}))}/></div>
               <div style={{marginBottom:14}}>
                 <label style={lbl}>Color</label>
-                <div style={{display:'grid',gridTemplateColumns:'repeat(8,1fr)',gap:6,marginTop:4}}>
-                  {PLAN_COLORS.map(c=>(
-                    <button key={c} onClick={()=>setPForm(f=>({...f,color:c}))} style={{width:28,height:28,borderRadius:'50%',background:c,cursor:'pointer',border:`3px solid ${pForm.color===c?'white':'transparent'}`,boxShadow:pForm.color===c?`0 0 8px ${c}`:'none'}}/>
+                <div style={{display:'grid',gridTemplateColumns:'repeat(4,1fr)',gap:4,marginTop:4}}>
+                  {BLOCK_COLORS.map(c=>(
+                    <button key={c} onClick={()=>setPForm(f=>({...f,color:c}))} style={{width:20,height:20,borderRadius:0,background:c,cursor:'pointer',border:`1px solid rgba(255,255,255,0.2)`,display:'flex',alignItems:'center',justifyContent:'center'}}>
+                      {pForm.color===c && <span style={{color:'white',fontSize:11,fontWeight:900,textShadow:'0 0 3px rgba(0,0,0,.8)',lineHeight:1}}>✓</span>}
+                    </button>
                   ))}
                 </div>
               </div>
               <div style={{marginBottom:14}}><label style={lbl}>Notes</label><textarea style={{...inp,minHeight:60,resize:'vertical',lineHeight:1.6,fontFamily:'var(--font-mono)'}} value={pForm.notes} onChange={e=>setPForm(f=>({...f,notes:e.target.value}))} placeholder="What's this for?"/></div>
+              <div style={{marginBottom:14,display:'flex',alignItems:'center',gap:6}}>
+                <span style={{fontSize:13}}>🔗</span>
+                <input type="url" placeholder="https://… (optional)" value={pForm.url||''} onChange={e=>setPForm(f=>({...f,url:e.target.value}))} style={inp}/>
+              </div>
 
               {/* Also add as task — prominent, in creation form */}
               <div style={{marginBottom:16,padding:12,borderRadius:'var(--radius-md)',background:pForm.alsoTask?'var(--accent-dim)':'var(--glass-bg)',border:`2px solid ${pForm.alsoTask?'var(--accent)':'var(--glass-border)'}`,cursor:'pointer',transition:'all .2s'}}
@@ -760,12 +778,13 @@ export default function CalendarPage({ onDataChange }) {
                 onDragLeave={()=>setDragOverDate(null)}
                 onDrop={e=>handleCellDrop(e,ds)}
                 onMouseEnter={e=>{ if(!isToday&&!dragPill) e.currentTarget.style.background='var(--glass-bg-2)' }}
-                onMouseLeave={e=>{ e.currentTarget.style.background=isToday?'var(--accent-dim)':isPast?'rgba(0,0,0,.07)':'transparent' }}
+                onMouseLeave={e=>{ e.currentTarget.style.background=isToday?'rgba(16,108,137,0.10)':isPast?'rgba(0,0,0,.07)':'transparent' }}
                 style={{
                   minHeight:cellH, maxHeight:200, overflowY:'auto',
                   borderRight:'1px solid var(--glass-border)', borderBottom:'1px solid var(--glass-border)',
+                  borderTop: isToday ? '2px solid #106c89' : '1px solid transparent',
                   padding:'6px 5px 5px', position:'relative',
-                  background:dragOverDate===ds?'var(--accent-dim)':isToday?'var(--accent-dim)':isPast?'rgba(0,0,0,.07)':'transparent',
+                  background:dragOverDate===ds?'var(--accent-dim)':isToday?'rgba(16,108,137,0.10)':isPast?'rgba(0,0,0,.07)':'transparent',
                   cursor:'pointer', transition:'background .1s',
                   outline: dragOverDate===ds ? '2px solid var(--accent)' : 'none',
                 }}
@@ -814,19 +833,26 @@ export default function CalendarPage({ onDataChange }) {
                   <div key={`p-${p.id}-${pi}`}
                     draggable
                     onDragStart={e=>handlePillDragStart(e,'plan',p)}
-                    style={{display:'flex',alignItems:'center',gap:2,marginBottom:2,borderRadius:4,background:`${p.color}25`,borderLeft:`3px solid ${p.color}`,transition:'all .1s',cursor:'grab'}}
-                    onMouseEnter={e=>e.currentTarget.style.background=`${p.color}40`}
-                    onMouseLeave={e=>e.currentTarget.style.background=`${p.color}25`}
+                    style={{display:'flex',alignItems:'center',gap:2,marginBottom:2,borderRadius:0,background:`${p.color}30`,borderLeft:`3px solid ${p.color}`,color:p.color,transition:'all .1s',cursor:'grab',opacity:p.done?0.5:1,filter:p.done?'saturate(0.2)':'none'}}
+                    onMouseEnter={e=>e.currentTarget.style.background=`${p.color}48`}
+                    onMouseLeave={e=>e.currentTarget.style.background=`${p.color}30`}
                   >
+                    <span onClick={e=>{e.stopPropagation();setPlans(ps=>ps.map(q=>q.id===p.id?{...q,done:!q.done}:q))}} style={{cursor:'pointer',display:'flex',alignItems:'center',padding:'2px 2px 2px 4px',flexShrink:0}}>
+                      {p.done ? <CheckCircle2 size={9} style={{color:'var(--accent)'}}/> : <Circle size={9} style={{color:'var(--text-3)'}}/>}
+                    </span>
                     <button
                       onClick={e=>{ e.stopPropagation(); const r=e.currentTarget.getBoundingClientRect(); setPlanPopup({plan:p,x:r.left+r.width/2,y:r.bottom}) }}
                       onDoubleClick={e=>{ e.stopPropagation(); setPlanPopup(null); setEditPlan(p) }}
-                      style={{display:'flex',alignItems:'center',gap:3,flex:1,border:'none',cursor:'pointer',padding:'2px 5px',background:'transparent',borderRadius:4}}
+                      style={{display:'flex',alignItems:'center',gap:3,flex:1,border:'none',cursor:'pointer',padding:'2px 3px 2px 1px',background:'transparent',minWidth:0}}
                     >
-                      <span style={{fontSize:9}}>☑️</span>
-                      <span style={{fontSize:9,fontWeight:700,color:darkenColor(p.color),overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap',flex:1}}>{p.title}</span>
-                      {p.tasked && <span style={{fontSize:7,padding:'0 3px',borderRadius:3,background:`${p.color}44`,color:darkenColor(p.color),fontWeight:700,flexShrink:0}}>tasked</span>}
+                      <span style={{fontSize:9,fontWeight:700,color:p.color,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap',flex:1,textDecoration:p.done?'line-through':'none'}}>{p.done?'✓ ':''}{p.title}</span>
+                      {p.tasked && <span style={{fontSize:7,padding:'0 3px',borderRadius:3,background:`${p.color}44`,color:p.color,fontWeight:700,flexShrink:0}}>tasked</span>}
                     </button>
+                    {p.url && (
+                      <span onClick={e=>{e.stopPropagation();window.open(p.url,'_blank')}} style={{cursor:'pointer',display:'flex',alignItems:'center',flexShrink:0,padding:'0 2px'}}>
+                        <ExternalLink size={8} style={{color:'var(--text-3)'}}/>
+                      </span>
+                    )}
                     <button onClick={e=>{ e.stopPropagation(); handleDeletePlan(p.id) }}
                       style={{background:'none',border:'none',cursor:'pointer',padding:'2px 4px',color:'var(--text-3)',display:'flex',flexShrink:0,borderRadius:3}}
                       onMouseEnter={e=>e.currentTarget.style.color='var(--coral)'}

@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { Plus, Trash2, Edit2, Check, X, ChevronDown, ChevronUp, BookOpen } from 'lucide-react'
+import { Plus, Trash2, Edit2, Check, X, ChevronDown, ChevronUp, BookOpen, ExternalLink } from 'lucide-react'
 import { loadTerms, saveTerms, uid, ASSIGNMENT_TYPES, getCourseColorMap } from '../utils/termData.js'
 import { useSaveHalo } from '../hooks/useSaveHalo.js'
 import { formatRelativeDue } from '../utils/timeFormat.js'
@@ -20,7 +20,7 @@ const STATUS = [
 ]
 const COURSE_COLORS = ['#6366f1','#14b8a6','#f59e0b','#f43f5e','#22c55e','#8b5cf6','#06b6d4','#ec4899']
 const BLANK_COURSE  = { name:'', instructor:'', days:'', time:'', room:'', credits:3, gradeTarget:90, color:COURSE_COLORS[0], notes:'' }
-const BLANK_ASSIGN  = { title:'', type:ASSIGNMENT_TYPES[0], due:'', dueTime:'', startDate:'', status:'To do', priority:'none', notes:'', score:'', maxScore:'100', submissionType:'Canvas' }
+const BLANK_ASSIGN  = { title:'', type:ASSIGNMENT_TYPES[0], due:'', dueTime:'', startDate:'', status:'To do', priority:'none', notes:'', score:'', maxScore:'100', submissionType:'Canvas', url:'' }
 
 const ACCORDION_KEY = 'courses_accordion_state'
 
@@ -264,7 +264,7 @@ export default function Courses({ onDataChange }) {
 
                         return(
                           <div key={a.id} id={`assign-${a.id}`} style={{borderBottom:'1px solid var(--glass-border)',background:isJump?`${course.color}18`:'transparent',outline:isJump?`2px solid ${course.color}`:'none',outlineOffset:'-2px',transition:'background .3s',cursor:'pointer'}}
-                            onDoubleClick={()=>{setEditAssignId(a.id);setEditAssign({title:a.title,type:a.type||'Essay',due:a.due||'',dueTime:a.dueTime||'',startDate:a.startDate||'',status:a.status,priority:a.priority||'none',notes:a.notes||'',score:a.score||'',maxScore:a.maxScore||'100',submissionType:a.submissionType||'Canvas'})}}>
+                            onDoubleClick={()=>{setEditAssignId(a.id);setEditAssign({title:a.title,type:a.type||'Essay',due:a.due||'',dueTime:a.dueTime||'',startDate:a.startDate||'',status:a.status,priority:a.priority||'none',notes:a.notes||'',score:a.score||'',maxScore:a.maxScore||'100',submissionType:a.submissionType||'Canvas',url:a.url||''})}}>
 
                             {isEdit?(
                               <div style={{padding:'12px 16px',display:'flex',flexDirection:'column',gap:8}}>
@@ -292,6 +292,7 @@ export default function Courses({ onDataChange }) {
                                   {editAssign.score&&editAssign.maxScore&&<span style={{fontSize:13,fontWeight:700,color:scoreColor}}>{Math.round((Number(editAssign.score)/Number(editAssign.maxScore))*100)}%</span>}
                                 </div>
                                 <textarea style={{...inp,minHeight:60,resize:'vertical',fontFamily:'var(--font-mono)',lineHeight:1.6}} placeholder="Notes…" value={editAssign.notes||''} onChange={e=>setEditAssign(a=>({...a,notes:e.target.value}))}/>
+                                <input type="url" placeholder="Reference link (optional)" value={editAssign.url||''} onChange={e=>setEditAssign(a=>({...a,url:e.target.value}))} style={inp}/>
                                 <div style={{display:'flex',gap:8}}>
                                   <button className="btn btn-primary" style={{flex:1,fontSize:12}} onClick={()=>saveAssign(activeTerm.id,course.id,a.id)}>Save</button>
                                   <button className="btn btn-ghost" style={{fontSize:12,color:'var(--coral)'}} onClick={()=>{if(confirm('Delete?'))deleteAssign(activeTerm.id,course.id,a.id)}}><Trash2 size={12}/></button>
@@ -318,9 +319,14 @@ export default function Courses({ onDataChange }) {
                                   </div>
                                 </div>
                                 {/* Desktop pills */}
-                                <div className="desktop-only" style={{display:'flex',gap:4,flexShrink:0}}>
+                                <div className="desktop-only" style={{display:'flex',gap:4,flexShrink:0,alignItems:'center'}}>
                                   {pri&&pri.key!=='none'&&<span style={{fontSize:10,padding:'2px 8px',borderRadius:20,background:pri.bg,color:pri.color,fontWeight:700,border:`1px solid ${pri.color}44`}}>{pri.label}</span>}
                                   <span style={{fontSize:10,padding:'2px 8px',borderRadius:20,background:stCfg.bg,color:stCfg.color,fontWeight:700}}>{a.status}</span>
+                                  {a.url && (
+                                    <a href={a.url} target="_blank" rel="noreferrer" style={{display:'flex',alignItems:'center',color:'var(--text-3)'}} onClick={e=>e.stopPropagation()}>
+                                      <ExternalLink size={11}/>
+                                    </a>
+                                  )}
                                 </div>
                               </div>
                             )}
