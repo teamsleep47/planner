@@ -1,11 +1,11 @@
 {
-  "name": "My Dashboard",
-  "short_name": "Dashboard",
-  "description": "Personal academic & professional dashboard",
-  "start_url": ".",
+  "name": "Assignment Planner",
+  "short_name": "Planner",
+  "description": "Personal academic planner",
+  "start_url": "/planner/",
   "display": "standalone",
-  "background_color": "#1a1a2e",
-  "theme_color": "#1a1a2e",
+  "background_color": "#0e151c",
+  "theme_color": "#111920",
   "icons": [
     { "src": "favicon.svg", "sizes": "any", "type": "image/svg+xml" }
   ]

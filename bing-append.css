@@ -1,0 +1,144 @@
+
+/* ══════════════════════════════════════════════════
+   BING THEME — paste at bottom of src/index.css
+   Fixes: bing was showing as light mode because
+   [data-theme="bing"] had no CSS variables defined.
+   ══════════════════════════════════════════════════ */
+[data-theme="bing"] {
+  --bg-base:      #06060f;
+  --bg-mesh-1:    #0a0620;
+  --bg-mesh-2:    #060e1e;
+  --bg-mesh-3:    #0e0618;
+  --glass-bg:     rgba(255,255,255,0.05);
+  --glass-bg-2:   rgba(255,255,255,0.08);
+  --glass-border: rgba(255,255,255,0.10);
+  --glass-hover:  rgba(255,255,255,0.12);
+  --blur:         blur(20px);
+  --blur-sm:      blur(10px);
+  --text-1:       #eeeeff;
+  --text-2:       #8888b8;
+  --text-3:       #484868;
+  --shadow:       0 8px 32px rgba(0,0,0,0.5);
+  --shadow-sm:    0 2px 12px rgba(0,0,0,0.35);
+  --flip-bg:      rgba(255,255,255,0.08);
+  --flip-border:  rgba(255,255,255,0.12);
+}
+[data-theme="bing"] {
+  --panel-bg:     #0e0c20;
+  --panel-border: rgba(255,255,255,0.12);
+  --tooltip-bg:     rgba(6,6,18,0.97);
+  --tooltip-border: rgba(255,255,255,0.15);
+  --tooltip-text:   #e0e0ff;
+}
+
+/* ── Mobile professional pass ─────────────────────
+   Complete responsive overhaul for all tabs.
+   ─────────────────────────────────────────────── */
+
+/* Calendar mobile — Google Calendar proportions */
+@media (max-width: 768px) {
+  /* Calendar grid: taller cells, readable pills */
+  .cal-grid-wrap { margin: 0 8px 16px !important; }
+
+  /* Full-width calendar on mobile */
+  .cal-grid-wrap > div {
+    border-radius: 12px !important;
+  }
+
+  /* Task rows — compact on mobile */
+  .task-row-mobile {
+    padding: 6px 8px !important;
+    gap: 6px !important;
+    min-height: 36px;
+  }
+
+  /* Home main grid stacks vertically */
+  .home-main-grid {
+    grid-template-columns: 1fr !important;
+    gap: 12px !important;
+  }
+
+  /* Timer goes below tasks on mobile */
+  .home-timer-col { order: 2; }
+  .home-tasks-col { order: 1; }
+
+  /* Page header tighter on mobile */
+  .page-header {
+    padding: 14px 14px 0 !important;
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+  .page-body {
+    padding: 12px 14px 32px !important;
+  }
+
+  /* Stats grid 2-col on mobile */
+  .grid-4 {
+    grid-template-columns: 1fr 1fr !important;
+    gap: 8px !important;
+  }
+  .grid-3 {
+    grid-template-columns: 1fr 1fr !important;
+    gap: 8px !important;
+  }
+
+  /* Cards less padding */
+  .card      { padding: 12px 14px !important; }
+  .stat-card { padding: 10px 12px !important; }
+  .stat-value { font-size: 20px !important; }
+
+  /* Assignments tab — pill rows wrap */
+  .pill-row { flex-wrap: wrap !important; gap: 4px !important; }
+  .assign-row { flex-wrap: wrap !important; gap: 6px !important; }
+
+  /* Hide desktop-only pills on mobile */
+  .desktop-only { display: none !important; }
+
+  /* Prevent iOS font zoom on input focus */
+  input, select, textarea { font-size: 16px !important; }
+  .input-sm { font-size: 14px !important; }
+
+  /* Notes sidebar becomes horizontal tabs */
+  .notes-layout { flex-direction: column !important; }
+  .notes-course-sidebar {
+    width: 100% !important;
+    flex-direction: row !important;
+    overflow-x: auto !important;
+    flex-wrap: nowrap !important;
+    gap: 4px !important;
+    padding-bottom: 6px;
+    -webkit-overflow-scrolling: touch;
+  }
+  .notes-course-sidebar button {
+    flex-shrink: 0 !important;
+    white-space: nowrap !important;
+    border-left: none !important;
+    border-bottom: 2px solid transparent !important;
+  }
+
+  /* Habit tracker scrolls horizontally */
+  .habit-table-wrap { overflow-x: auto !important; -webkit-overflow-scrolling: touch; }
+
+  /* Study sessions stacks */
+  .study-grid { grid-template-columns: 1fr !important; }
+
+  /* Tooltips suppressed on touch */
+  .tooltip-box { display: none !important; }
+
+  /* Weather strip horizontal scroll */
+  .weather-strip {
+    overflow-x: auto !important;
+    flex-wrap: nowrap !important;
+    -webkit-overflow-scrolling: touch;
+    padding-bottom: 4px;
+  }
+}
+
+@media (max-width: 420px) {
+  .grid-4 { grid-template-columns: 1fr !important; }
+  .page-body { padding: 10px 10px 28px !important; }
+  .page-header { padding: 12px 10px 0 !important; }
+}
+
+/* Desktop-only utility class */
+.desktop-only { display: flex; }

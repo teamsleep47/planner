@@ -182,7 +182,7 @@ function MobileHeader({ profile, signOut, sidebarOpen, setSidebarOpen, theme, to
         {sidebarOpen ? <X size={22}/> : <Menu size={22}/>}
       </button>
 
-      <span style={{fontWeight:700,fontSize:16,letterSpacing:'-0.4px',flex:1,color:'var(--text-1)'}}>Planner</span>
+      <span style={{fontWeight:700,fontSize:16,letterSpacing:'-0.4px',flex:1,color:'var(--text-1)'}}>Assignment Planner</span>
 
       <ThemeTogglePill theme={theme} toggleTheme={toggleTheme}/>
 
@@ -316,6 +316,7 @@ export default function App() {
 
   const handleDataChange = useCallback(() => {
     syncToCloud(getAllData())
+    window.dispatchEvent(new Event('data-saved'))
   }, [syncToCloud])
 
   useEffect(() => {
@@ -360,14 +361,7 @@ export default function App() {
 
         <aside className={`sidebar ${sidebarOpen?'open':''}`}>
           <div className="sidebar-logo">
-            <svg width="30" height="30" viewBox="0 0 32 32">
-              <rect width="32" height="32" rx="0" fill="var(--accent)"/>
-              <rect x="6"  y="6"  width="8" height="8" rx="0" fill="white" opacity="0.95"/>
-              <rect x="18" y="6"  width="8" height="8" rx="0" fill="white" opacity="0.55"/>
-              <rect x="6"  y="18" width="8" height="8" rx="0" fill="white" opacity="0.55"/>
-              <rect x="18" y="18" width="8" height="8" rx="0" fill="white" opacity="0.95"/>
-            </svg>
-            <span className="sidebar-logo-text">Planner</span>
+            <span className="sidebar-logo-text">Assignment Planner</span>
           </div>
 
           <nav className="sidebar-nav">

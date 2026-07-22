@@ -1,0 +1,113 @@
+
+/* ══════════════════════════════════════════════════
+   MOBILE PASS — append to bottom of index.css
+   ══════════════════════════════════════════════════ */
+
+/* ── Global mobile tweaks ───────────────────────── */
+@media (max-width: 768px) {
+
+  /* Page body more breathing room */
+  .page-body   { padding: 12px 12px 32px !important; }
+  .page-header { padding: 16px 12px 0   !important; }
+  .page-title  { font-size: 18px !important; }
+
+  /* Cards less padding on mobile */
+  .card      { padding: 14px 14px !important; }
+  .stat-card { padding: 12px 14px !important; }
+
+  /* pill rows wrap instead of overflow */
+  .pill-row { flex-wrap: wrap !important; gap: 4px !important; }
+
+  /* assign-row stacks on very small screens */
+  .assign-row { flex-wrap: wrap !important; gap: 8px !important; }
+
+  /* ── Today's Focus — compact task rows ─────────── */
+  .task-row-mobile {
+    padding: 6px 8px 6px 10px !important;
+    margin-bottom: 2px !important;
+    gap: 6px !important;
+  }
+
+  /* ── Calendar — full-width controls ────────────── */
+  .cal-page-header { padding: 14px 12px 0 !important; }
+  .cal-grid-wrap   { margin: 0 8px 16px  !important; }
+
+  /* Calendar view switcher wraps */
+  .cal-view-switch { flex-wrap: wrap !important; }
+
+  /* ── Resources — course tabs scroll horizontally ── */
+  .resource-course-tabs {
+    overflow-x: auto;
+    flex-wrap: nowrap !important;
+    -webkit-overflow-scrolling: touch;
+    padding-bottom: 4px;
+  }
+
+  /* ── Notes — sidebar becomes top scroll bar ─────── */
+  .notes-layout {
+    flex-direction: column !important;
+  }
+  .notes-course-sidebar {
+    width: 100% !important;
+    flex-direction: row !important;
+    flex-wrap: nowrap !important;
+    overflow-x: auto !important;
+    -webkit-overflow-scrolling: touch;
+    gap: 4px !important;
+    padding-bottom: 4px;
+  }
+  .notes-course-sidebar button {
+    flex-shrink: 0 !important;
+    white-space: nowrap !important;
+    padding: 6px 12px !important;
+    border-radius: 20px !important;
+    border-left: none !important;
+    border-bottom: 2px solid transparent !important;
+    width: auto !important;
+    justify-content: center !important;
+  }
+
+  /* ── Flashcards — full-width deck list ──────────── */
+  .flashcard-grid {
+    grid-template-columns: 1fr !important;
+  }
+
+  /* ── Study sessions — stack timer and log ────────── */
+  .study-grid {
+    grid-template-columns: 1fr !important;
+    gap: 16px !important;
+  }
+
+  /* ── Habits — table scrolls horizontally ────────── */
+  .habit-table-wrap {
+    overflow-x: auto !important;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  /* ── Settings — stacked buttons ─────────────────── */
+  .settings-theme-btns {
+    flex-direction: column !important;
+  }
+
+  /* ── Inputs / textareas — no zoom on focus (iOS) ─── */
+  input, select, textarea {
+    font-size: 16px !important;
+  }
+  .input-sm { font-size: 14px !important; }
+
+  /* ── Stat grid always 2-col ──────────────────────── */
+  .grid-4 {
+    grid-template-columns: 1fr 1fr !important;
+    gap: 8px !important;
+  }
+
+  /* ── Quick links topbar hidden on mobile (already hidden via .top-bar) */
+
+  /* ── Tooltips disabled on mobile (touch has no hover) */
+  .tooltip-box { display: none !important; }
+}
+
+@media (max-width: 400px) {
+  .grid-4 { grid-template-columns: 1fr !important; }
+  .page-body { padding: 10px 10px 28px !important; }
+}

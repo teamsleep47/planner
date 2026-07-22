@@ -17,6 +17,12 @@ const BLOCK_COLORS = [
 ]
 const PLAN_COLORS = BLOCK_COLORS
 
+const openUrl = (raw) => {
+  if (!raw) return
+  const url = /^https?:\/\//i.test(raw) ? raw : `https://${raw}`
+  window.open(url, '_blank', 'noopener,noreferrer')
+}
+
 // Returns a darkened/saturated version of a hex color for text on tinted backgrounds
 function darkenColor(hex) {
   const r = parseInt(hex.slice(1,3),16)
@@ -82,9 +88,9 @@ function PlanPopup({ plan, anchor, onClose, onEdit, onDelete }) {
           {planDate && <div style={{display:'flex',alignItems:'center',gap:8}}><span style={{fontSize:11,color:'var(--text-3)',width:44}}>Date</span><span style={{fontSize:13,fontWeight:700,color:'var(--text-1)'}}>{planDate}</span></div>}
           {plan.notes && <div style={{fontSize:11,color:'var(--text-3)',lineHeight:1.5,background:'var(--glass-bg)',borderRadius:6,padding:'7px 9px',maxHeight:60,overflow:'hidden',WebkitMaskImage:'linear-gradient(to bottom,black 60%,transparent 100%)'}}>{plan.notes}</div>}
           {plan.url && (
-            <a href={plan.url} target="_blank" rel="noreferrer" style={{display:'flex',alignItems:'center',gap:4,fontSize:12,color:'var(--accent)',textDecoration:'none'}}>
+            <button onClick={()=>openUrl(plan.url)} style={{display:'flex',alignItems:'center',gap:4,fontSize:12,color:'var(--accent-primary)',background:'none',border:'none',cursor:'pointer',textDecoration:'none',padding:0}}>
               🔗 Open reference
-            </a>
+            </button>
           )}
         </div>
         <div style={{padding:'0 14px 14px',display:'flex',gap:8}}>
@@ -849,7 +855,7 @@ export default function CalendarPage({ onDataChange }) {
                       {p.tasked && <span style={{fontSize:7,padding:'0 3px',borderRadius:3,background:`${p.color}44`,color:p.color,fontWeight:700,flexShrink:0}}>tasked</span>}
                     </button>
                     {p.url && (
-                      <span onClick={e=>{e.stopPropagation();window.open(p.url,'_blank')}} style={{cursor:'pointer',display:'flex',alignItems:'center',flexShrink:0,padding:'0 2px'}}>
+                      <span onClick={e=>{e.stopPropagation();openUrl(p.url)}} style={{cursor:'pointer',display:'flex',alignItems:'center',flexShrink:0,padding:'0 2px'}}>
                         <ExternalLink size={8} style={{color:'var(--text-3)'}}/>
                       </span>
                     )}

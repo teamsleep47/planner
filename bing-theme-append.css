@@ -1,0 +1,41 @@
+
+/* ══════════════════════════════════════════════════
+   BING THEME
+   Paste at the very bottom of src/index.css
+   ══════════════════════════════════════════════════ */
+
+/* Bing theme inherits dark mode values as its base,
+   then overrides with a slightly warmer/deeper palette
+   so it feels distinct without breaking any UI. */
+[data-theme="bing"] {
+  --bg-base:      #06060f;
+  --bg-mesh-1:    #0a0620;
+  --bg-mesh-2:    #060e1e;
+  --bg-mesh-3:    #0e0618;
+  --glass-bg:     rgba(255,255,255,0.05);
+  --glass-bg-2:   rgba(255,255,255,0.08);
+  --glass-border: rgba(255,255,255,0.10);
+  --glass-hover:  rgba(255,255,255,0.12);
+  --blur:         blur(20px);
+  --blur-sm:      blur(10px);
+  --text-1:       #eeeeff;
+  --text-2:       #8888b8;
+  --text-3:       #484868;
+  --shadow:       0 8px 32px rgba(0,0,0,0.5);
+  --shadow-sm:    0 2px 12px rgba(0,0,0,0.35);
+  --flip-bg:      rgba(255,255,255,0.08);
+  --flip-border:  rgba(255,255,255,0.12);
+  --panel-bg:     #0e0c20;
+  --panel-border: rgba(255,255,255,0.12);
+  --tooltip-bg:     rgba(6,6,18,0.97);
+  --tooltip-border: rgba(255,255,255,0.15);
+  --tooltip-text:   #e0e0ff;
+}
+
+/* Bing photo header banner */
+.bing-header-banner {
+  position: relative;
+  width: 100%;
+  overflow: hidden;
+  flex-shrink: 0;
+}

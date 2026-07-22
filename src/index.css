@@ -219,7 +219,7 @@ input, select, textarea { font-family: var(--font); }
 .sidebar {
   width: var(--sidebar-w);
   position: fixed;
-  top: 0; left: 0; bottom: 0;
+  top: var(--topbar-h); left: 0; bottom: 0;
   z-index: 200;
   display: flex;
   flex-direction: column;
@@ -326,10 +326,13 @@ input, select, textarea { font-family: var(--font); }
   backdrop-filter: var(--blur-sm);
   -webkit-backdrop-filter: var(--blur-sm);
   border-bottom: 1px solid var(--glass-border);
-  position: sticky;
+  position: fixed;
   top: 0;
+  left: var(--sidebar-w);
+  right: 0;
   z-index: 100;
 }
+.main-content { padding-top: var(--topbar-h); }
 .top-bar-left  { display: flex; align-items: center; gap: 14px; flex: 1; min-width: 0; }
 .top-bar-right { display: flex; align-items: center; gap: 8px; flex-shrink: 0; }
 
@@ -511,7 +514,7 @@ input, select, textarea { font-family: var(--font); }
   color: #fff;
   box-shadow: 0 0 20px var(--accent-glow);
 }
-.btn-primary:hover { opacity: .88; transform: translateY(-1px); box-shadow: 0 4px 24px var(--accent-glow); }
+.btn-primary:hover { opacity: .88; transform: translateY(-1px); box-shadow: var(--shadow-sm); }
 .btn-ghost {
   background: var(--glass-bg);
   backdrop-filter: var(--blur-sm);
@@ -533,7 +536,7 @@ input, select, textarea { font-family: var(--font); }
 
 /* ── Progress bar ────────────────────────────────── */
 .progress-bar { height: 5px; background: var(--glass-border); border-radius: 4px; overflow: hidden; }
-.progress-fill { height: 100%; border-radius: 4px; background: var(--accent-primary); transition: width .5s ease; box-shadow: 0 0 8px var(--accent-glow); }
+.progress-fill { height: 100%; border-radius: 4px; background: var(--accent-primary); transition: width .5s ease; }
 
 /* ── Checkbox row ────────────────────────────────── */
 .checkbox-row { display: flex; align-items: center; gap: 10px; padding: 9px 0; border-bottom: 1px solid var(--glass-border); font-size: 13.5px; }
@@ -629,12 +632,14 @@ textarea.inline-input { resize: vertical; line-height: 1.5; }
 
   /* ── Sidebar drawer — smooth + polished ── */
   .sidebar {
+    top: 0;
     transform: translateX(-100%);
     transition: transform .28s cubic-bezier(0.4, 0, 0.2, 1);
     box-shadow: none;
     z-index: 210;
     width: var(--sidebar-w);
   }
+  .main-content { padding-top: 0; }
   .sidebar.open {
     transform: translateX(0);
     box-shadow: 4px 0 32px rgba(0,0,0,0.4);
@@ -712,67 +717,21 @@ select option {
   color: var(--text-1);
 }
 
-/* ── Neon glow borders ───────────────────────────── */
-.card {
-  border: 1px solid var(--glass-border) !important;
-  box-shadow: 0 0 0 1px var(--accent-glow), var(--shadow-sm) !important;
-  transition: box-shadow .25s ease, border-color .25s ease !important;
+/* ── Card interactive modifier ───────────────────── */
+.card:not(.card--interactive):hover {
+  transform: none;
+  box-shadow: var(--shadow-sm);
+  border-color: var(--glass-border);
+  background: var(--glass-bg);
 }
-.card:hover {
-  border-color: var(--accent-primary) !important;
-  box-shadow: 0 0 0 1px var(--accent-primary), 0 0 18px var(--accent-glow), var(--shadow) !important;
+.card.card--interactive:hover {
+  border-color: var(--glass-hover);
+  box-shadow: var(--shadow);
 }
 
-.stat-card {
-  border: 1px solid var(--glass-border) !important;
-  box-shadow: 0 0 0 1px var(--accent-glow) !important;
-  transition: all .2s ease !important;
-}
 .stat-card:hover {
-  border-color: var(--accent-primary) !important;
-  box-shadow: 0 0 0 1px var(--accent-primary), 0 0 16px var(--accent-glow) !important;
-  transform: translateY(-2px) !important;
-}
-
-.btn-primary {
-  border: 1px solid var(--accent-primary) !important;
-  box-shadow: 0 0 12px var(--accent-glow), inset 0 1px 0 rgba(255,255,255,0.15) !important;
-}
-.btn-primary:hover {
-  box-shadow: 0 0 24px var(--accent-glow), 0 4px 16px var(--accent-glow) !important;
-}
-
-.btn-ghost {
-  border: 1px solid var(--glass-border) !important;
-  box-shadow: 0 0 8px rgba(255,255,255,0.03) !important;
-}
-.btn-ghost:hover {
-  border-color: var(--accent-primary) !important;
-  box-shadow: 0 0 12px var(--accent-glow) !important;
-}
-
-.btn-icon {
-  border: 1px solid var(--glass-border) !important;
-}
-.btn-icon:hover {
-  border-color: var(--accent-primary) !important;
-  box-shadow: 0 0 10px var(--accent-glow) !important;
-}
-
-.nav-item.active {
-  box-shadow: 0 0 12px var(--accent-glow) !important;
-}
-
-.ql-chip {
-  border: 1px solid var(--glass-border) !important;
-}
-.ql-chip:hover {
-  border-color: var(--accent-primary) !important;
-  box-shadow: 0 0 10px var(--accent-glow) !important;
-}
-
-.inline-input:focus {
-  box-shadow: 0 0 0 3px var(--accent-dim), 0 0 12px var(--accent-glow) !important;
+  box-shadow: var(--shadow-sm);
+  transform: translateY(-1px);
 }
 
 /* ── 3D Flip Clock ───────────────────────────────── */
@@ -893,6 +852,12 @@ select option {
 }
 
 @keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
+
+@keyframes fadeOut {
+  0%   { opacity: 1; }
+  60%  { opacity: 1; }
+  100% { opacity: 0; }
+}
 
 
 /* ════════════════════════════════════════════════════

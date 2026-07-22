@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { Settings, Plus, X, Check, Edit2, GripVertical } from 'lucide-react'
+import { Settings, Plus, X, Check, Edit2, GripVertical, CheckCircle2 } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
 import FlipClock from './FlipClock.jsx'
 import Tooltip from './Tooltip.jsx'
@@ -166,8 +166,15 @@ export default function TopBar({ theme, toggleTheme, saveState, onLinksChange, n
   const [showModal,setShowModal]= useState(false)
   const [dragIdx,    setDragIdx]    = useState(null)
   const [dragOverIdx,setDragOverIdx]= useState(null)
+  const [showSaved, setShowSaved] = useState(false)
 
   useEffect(() => { onLinksChange?.() }, [links])
+
+  useEffect(() => {
+    const handler = () => { setShowSaved(true); setTimeout(() => setShowSaved(false), 2000) }
+    window.addEventListener('data-saved', handler)
+    return () => window.removeEventListener('data-saved', handler)
+  }, [])
 
   const handleLinkDragStart = (e, i) => { setDragIdx(i); e.dataTransfer.effectAllowed='move' }
   const handleLinkDragOver  = (e, i) => { e.preventDefault(); setDragOverIdx(i) }
@@ -197,6 +204,12 @@ export default function TopBar({ theme, toggleTheme, saveState, onLinksChange, n
 
         <div className="top-bar-right">
           <NotificationBell notifs={notifs} unread={unread} markAllRead={markAllRead} clearNotif={clearNotif}/>
+
+          {showSaved && (
+            <div style={{display:'flex',alignItems:'center',gap:4,fontSize:11,color:'var(--success)',animation:'fadeOut 2s forwards',whiteSpace:'nowrap'}}>
+              <CheckCircle2 size={13}/> Saved
+            </div>
+          )}
 
           {/* Quick links */}
           <div className="ql-bar">

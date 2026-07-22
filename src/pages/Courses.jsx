@@ -6,6 +6,12 @@ import { formatRelativeDue } from '../utils/timeFormat.js'
 import { load, save } from '../utils/storage.js'
 import Tooltip from '../components/Tooltip.jsx'
 
+const openUrl = (raw) => {
+  if (!raw) return
+  const url = /^https?:\/\//i.test(raw) ? raw : `https://${raw}`
+  window.open(url, '_blank', 'noopener,noreferrer')
+}
+
 const PRIORITY = [
   { key:'none',   label:'—',      color:'var(--text-3)',  bg:'var(--glass-bg-2)' },
   { key:'low',    label:'Low',    color:'var(--green)',   bg:'var(--green-dim)'  },
@@ -45,6 +51,7 @@ export default function Courses({ onDataChange }) {
   const [editAssign,     setEditAssign]     = useState({})
   const [jumpAssignId,   setJumpAssignId]   = useState(null)
   const [openNotes,      setOpenNotes]      = useState({})
+  const [deleteTarget,   setDeleteTarget]   = useState(null)
 
   // Persist accordion state whenever it changes
   useEffect(()=>{ save(ACCORDION_KEY, expanded) },[expanded])
@@ -295,7 +302,7 @@ export default function Courses({ onDataChange }) {
                                 <input type="url" placeholder="Reference link (optional)" value={editAssign.url||''} onChange={e=>setEditAssign(a=>({...a,url:e.target.value}))} style={inp}/>
                                 <div style={{display:'flex',gap:8}}>
                                   <button className="btn btn-primary" style={{flex:1,fontSize:12}} onClick={()=>saveAssign(activeTerm.id,course.id,a.id)}>Save</button>
-                                  <button className="btn btn-ghost" style={{fontSize:12,color:'var(--coral)'}} onClick={()=>{if(confirm('Delete?'))deleteAssign(activeTerm.id,course.id,a.id)}}><Trash2 size={12}/></button>
+                                  <button className="btn btn-ghost" style={{fontSize:12,color:'var(--coral)'}} onClick={()=>setDeleteTarget({termId:activeTerm.id,courseId:course.id,assignmentId:a.id,title:a.title})}><Trash2 size={12}/></button>
                                   <button className="btn btn-ghost" style={{fontSize:12}} onClick={()=>setEditAssignId(null)}>Cancel</button>
                                 </div>
                               </div>
@@ -323,9 +330,9 @@ export default function Courses({ onDataChange }) {
                                   {pri&&pri.key!=='none'&&<span style={{fontSize:10,padding:'2px 8px',borderRadius:20,background:pri.bg,color:pri.color,fontWeight:700,border:`1px solid ${pri.color}44`}}>{pri.label}</span>}
                                   <span style={{fontSize:10,padding:'2px 8px',borderRadius:20,background:stCfg.bg,color:stCfg.color,fontWeight:700}}>{a.status}</span>
                                   {a.url && (
-                                    <a href={a.url} target="_blank" rel="noreferrer" style={{display:'flex',alignItems:'center',color:'var(--text-3)'}} onClick={e=>e.stopPropagation()}>
+                                    <button onClick={e=>{e.stopPropagation();openUrl(a.url)}} style={{display:'flex',alignItems:'center',color:'var(--text-3)',background:'none',border:'none',cursor:'pointer',padding:2}}>
                                       <ExternalLink size={11}/>
-                                    </a>
+                                    </button>
                                   )}
                                 </div>
                               </div>
@@ -383,6 +390,19 @@ export default function Courses({ onDataChange }) {
           </>
         )}
       </div>
+
+      {deleteTarget && (
+        <div style={{position:'fixed',inset:0,background:'var(--overlay)',display:'flex',alignItems:'center',justifyContent:'center',zIndex:9999}}>
+          <div style={{background:'var(--panel-bg)',border:'1px solid var(--glass-border)',borderRadius:'var(--radius-lg)',padding:'24px 28px',maxWidth:360,width:'90%',boxShadow:'var(--shadow)'}}>
+            <p style={{color:'var(--text-1)',fontWeight:600,marginBottom:8}}>Delete assignment?</p>
+            <p style={{color:'var(--text-2)',fontSize:13,marginBottom:20}}>"{deleteTarget.title}" will be permanently removed.</p>
+            <div style={{display:'flex',gap:8,justifyContent:'flex-end'}}>
+              <button onClick={()=>setDeleteTarget(null)} style={{padding:'7px 16px',background:'var(--surface-chip)',border:'1px solid var(--glass-border)',borderRadius:'var(--radius-sm)',color:'var(--text-2)',cursor:'pointer',fontSize:13}}>Cancel</button>
+              <button onClick={()=>{deleteAssign(deleteTarget.termId,deleteTarget.courseId,deleteTarget.assignmentId);setDeleteTarget(null)}} style={{padding:'7px 16px',background:'var(--danger-surface)',border:'1px solid var(--danger)',borderRadius:'var(--radius-sm)',color:'var(--danger)',cursor:'pointer',fontSize:13,fontWeight:600}}>Delete</button>
+            </div>
+          </div>
+        </div>
+      )}
     </>
   )
 }
