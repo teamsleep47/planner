@@ -28,16 +28,37 @@ const ALL_KEYS = [
 ]
 
 function ThemeTogglePill({ theme, toggleTheme }) {
+  const isDark = theme === 'dark'
   return (
-    <button onClick={toggleTheme} title={theme==='dark' ? 'Switch to light mode' : 'Switch to dark mode'} style={{
-      display:'flex', alignItems:'center', gap:4,
-      padding:'4px 8px',
-      background: theme==='dark' ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.06)',
-      border: '1px solid var(--glass-border)',
-      borderRadius: 0,
-      cursor:'pointer', fontSize:14, transition:'all .2s', color:'var(--text-1)',
-    }}>
-      {theme==='dark' ? '🌙' : '☀️'}
+    <button
+      onClick={toggleTheme}
+      aria-label={isDark ? 'Switch to light mode' : 'Switch to dark mode'}
+      style={{
+        position: 'relative',
+        width: 52,
+        height: 28,
+        borderRadius: 14,
+        border: '1px solid var(--glass-border)',
+        background: isDark ? '#29274a' : '#fff1da',
+        cursor: 'pointer',
+        padding: 0,
+        transition: 'background .3s',
+        flexShrink: 0,
+      }}
+    >
+      <span style={{ position:'absolute', left:7, top:'50%', transform:'translateY(-50%)', fontSize:11, opacity: isDark ? 0 : 1, transition:'opacity .2s' }}>☀️</span>
+      <span style={{ position:'absolute', right:7, top:'50%', transform:'translateY(-50%)', fontSize:11, opacity: isDark ? 1 : 0, transition:'opacity .2s' }}>🌙</span>
+      <span style={{
+        position: 'absolute',
+        top: 3,
+        left: isDark ? 'calc(100% - 25px)' : 3,
+        width: 20,
+        height: 20,
+        borderRadius: '50%',
+        background: isDark ? '#9185f5' : '#e99a22',
+        boxShadow: '0 1px 4px rgba(0,0,0,0.25)',
+        transition: 'left .25s cubic-bezier(.4,0,.2,1), background .3s',
+      }}/>
     </button>
   )
 }
