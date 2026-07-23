@@ -1,13 +1,6 @@
 export default function LoginPage({ onSignIn, error, loading }) {
   return (
-    <div style={{
-      minHeight: '100vh',
-      display: 'flex',
-      alignItems: 'center',
-      justifyContent: 'center',
-      padding: 24,
-      background: 'radial-gradient(ellipse at 20% 30%, var(--bg-mesh-1) 0%, transparent 60%), radial-gradient(ellipse at 80% 70%, var(--bg-mesh-2) 0%, transparent 60%), var(--bg-base)',
-    }}>
+    <div className="login-outer" style={{background:'radial-gradient(ellipse at 20% 30%, var(--bg-mesh-1) 0%, transparent 60%), radial-gradient(ellipse at 80% 70%, var(--bg-mesh-2) 0%, transparent 60%), var(--bg-base)'}}>
       <div style={{
         background: 'var(--glass-bg-2)',
         backdropFilter: 'var(--blur)',

@@ -1,7 +1,7 @@
 import { useState, useCallback, useEffect, useRef } from 'react'
 import { HashRouter, Routes, Route, NavLink, useNavigate, useLocation } from 'react-router-dom'
 import {
-  LayoutDashboard, BookOpen, Clock, Target, Link, Menu, X,
+  LayoutDashboard, BookOpen, Target, Link, Menu, X,
   Cloud, LogOut, Trash2, BookText, GraduationCap, Settings,
   Layers, Calendar, FolderOpen
 } from 'lucide-react'
@@ -17,7 +17,6 @@ import { signOut as fbSignOut } from 'firebase/auth'
 import LoginPage      from './pages/LoginPage.jsx'
 import WeeklyHome     from './pages/WeeklyHome.jsx'
 import Courses        from './pages/Courses.jsx'
-import StudySessions  from './pages/StudySessions.jsx'
 import Goals          from './pages/Goals.jsx'
 import Notes          from './pages/Notes.jsx'
 import NotesPage      from './pages/NotesPage.jsx'
@@ -36,7 +35,6 @@ const ALL_NAV = [
   { label: 'Daily', items: [
     { key:'home',       to:'/',           icon:LayoutDashboard, text:'Home'           },
     { key:'courses',    to:'/courses',    icon:BookOpen,        text:'Assignments'    },
-    { key:'study',      to:'/study',      icon:Clock,           text:'Study sessions' },
     { key:'calendar',   to:'/calendar',   icon:Calendar,        text:'Calendar'       },
   ]},
   { label: 'Progress', items: [
@@ -55,11 +53,8 @@ const ALL_NAV = [
 // ALL localStorage keys — synced to Drive & included in export
 const ALL_KEYS = [
   'home_tasks',
-  'study_sessions',
   'habit_grid', 'habit_history',
-  'timer_settings',
   'streak',
-  'study_week_goal',
   'sem_end_date',
   'terms_v1', 'assignments',
   'habits_config', 'recurring_tasks', 'rec_history', 'goals_config',
@@ -79,7 +74,6 @@ function getAllData() {
 }
 
 function wipeAllSettings() {
-  if (!confirm('Wipe ALL data? Cannot be undone.')) return
   const prefixes  = ['planner_v1_']
   const exactKeys = ['canvas_token_v1','canvas_url_v1','canvas_ical_v1','canvas_warned_v1']
   Object.keys(localStorage).filter(k => prefixes.some(p => k.startsWith(p))).forEach(k => localStorage.removeItem(k))
@@ -267,7 +261,7 @@ function MobileHeader({ profile, signOut, sidebarOpen, setSidebarOpen, theme, to
                 onMouseLeave={e=>e.currentTarget.style.background='none'}>
                 <span style={{fontSize:20}}>🚪</span> Sign out
               </button>
-              <button onClick={()=>{setShowDropdown(false); wipeAllSettings()}} style={{
+              <button onClick={()=>{setShowDropdown(false); setShowWipeConfirm(true)}} style={{
                 width:'100%', display:'flex', alignItems:'center', gap:14,
                 padding:'14px 16px', background:'none', border:'none',
                 borderRadius:0, color:'var(--coral)',
@@ -299,7 +293,8 @@ export default function App() {
   const { notifs, unread, markAllRead, clearNotif }             = useNotifications()
   const [sidebarOpen, setSidebarOpen] = useState(false)
   const [errorOverlay, setErrorOverlay] = useState(false)
-  const [hiddenTabs,  setHiddenTabs]  = useState(() => load('hidden_tabs', []))
+  const [hiddenTabs,  setHiddenTabs]  = useState(() => load('hidden_tabs', ['canvas','resources','notes','links','flashcards','goals']))
+  const [showWipeConfirm, setShowWipeConfirm] = useState(false)
 
   useEffect(() => {
     const h = () => {
@@ -399,7 +394,7 @@ export default function App() {
               <button onClick={signOut} className="btn btn-ghost" style={{flex:1,fontSize:11,padding:'6px 8px',gap:5,...chipBorder}}>
                 <LogOut size={12}/> Sign out
               </button>
-              <button onClick={wipeAllSettings} className="btn btn-ghost"
+              <button onClick={()=>setShowWipeConfirm(true)} className="btn btn-ghost"
                 style={{fontSize:11,padding:'6px 8px',gap:5,color:'var(--coral)',borderColor:'rgba(248,113,113,0.4)',...chipBorder}}
                 title="Wipe all data">
                 <Trash2 size={12}/>
@@ -424,7 +419,6 @@ export default function App() {
           <Routes>
             <Route path="/"           element={<WeeklyHome     onDataChange={handleDataChange}/>}/>
             <Route path="/courses"    element={<Courses        onDataChange={handleDataChange}/>}/>
-            <Route path="/study"      element={<StudySessions  onDataChange={handleDataChange}/>}/>
             <Route path="/goals"      element={<Goals          onDataChange={handleDataChange}/>}/>
             <Route path="/links"      element={<Notes          onDataChange={handleDataChange}/>}/>
             <Route path="/notes"      element={<NotesPage      onDataChange={handleDataChange}/>}/>
@@ -436,6 +430,20 @@ export default function App() {
           </Routes>
         </div>
       </div>
+
+      {showWipeConfirm && (
+        <div style={{position:'fixed',inset:0,zIndex:9999,display:'flex',alignItems:'center',justifyContent:'center',background:'var(--overlay)',backdropFilter:'blur(4px)'}} onClick={()=>setShowWipeConfirm(false)}>
+          <div className="card" style={{maxWidth:340,width:'90%',padding:24,textAlign:'center'}} onClick={e=>e.stopPropagation()}>
+            <div style={{fontSize:28,marginBottom:10}}>⚠️</div>
+            <div style={{fontWeight:700,fontSize:15,color:'var(--text-1)',marginBottom:8}}>Wipe all data?</div>
+            <div style={{fontSize:13,color:'var(--text-2)',marginBottom:20,lineHeight:1.5}}>This will permanently delete all your tasks, assignments, calendar blocks, and settings. This cannot be undone.</div>
+            <div style={{display:'flex',gap:8,justifyContent:'center'}}>
+              <button className="btn btn-ghost" onClick={()=>setShowWipeConfirm(false)} style={{flex:1}}>Cancel</button>
+              <button className="btn" onClick={()=>{setShowWipeConfirm(false);wipeAllSettings()}} style={{flex:1,background:'var(--coral)',color:'white',border:'none'}}>Wipe all</button>
+            </div>
+          </div>
+        </div>
+      )}
     </HashRouter>
   )
 }

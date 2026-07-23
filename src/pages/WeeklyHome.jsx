@@ -1,9 +1,10 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
-import { CheckCircle2, Circle, Plus, X, History, Calendar } from 'lucide-react'
+import { CheckCircle2, Circle, Plus, X, History, Calendar, ChevronRight } from 'lucide-react'
 import { load, save } from '../utils/storage.js'
 import { formatRelativeDue } from '../utils/timeFormat.js'
 import { getActiveTermCourses, getCourseColorMap } from '../utils/termData.js'
 import Tooltip from '../components/Tooltip.jsx'
+import { useNavigate } from 'react-router-dom'
 
 const URGENCY = {
   urgent: { color:'#ef4444', label:'🔴 Urgent' },
@@ -12,8 +13,39 @@ const URGENCY = {
   low:    { color:'#22c55e', label:'🟢 Relaxed' },
   none:   { color:null,      label:'No priority' },
 }
-const DEFAULT_TIMERS = { focus:25, short:5, long:15 }
 const WX_ICONS = {0:'☀️',1:'🌤',2:'⛅',3:'☁️',45:'🌫',51:'🌦',53:'🌦',55:'🌧',61:'🌧',63:'🌧',65:'🌧',80:'🌦',82:'⛈',95:'⛈'}
+
+function getSemCountdown(dateStr) {
+  if (!dateStr) return null
+  const now = new Date()
+  const end = new Date(dateStr + 'T23:59:00')
+  const ms  = end - now
+  if (ms <= 0) return { past: true, label: 'Ended' }
+  const totalDays = Math.ceil(ms / 86400000)
+  const weeks = Math.floor(totalDays / 7)
+  const days  = totalDays % 7
+  const parts = []
+  if (weeks) parts.push(`${weeks}w`)
+  if (days)  parts.push(`${days}d`)
+  return { past: false, label: parts.join(' ') || '0d', weeks, days, totalDays }
+}
+
+function getAllUpcomingAssignments() {
+  try {
+    const terms  = JSON.parse(localStorage.getItem('planner_v1_terms_v1') || '[]')
+    const active = terms.find(t => t.active) || terms[0]
+    if (!active) return []
+    return active.courses
+      .flatMap(c => c.assignments.map(a => ({ ...a, courseName: c.name, courseColor: c.color })))
+      .filter(a => a.status !== 'Done' && a.due)
+      .sort((a, b) => {
+        const dd = new Date(a.due) - new Date(b.due)
+        if (dd !== 0) return dd
+        const pw = { urgent:4, high:3, medium:2, low:1, none:0 }
+        return (pw[b.priority||'none']||0) - (pw[a.priority||'none']||0)
+      })
+  } catch(e) { return [] }
+}
 
 function getGreeting() {
   const h = new Date().getHours()
@@ -201,11 +233,8 @@ function TaskRow({task,courseColors,courseOptions,editId,editText,editCourse,edi
 
 
 export default function WeeklyHome({ onDataChange }) {
+  const navigate = useNavigate()
   const [tasks,       setTasks]      = useState(()=>load('home_tasks',[]))
-  const [timerMins,   setTimerMins]  = useState(()=>load('timer_settings',DEFAULT_TIMERS))
-  const [mode,        setMode]       = useState('focus')
-  const [secs,        setSecs]       = useState(()=>load('timer_settings',DEFAULT_TIMERS).focus*60)
-  const [running,     setRunning]    = useState(false)
   const [showAdd,     setShowAdd]    = useState(false)
   const [newTask,     setNewTask]    = useState({text:'',course:'OTHER',urgency:'none',due:'',isPlan:false})
   const addInputRef = useRef(null)
@@ -215,8 +244,6 @@ export default function WeeklyHome({ onDataChange }) {
   const [editUrgency, setEditUrgency]= useState('none')
   const [editDue,     setEditDue]    = useState('')
   const [editIsPlan,  setEditIsPlan] = useState(false)
-  const [showSettings,setShowSettings]=useState(false)
-  const [draftTimers, setDraftTimers]=useState(timerMins)
   const [weather,     setWeather]    = useState(null)
   const [weatherError,setWeatherError]=useState(false)
   const [city,        setCity]       = useState(()=>load('weather_city','Bradenton'))
@@ -227,11 +254,11 @@ export default function WeeklyHome({ onDataChange }) {
   const [editSemDate, setEditSemDate]=useState(false)
   const [showHistory, setShowHistory]=useState(false)
   const [upcoming,    setUpcoming]   = useState([])
+  const [showUpcomingModal, setShowUpcomingModal] = useState(false)
   const [dragId,      setDragId]     = useState(null)
   const [dragOverId,  setDragOverId] = useState(null)
   const [expandedTaskId, setExpandedTaskId] = useState(null)
   const [confirmModal,   setConfirmModal]   = useState(null) // { type, taskId, planId, message }
-  const timerRef = useRef(null)
   const COURSE_COLORS = getCourseColorMap()
   const courseOptions = [...getActiveTermCourses().map(c=>c.name),'OTHER']
 
@@ -240,8 +267,7 @@ export default function WeeklyHome({ onDataChange }) {
     save('home_tasks',tasks)
     onDataChange?.()
   },[tasks])
-  useEffect(()=>{ save('timer_settings',timerMins) },[timerMins])
-  useEffect(()=>{ save('sem_end_date',semDate) },[semDate])
+  useEffect(()=>{ save('sem_end_date',semDate); onDataChange?.() },[semDate])
 
   // Re-read tasks from localStorage when Drive syncs (replaces driveKey remount)
   useEffect(() => {
@@ -256,12 +282,6 @@ export default function WeeklyHome({ onDataChange }) {
   },[])
   useEffect(()=>{ refreshUpcoming(); window.addEventListener('drive-loaded',refreshUpcoming); return()=>window.removeEventListener('drive-loaded',refreshUpcoming) },[])
   useEffect(()=>{ refreshUpcoming() },[tasks])
-
-  useEffect(()=>{
-    if(running){timerRef.current=setInterval(()=>setSecs(s=>{if(s<=1){clearInterval(timerRef.current);setRunning(false);return timerMins[mode]*60}return s-1}),1000)}
-    else clearInterval(timerRef.current)
-    return()=>clearInterval(timerRef.current)
-  },[running,mode,timerMins])
 
   const fetchWeather=async(c=city)=>{
     try{
@@ -381,9 +401,8 @@ export default function WeeklyHome({ onDataChange }) {
   const handleDragEnd=useCallback(()=>{setDragId(null);setDragOverId(null)},[])
 
   const activeTasks=tasks.filter(t=>!t.done),doneTasks=tasks.filter(t=>t.done)
-  const streak=load('streak',0),semDays=semDate?formatRelativeDue(semDate,''):null
-  const mm=String(Math.floor(secs/60)).padStart(2,'0'),ss2=String(secs%60).padStart(2,'0')
-  const pct=((timerMins[mode]*60-secs)/(timerMins[mode]*60))*100
+  const streak=load('streak',0)
+  const semCountdown = getSemCountdown(semDate)
   const inputSm={padding:'7px 10px',background:'var(--glass-bg-2)',border:'1px solid var(--glass-border)',borderRadius:'var(--radius-sm)',color:'var(--text-1)',fontSize:12,fontFamily:'inherit'}
 
   return(
@@ -394,15 +413,28 @@ export default function WeeklyHome({ onDataChange }) {
       </div>
       <div className="page-body" style={{display:'flex',flexDirection:'column',gap:16}}>
         <div className="grid-4">
-          <div className="stat-card"><div className="stat-label">Tasks</div><div className="stat-value" style={{color:'var(--accent)'}}>{activeTasks.length}</div><div className="stat-sub">{doneTasks.length} done</div></div>
+          <div className="stat-card"><div className="stat-label">Tasks</div><div className="stat-value" style={{color:'var(--accent-primary)'}}>{activeTasks.length}</div><div className="stat-sub">{doneTasks.length} done</div></div>
           <div className="stat-card">
             <div className="stat-label">Semester ends</div>
-            <div className="stat-value" style={{color:semDays?.urgent?'var(--coral)':semDays?.warn?'var(--amber)':'var(--accent)',fontSize:22}}>{semDays?semDays.label:'—'}</div>
-            {editSemDate?<div style={{display:'flex',gap:4,marginTop:4}}><input type="date" style={{...inputSm,flex:1}} value={semDate} onChange={e=>setSemDate(e.target.value)}/><button className="btn-icon" style={{padding:4}} onClick={()=>setEditSemDate(false)}>✓</button></div>
-              :<div style={{fontSize:10,color:'var(--text-3)',marginTop:4,cursor:'pointer'}} onClick={()=>setEditSemDate(true)}>{semDate} · tap to edit</div>}
+            <div className="stat-value" style={{color:semCountdown?.past?'var(--text-3)':'var(--accent-primary)',fontSize:20,cursor:'pointer'}} onClick={()=>setEditSemDate(true)}>
+              {semCountdown ? semCountdown.label : '—'}
+            </div>
+            {editSemDate
+              ? <div style={{display:'flex',gap:4,marginTop:4}}>
+                  <input type="date" style={{...inputSm,flex:1}} value={semDate} onChange={e=>setSemDate(e.target.value)} autoFocus/>
+                  <button className="btn-icon" style={{padding:4}} onClick={()=>setEditSemDate(false)}>✓</button>
+                </div>
+              : <div style={{fontSize:10,color:'var(--text-3)',marginTop:4,cursor:'pointer',lineHeight:1.4}} onClick={()=>setEditSemDate(true)}>
+                  {semDate ? `until ${semDate}` : 'tap to set date'}
+                </div>
+            }
           </div>
           <div className="stat-card"><div className="stat-label">Today</div><div className="stat-value" style={{color:'var(--teal)',fontSize:22}}>{DAYS_SHORT[DAY_IDX]}</div><div className="stat-sub">{IS_CLASS?'Class day':'No class'}</div></div>
-          <div className="stat-card"><div className="stat-label">Upcoming</div><div className="stat-value" style={{color:'var(--amber)',fontSize:22}}>{upcoming.length}</div><div className="stat-sub">due soon</div></div>
+          <div className="stat-card" style={{cursor:'pointer'}} onClick={()=>setShowUpcomingModal(true)}>
+            <div className="stat-label">Upcoming</div>
+            <div className="stat-value" style={{color:'var(--amber)',fontSize:22}}>{upcoming.length}</div>
+            <div className="stat-sub" style={{color:'var(--accent-primary)',fontWeight:600}}>view all →</div>
+          </div>
         </div>
 
         {/* Weather card */}
@@ -459,9 +491,9 @@ export default function WeeklyHome({ onDataChange }) {
               <span className="card-title" style={{margin:0}}>Today's focus</span>
               <div style={{display:'flex',gap:6}}>
                 <Tooltip text="View completed">
-                  <button className="btn-icon" onClick={()=>setShowHistory(s=>!s)} style={{padding:5,position:'relative',color:showHistory?'var(--accent)':'var(--text-3)'}}>
+                  <button className="btn-icon" onClick={()=>setShowHistory(s=>!s)} style={{padding:5,position:'relative',color:showHistory?'var(--accent-primary)':'var(--text-1)'}}>
                     <History size={13}/>
-                    {doneTasks.length>0&&<span style={{position:'absolute',top:-3,right:-3,background:'var(--accent)',color:'white',fontSize:8,fontWeight:700,width:13,height:13,borderRadius:'50%',display:'flex',alignItems:'center',justifyContent:'center'}}>{doneTasks.length}</span>}
+                    {doneTasks.length>0&&<span style={{position:'absolute',top:-3,right:-3,background:'var(--surface-chip)',color:'var(--text-1)',fontSize:8,fontWeight:700,width:13,height:13,borderRadius:'50%',display:'flex',alignItems:'center',justifyContent:'center'}}>{doneTasks.length}</span>}
                   </button>
                 </Tooltip>
                 <Tooltip text="Add task — press Enter to keep adding">
@@ -509,7 +541,7 @@ export default function WeeklyHome({ onDataChange }) {
                   </div>
                 )}
                 <div style={{display:'flex',justifyContent:'flex-end'}}>
-                  <button className="btn btn-ghost" onClick={()=>{ if(newTask.text.trim()) addTask(); setShowAdd(false) }} style={{fontSize:12}}>Done</button>
+                  <button className="btn btn-primary" onClick={()=>{ if(newTask.text.trim()) addTask(); setShowAdd(false) }} style={{fontSize:12}}>Done</button>
                 </div>
               </div>
             )}
@@ -541,13 +573,16 @@ export default function WeeklyHome({ onDataChange }) {
           </div>
 
           <div style={{display:'flex',flexDirection:'column',gap:16}} className="home-timer-col">
-            <div className="card">
-              <div className="card-title">Upcoming</div>
+            <div className="card" style={{cursor:'pointer'}} onClick={()=>setShowUpcomingModal(true)}>
+              <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:8}}>
+                <div className="card-title" style={{margin:0}}>Upcoming</div>
+                <ChevronRight size={14} style={{color:'var(--text-3)'}}/>
+              </div>
               {upcoming.length===0?<div style={{fontSize:12,color:'var(--text-3)',textAlign:'center',padding:'8px 0'}}>Nothing upcoming</div>
                 :upcoming.map((item,i)=>{
                   const due=item._type==='assignment'?formatRelativeDue(item.due,''):null
                   const planDate=item._type==='plan'?new Date(item.date+'T12:00:00').toLocaleDateString('en-US',{month:'short',day:'numeric'}):null
-                  const color=item.courseColor||item.color||'var(--accent)',isFirst=i===0
+                  const color=item.courseColor||item.color||'var(--accent-primary)',isFirst=i===0
                   return(<div key={item.id||i} style={{padding:isFirst?'8px 10px':'5px 10px',borderRadius:8,background:isFirst?'var(--glass-bg-2)':'transparent',border:isFirst?'1px solid var(--glass-border)':'none',borderLeft:`3px solid ${isFirst?color:'var(--glass-border)'}`,opacity:isFirst?1:.75,marginBottom:4}}>
                     <div style={{display:'flex',alignItems:'center',gap:5,marginBottom:2}}>
                       {item._type==='plan'&&<span style={{fontSize:9}}>📅</span>}
@@ -562,41 +597,50 @@ export default function WeeklyHome({ onDataChange }) {
 
             <CountdownCards/>
 
-            <div className="card" style={{textAlign:'center'}}>
-              <div className="card-title">Pomodoro timer</div>
-              <div style={{display:'flex',gap:4,justifyContent:'center',marginBottom:14}}>
-                {[['focus','🎯 Focus'],['short','☕ Short'],['long','🌿 Long']].map(([k,label])=>(
-                  <button key={k} onClick={()=>{setMode(k);setSecs(timerMins[k]*60);setRunning(false)}} style={{padding:'4px 10px',borderRadius:20,border:`1px solid ${mode===k?'var(--accent)':'var(--glass-border)'}`,background:mode===k?'var(--accent-dim)':'transparent',color:mode===k?'var(--accent)':'var(--text-3)',fontSize:11,fontWeight:600,cursor:'pointer'}}>{label}</button>
-                ))}
-              </div>
-              <div style={{position:'relative',width:110,height:110,margin:'0 auto 12px'}}>
-                <svg width="110" height="110" style={{position:'absolute',top:0,left:0,transform:'rotate(-90deg)'}}>
-                  <circle cx="55" cy="55" r="48" fill="none" stroke="var(--glass-border)" strokeWidth="5"/>
-                  <circle cx="55" cy="55" r="48" fill="none" stroke="var(--accent)" strokeWidth="5" strokeDasharray={`${2*Math.PI*48}`} strokeDashoffset={`${2*Math.PI*48*(1-pct/100)}`} strokeLinecap="round" style={{transition:'stroke-dashoffset .5s'}}/>
-                </svg>
-                <div style={{position:'absolute',inset:0,display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'center'}}>
-                  <div style={{fontFamily:'var(--font-mono)',fontSize:22,fontWeight:700}}>{mm}:{ss2}</div>
-                  <div style={{fontSize:10,color:'var(--text-3)',textTransform:'uppercase',letterSpacing:'.06em'}}>{mode}</div>
-                </div>
-              </div>
-              <div style={{display:'flex',gap:8,justifyContent:'center'}}>
-                <button className="btn btn-primary" onClick={()=>setRunning(r=>!r)} style={{minWidth:80}}>{running?'Pause':'Start'}</button>
-                <button className="btn btn-ghost" onClick={()=>{setRunning(false);setSecs(timerMins[mode]*60)}}>Reset</button>
-                <button className="btn-icon" onClick={()=>setShowSettings(s=>!s)} style={{padding:7}}>⚙</button>
-              </div>
-              {showSettings&&(<div style={{marginTop:12,padding:10,background:'var(--glass-bg-2)',borderRadius:'var(--radius-md)',display:'flex',flexDirection:'column',gap:8}}>
-                {[['focus','Focus (min)'],['short','Short break'],['long','Long break']].map(([k,label])=>(
-                  <div key={k} style={{display:'flex',alignItems:'center',gap:8}}>
-                    <span style={{fontSize:11,flex:1,color:'var(--text-2)',textAlign:'left'}}>{label}</span>
-                    <input type="number" min="1" max="120" style={{...inputSm,width:56,textAlign:'center'}} value={draftTimers[k]} onChange={e=>setDraftTimers(d=>({...d,[k]:Number(e.target.value)}))}/>
-                  </div>
-                ))}
-                <button className="btn btn-primary" style={{fontSize:12}} onClick={()=>{setTimerMins(draftTimers);setSecs(draftTimers[mode]*60);setRunning(false);setShowSettings(false)}}>Save</button>
-              </div>)}
-            </div>
           </div>
         </div>
       </div>
+
+      {/* Upcoming assignments modal */}
+      {showUpcomingModal && (() => {
+        const all = getAllUpcomingAssignments()
+        return (
+          <div style={{position:'fixed',inset:0,zIndex:1000,display:'flex',alignItems:'center',justifyContent:'center',padding:16,background:'var(--overlay)',backdropFilter:'blur(4px)'}} onClick={()=>setShowUpcomingModal(false)}>
+            <div className="card" style={{maxWidth:480,width:'100%',padding:0,overflow:'hidden',maxHeight:'80vh',display:'flex',flexDirection:'column'}} onClick={e=>e.stopPropagation()}>
+              <div style={{padding:'18px 20px 14px',borderBottom:'1px solid var(--glass-border)',display:'flex',alignItems:'center',justifyContent:'space-between',background:'var(--glass-bg-2)'}}>
+                <div>
+                  <div style={{fontWeight:700,fontSize:15,color:'var(--text-1)'}}>All Upcoming</div>
+                  <div style={{fontSize:12,color:'var(--text-3)',marginTop:2}}>{all.length} assignment{all.length!==1?'s':''} remaining</div>
+                </div>
+                <button onClick={()=>setShowUpcomingModal(false)} style={{background:'none',border:'none',color:'var(--text-3)',cursor:'pointer',padding:4,display:'flex'}}><X size={16}/></button>
+              </div>
+              <div style={{overflow:'auto',flex:1,padding:'10px 12px'}}>
+                {all.length===0 && <div style={{textAlign:'center',color:'var(--text-3)',fontSize:13,padding:'20px 0'}}>Nothing upcoming — all clear!</div>}
+                {all.map(a => {
+                  const due = formatRelativeDue(a.due, a.dueTime)
+                  return (
+                    <div key={a.id} style={{display:'flex',alignItems:'flex-start',gap:10,padding:'10px 10px',borderRadius:6,marginBottom:6,background:'var(--surface-row)',border:`1px solid var(--glass-border)`,borderLeft:`3px solid ${a.courseColor}`}}>
+                      <div style={{flex:1,minWidth:0}}>
+                        <div style={{fontWeight:600,fontSize:13,color:'var(--text-1)',marginBottom:2}}>{a.title}</div>
+                        <div style={{fontSize:11,color:'var(--text-3)'}}>{a.courseName} · {a.type}</div>
+                        <div style={{fontSize:12,fontWeight:700,color:due.color,marginTop:3}}>{due.label}</div>
+                      </div>
+                      <div style={{display:'flex',flexDirection:'column',gap:5,flexShrink:0}}>
+                        <button className="btn btn-ghost" style={{fontSize:11,padding:'4px 10px'}} onClick={()=>{setShowUpcomingModal(false);navigate('/courses',{state:{highlightId:a.id}})}}>
+                          Assignments
+                        </button>
+                        <button className="btn btn-ghost" style={{fontSize:11,padding:'4px 10px'}} onClick={()=>{setShowUpcomingModal(false);navigate('/calendar',{state:{date:a.due}})}}>
+                          Calendar
+                        </button>
+                      </div>
+                    </div>
+                  )
+                })}
+              </div>
+            </div>
+          </div>
+        )
+      })()}
 
       {/* In-app confirm modal for linked task/plan deletion */}
       {confirmModal && (

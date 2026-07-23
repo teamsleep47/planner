@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react'
+import { useLocation } from 'react-router-dom'
 import { Plus, Trash2, Edit2, Check, X, ChevronDown, ChevronUp, BookOpen, ExternalLink } from 'lucide-react'
 import { loadTerms, saveTerms, uid, ASSIGNMENT_TYPES, getCourseColorMap } from '../utils/termData.js'
 import { formatRelativeDue } from '../utils/timeFormat.js'
@@ -30,6 +31,7 @@ const BLANK_ASSIGN  = { title:'', type:ASSIGNMENT_TYPES[0], due:'', dueTime:'', 
 const ACCORDION_KEY = 'courses_accordion_state'
 
 export default function Courses({ onDataChange }) {
+  const location = useLocation()
   const [terms,        setTerms]        = useState(()=>loadTerms())
   const [activeTermId, setActiveTermId] = useState(()=>{ const t=loadTerms().find(t=>t.active); return t?.id||loadTerms()[0]?.id })
   // Accordion state: { courseId: bool } — persisted to localStorage
@@ -80,6 +82,17 @@ export default function Courses({ onDataChange }) {
   },[])
   useEffect(()=>{ if(!jumpAssignId)return; const t=setTimeout(()=>setJumpAssignId(null),2500); return()=>clearTimeout(t) },[jumpAssignId])
 
+  // Navigation state highlight (from Upcoming modal)
+  useEffect(()=>{
+    const id=location.state?.highlightId
+    if(!id)return
+    setJumpAssignId(id)
+    const t=loadTerms()
+    const active=t.find(x=>x.active)||t[0]
+    active?.courses.forEach(c=>{ if(c.assignments.some(a=>a.id===id)) setExpanded(e=>({...e,[c.id]:true})) })
+    setTimeout(()=>{ const el=document.getElementById(`assign-${id}`); el?.scrollIntoView({behavior:'smooth',block:'center'}) },350)
+  },[])
+
   const toggleExpanded = (courseId) => setExpanded(e=>({...e,[courseId]:!e[courseId]}))
   const isExpanded     = (courseId) => expanded[courseId] !== false // default open
 
@@ -88,13 +101,13 @@ export default function Courses({ onDataChange }) {
 
   // Term ops
   const addTerm    = ()=>{ if(!newTermName.trim())return; updateTerms(ts=>[...ts,{id:uid(),name:newTermName.trim(),active:false,courses:[]}]); setNewTermName(''); setShowAddTerm(false) }
-  const deleteTerm = id=>{ if(!confirm('Delete this term?'))return; updateTerms(ts=>ts.filter(t=>t.id!==id)); if(activeTermId===id) setActiveTermId(terms.find(t=>t.id!==id)?.id) }
+  const deleteTerm = id=>{ setDeleteTarget({kind:'term',termId:id,title:terms.find(t=>t.id===id)?.name||'this term'}) }
   const setActiveTerm=id=>{ setActiveTermId(id); updateTerms(ts=>ts.map(t=>({...t,active:t.id===id}))) }
   const saveTermName=id=>{ updateTerms(ts=>ts.map(t=>t.id===id?{...t,name:editTermName}:t)); setEditTermId(null) }
 
   // Course ops
   const addCourse  =(termId)=>{ if(!newCourse.name.trim())return; const nid=uid(); updateTerms(ts=>ts.map(t=>t.id!==termId?t:{...t,courses:[...t.courses,{...newCourse,id:nid,assignments:[]}]})); setNewCourse(BLANK_COURSE); setShowAddCourse(null); setExpanded(e=>({...e,[nid]:true})) }
-  const deleteCourse=(termId,courseId)=>{ if(!confirm('Delete this course?'))return; updateTerms(ts=>ts.map(t=>t.id!==termId?t:{...t,courses:t.courses.filter(c=>c.id!==courseId)})) }
+  const deleteCourse=(termId,courseId)=>{ const c=terms.find(t=>t.id===termId)?.courses.find(c=>c.id===courseId); setDeleteTarget({kind:'course',termId,courseId,title:c?.name||'this course'}) }
   const saveCourse =(termId,courseId)=>{ updateTerms(ts=>ts.map(t=>t.id!==termId?t:{...t,courses:t.courses.map(c=>c.id!==courseId?c:{...c,...editCourseForm})})); setEditCourseId(null) }
 
   // Assignment ops
@@ -392,11 +405,23 @@ export default function Courses({ onDataChange }) {
       {deleteTarget && (
         <div style={{position:'fixed',inset:0,background:'var(--overlay)',display:'flex',alignItems:'center',justifyContent:'center',zIndex:9999}}>
           <div style={{background:'var(--panel-bg)',border:'1px solid var(--glass-border)',borderRadius:'var(--radius-lg)',padding:'24px 28px',maxWidth:360,width:'90%',boxShadow:'var(--shadow)'}}>
-            <p style={{color:'var(--text-1)',fontWeight:600,marginBottom:8}}>Delete assignment?</p>
+            <p style={{color:'var(--text-1)',fontWeight:600,marginBottom:8}}>
+              {deleteTarget.kind==='term'?'Delete term?':deleteTarget.kind==='course'?'Delete course?':'Delete assignment?'}
+            </p>
             <p style={{color:'var(--text-2)',fontSize:13,marginBottom:20}}>"{deleteTarget.title}" will be permanently removed.</p>
             <div style={{display:'flex',gap:8,justifyContent:'flex-end'}}>
-              <button onClick={()=>setDeleteTarget(null)} style={{padding:'7px 16px',background:'var(--surface-chip)',border:'1px solid var(--glass-border)',borderRadius:'var(--radius-sm)',color:'var(--text-2)',cursor:'pointer',fontSize:13}}>Cancel</button>
-              <button onClick={()=>{deleteAssign(deleteTarget.termId,deleteTarget.courseId,deleteTarget.assignmentId);setDeleteTarget(null)}} style={{padding:'7px 16px',background:'var(--danger-surface)',border:'1px solid var(--danger)',borderRadius:'var(--radius-sm)',color:'var(--danger)',cursor:'pointer',fontSize:13,fontWeight:600}}>Delete</button>
+              <button onClick={()=>setDeleteTarget(null)} className="btn btn-ghost" style={{fontSize:13}}>Cancel</button>
+              <button onClick={()=>{
+                if(deleteTarget.kind==='term'){
+                  updateTerms(ts=>ts.filter(t=>t.id!==deleteTarget.termId))
+                  if(activeTermId===deleteTarget.termId) setActiveTermId(terms.find(t=>t.id!==deleteTarget.termId)?.id)
+                } else if(deleteTarget.kind==='course'){
+                  updateTerms(ts=>ts.map(t=>t.id!==deleteTarget.termId?t:{...t,courses:t.courses.filter(c=>c.id!==deleteTarget.courseId)}))
+                } else {
+                  deleteAssign(deleteTarget.termId,deleteTarget.courseId,deleteTarget.assignmentId)
+                }
+                setDeleteTarget(null)
+              }} style={{padding:'7px 16px',background:'var(--danger-surface)',border:'1px solid var(--danger)',borderRadius:'var(--radius-sm)',color:'var(--danger)',cursor:'pointer',fontSize:13,fontWeight:600}}>Delete</button>
             </div>
           </div>
         </div>

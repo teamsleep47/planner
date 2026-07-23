@@ -35,6 +35,7 @@ export default function FlashcardsPage({ onDataChange }) {
   const [editDeckId,   setEditDeckId]   = useState(null)
   const [editDeckForm, setEditDeckForm]  = useState({name:'',course:''})
   const [addingCard, setAddingCard] = useState(false)
+  const [deckDeleteTarget, setDeckDeleteTarget] = useState(null)
   const [newFront,   setNewFront]   = useState('')
   const [newBack,    setNewBack]    = useState('')
   const [editCardId,  setEditCardId]  = useState(null)
@@ -67,7 +68,6 @@ export default function FlashcardsPage({ onDataChange }) {
     setEditDeckId(null)
   }
   const deleteDeck = id => {
-    if (!confirm('Delete this deck and all its cards?')) return
     setDecks(ds => ds.filter(d => d.id!==id))
     setCards(cs => cs.filter(c => c.deckId!==id))
     if (activeDeck?.id === id) setActiveDeck(null)
@@ -281,7 +281,7 @@ export default function FlashcardsPage({ onDataChange }) {
                           <Edit2 size={10}/>
                         </button>
                       )}
-                      <button onClick={e=>{e.stopPropagation();deleteDeck(deck.id)}} style={{background:'none',border:'none',color:'var(--text-3)',cursor:'pointer',padding:2,opacity:.6}}>
+                      <button onClick={e=>{e.stopPropagation();setDeckDeleteTarget(deck)}} style={{background:'none',border:'none',color:'var(--text-3)',cursor:'pointer',padding:2,opacity:.6}}>
                         <Trash2 size={11}/>
                       </button>
                     </div>
@@ -411,6 +411,19 @@ export default function FlashcardsPage({ onDataChange }) {
           </div>
         )}
       </div>
+
+      {deckDeleteTarget && (
+        <div style={{position:'fixed',inset:0,zIndex:9999,display:'flex',alignItems:'center',justifyContent:'center',background:'var(--overlay)',backdropFilter:'blur(4px)'}} onClick={()=>setDeckDeleteTarget(null)}>
+          <div className="card" style={{maxWidth:320,width:'90%',padding:24,textAlign:'center'}} onClick={e=>e.stopPropagation()}>
+            <div style={{fontWeight:700,fontSize:15,color:'var(--text-1)',marginBottom:8}}>Delete deck?</div>
+            <div style={{fontSize:13,color:'var(--text-2)',marginBottom:20,lineHeight:1.5}}>"{deckDeleteTarget.name}" and all its cards will be permanently removed.</div>
+            <div style={{display:'flex',gap:8,justifyContent:'center'}}>
+              <button className="btn btn-ghost" onClick={()=>setDeckDeleteTarget(null)} style={{flex:1}}>Cancel</button>
+              <button className="btn" onClick={()=>{deleteDeck(deckDeleteTarget.id);setDeckDeleteTarget(null)}} style={{flex:1,background:'var(--coral)',color:'white',border:'none'}}>Delete</button>
+            </div>
+          </div>
+        </div>
+      )}
     </>
   )
 }

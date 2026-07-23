@@ -63,6 +63,7 @@ export default function SettingsPage({ onDataChange, allNav=[], hiddenTabs=[], s
   const [showWarn,   setShowWarn]   = useState(!hasWarned())
   const [saved,      setSaved]      = useState(false)
   const [flashMsg,   setFlashMsg]   = useState(null)
+  const [wipeConfirm, setWipeConfirm] = useState(false)
 
   const hasToken = !!getCanvasToken()
 
@@ -179,14 +180,7 @@ export default function SettingsPage({ onDataChange, allNav=[], hiddenTabs=[], s
                 reader.readAsText(file)
               }; input.click()
             }}>📤 Import backup</button>
-            <button className="btn btn-ghost" style={{color:'var(--coral)'}} onClick={()=>{
-              if(!confirm('Wipe ALL data? Cannot be undone.')) return
-              const prefixes=['planner_v1_']; const exactKeys=['canvas_token_v1','canvas_url_v1','canvas_ical_v1','canvas_warned_v1']
-              Object.keys(localStorage).filter(k=>prefixes.some(p=>k.startsWith(p))).forEach(k=>localStorage.removeItem(k))
-              exactKeys.forEach(k=>localStorage.removeItem(k))
-              sessionStorage.clear()
-              fbSignOut(fbAuth).catch(()=>{}).finally(()=>window.location.reload())
-            }}>🗑 Wipe all data</button>
+            <button className="btn btn-ghost" style={{color:'var(--coral)'}} onClick={()=>setWipeConfirm(true)}>🗑 Wipe all data</button>
           </div>
         </div>
 
@@ -269,6 +263,27 @@ export default function SettingsPage({ onDataChange, allNav=[], hiddenTabs=[], s
           color: flashMsg.type==='error' ? 'var(--coral)' : 'var(--green)',
           fontSize:13, fontWeight:600, zIndex:9999, boxShadow:'var(--shadow)',
         }}>{flashMsg.text}</div>
+      )}
+
+      {wipeConfirm && (
+        <div style={{position:'fixed',inset:0,zIndex:9999,display:'flex',alignItems:'center',justifyContent:'center',background:'var(--overlay)',backdropFilter:'blur(4px)'}} onClick={()=>setWipeConfirm(false)}>
+          <div className="card" style={{maxWidth:340,width:'90%',padding:24,textAlign:'center'}} onClick={e=>e.stopPropagation()}>
+            <div style={{fontSize:28,marginBottom:10}}>⚠️</div>
+            <div style={{fontWeight:700,fontSize:15,color:'var(--text-1)',marginBottom:8}}>Wipe all data?</div>
+            <div style={{fontSize:13,color:'var(--text-2)',marginBottom:20,lineHeight:1.5}}>This will permanently delete all your tasks, assignments, calendar blocks, and settings. This cannot be undone.</div>
+            <div style={{display:'flex',gap:8,justifyContent:'center'}}>
+              <button className="btn btn-ghost" onClick={()=>setWipeConfirm(false)} style={{flex:1}}>Cancel</button>
+              <button className="btn" onClick={()=>{
+                setWipeConfirm(false)
+                const prefixes=['planner_v1_']; const exactKeys=['canvas_token_v1','canvas_url_v1','canvas_ical_v1','canvas_warned_v1']
+                Object.keys(localStorage).filter(k=>prefixes.some(p=>k.startsWith(p))).forEach(k=>localStorage.removeItem(k))
+                exactKeys.forEach(k=>localStorage.removeItem(k))
+                sessionStorage.clear()
+                fbSignOut(fbAuth).catch(()=>{}).finally(()=>window.location.reload())
+              }} style={{flex:1,background:'var(--coral)',color:'white',border:'none'}}>Wipe all</button>
+            </div>
+          </div>
+        </div>
       )}
     </>
   )

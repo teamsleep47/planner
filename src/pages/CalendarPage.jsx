@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from 'react'
 import { ChevronLeft, ChevronRight, X, ExternalLink, Edit2, Trash2, Check, Circle, CheckCircle2 } from 'lucide-react'
 import { load, save } from '../utils/storage.js'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, useLocation } from 'react-router-dom'
 import { loadTerms, saveTerms, uid, ASSIGNMENT_TYPES, getCourseColorMap } from '../utils/termData.js'
 import { formatRelativeDue } from '../utils/timeFormat.js'
 
@@ -96,7 +96,7 @@ function PlanPopup({ plan, anchor, onClose, onEdit, onDelete }) {
           <button onClick={()=>{onEdit();onClose()}} className="btn btn-primary" style={{flex:1,justifyContent:'center',gap:6,fontSize:13}}>
             <Edit2 size={13}/> Edit
           </button>
-          <button onClick={()=>{if(confirm('Delete this plan?')){onDelete();onClose()}}} className="btn btn-ghost" style={{color:'var(--coral)',fontSize:13,padding:'8px 12px'}}>
+          <button onClick={()=>{onDelete();onClose()}} className="btn btn-ghost" style={{color:'var(--coral)',fontSize:13,padding:'8px 12px'}}>
             <Trash2 size={13}/>
           </button>
         </div>
@@ -238,7 +238,7 @@ function PlanEditModal({ plan, onClose, onSave, onDelete, onAddAsTask }) {
 
           <div style={{display:'flex',gap:8}}>
             <button className="btn btn-primary" style={{flex:1,justifyContent:'center'}} onClick={()=>{ if(!form.title.trim()) return; onSave(form); onClose() }}>Save</button>
-            <button className="btn btn-ghost" style={{color:'var(--coral)'}} onClick={()=>{ if(confirm('Delete this plan?')) { onDelete(); onClose() } }}><Trash2 size={13}/></button>
+            <button className="btn btn-ghost" style={{color:'var(--coral)'}} onClick={()=>{ onDelete(); onClose() }}><Trash2 size={13}/></button>
             <button className="btn btn-ghost" onClick={onClose}>Cancel</button>
           </div>
         </div>
@@ -511,7 +511,11 @@ function DayOverlay({ ds, x, y, assignments, plans, onClose, onAssignClick, onPl
 // ── Main calendar ────────────────────────────────────────────────
 export default function CalendarPage({ onDataChange }) {
   const navigate   = useNavigate()
-  const [anchor,   setAnchor]   = useState(new Date())
+  const location   = useLocation()
+  const [anchor,   setAnchor]   = useState(() => {
+    if (location.state?.date) return new Date(location.state.date + 'T12:00:00')
+    return new Date()
+  })
   const [popup,    setPopup]    = useState(null)
   const [addModal, setAddModal] = useState(null)   // date string
   const [editPlan,      setEditPlan]      = useState(null)

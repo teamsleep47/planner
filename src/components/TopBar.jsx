@@ -14,8 +14,8 @@ const DEFAULT_LINKS = [
 
 // Kept in sync with App.jsx ALL_KEYS
 const ALL_KEYS = [
-  'home_tasks', 'study_sessions', 'habit_grid', 'habit_history',
-  'timer_settings', 'streak', 'study_week_goal', 'sem_end_date',
+  'home_tasks', 'habit_grid', 'habit_history',
+  'streak', 'sem_end_date',
   'terms_v1', 'assignments',
   'habits_config', 'recurring_tasks', 'rec_history', 'goals_config',
   'course_notes', 'full_course_notes', 'full_course_notes_v2',
