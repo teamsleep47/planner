@@ -1,9 +1,8 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { ChevronLeft, ChevronRight, X, ExternalLink, Edit2, Trash2, Check, Circle, CheckCircle2 } from 'lucide-react'
 import { load, save } from '../utils/storage.js'
 import { useNavigate } from 'react-router-dom'
 import { loadTerms, saveTerms, uid, ASSIGNMENT_TYPES, getCourseColorMap } from '../utils/termData.js'
-import { useSaveHalo } from '../hooks/useSaveHalo.js'
 import { formatRelativeDue } from '../utils/timeFormat.js'
 
 const MONTHS  = ['January','February','March','April','May','June','July','August','September','October','November','December']
@@ -134,6 +133,7 @@ function AssignmentPopup({ item, anchor, onClose, onJump }) {
           {item.type && <div style={{display:'flex',alignItems:'center',gap:8}}><span style={{fontSize:11,color:'var(--text-3)',width:44}}>Type</span><span style={{fontSize:12,color:'var(--text-2)'}}>{item.type}</span></div>}
           {badge.label && <div style={{display:'flex',alignItems:'center',gap:8}}><span style={{fontSize:11,color:'var(--text-3)',width:44}}>Priority</span><span style={{fontSize:12,color:badge.color,fontWeight:600}}>{badge.label}</span></div>}
           {item.notes && <div style={{fontSize:11,color:'var(--text-3)',lineHeight:1.5,background:'var(--glass-bg)',borderRadius:6,padding:'7px 9px',maxHeight:60,overflow:'hidden',WebkitMaskImage:'linear-gradient(to bottom,black 60%,transparent 100%)'}}>{item.notes}</div>}
+          {item.url && <div style={{display:'flex',alignItems:'center',gap:8}}><span style={{fontSize:11,color:'var(--text-3)',width:44}}>Link</span><button onClick={()=>openUrl(item.url)} style={{background:'none',border:'none',padding:0,cursor:'pointer',color:'var(--accent)',fontSize:12,display:'flex',alignItems:'center',gap:4,fontFamily:'inherit'}}><ExternalLink size={11}/>Open reference</button></div>}
         </div>
         <div style={{padding:'0 14px 14px'}}>
           <button onClick={onJump} className="btn btn-primary" style={{width:'100%',justifyContent:'center',gap:6,fontSize:13}}>
@@ -510,7 +510,6 @@ function DayOverlay({ ds, x, y, assignments, plans, onClose, onAssignClick, onPl
 
 // ── Main calendar ────────────────────────────────────────────────
 export default function CalendarPage({ onDataChange }) {
-  const { haloRef: calHaloRef, triggerHalo: triggerCalHalo } = useSaveHalo()
   const navigate   = useNavigate()
   const [anchor,   setAnchor]   = useState(new Date())
   const [popup,    setPopup]    = useState(null)
@@ -521,12 +520,14 @@ export default function CalendarPage({ onDataChange }) {
   const [plans,         setPlans]         = useState(() => load('calendar_plans', []))
   const [dragPill,      setDragPill]      = useState(null)   // { type:'plan'|'assignment', item, originDate }
   const [dragOverDate,  setDragOverDate]  = useState(null)
+  const [planDragOverId, setPlanDragOverId] = useState(null)
+  const planDragId = useRef(null)
   const [dupModal,      setDupModal]      = useState(null)   // { type, item, newDate, oldDate }
   const [confirmDelete, setConfirmDelete] = useState(null)   // { planId, taskId, planTitle }
 
   const [assignments, setAssignments] = useState(() => getAllAssignments())
 
-  useEffect(() => { save('calendar_plans', plans); onDataChange?.(); triggerCalHalo('green') }, [plans])
+  useEffect(() => { save('calendar_plans', plans); onDataChange?.() }, [plans])
 
   // Re-read plans and assignments when Drive syncs or assignments updated
   useEffect(() => {
@@ -592,6 +593,7 @@ export default function CalendarPage({ onDataChange }) {
     })
     saveTerms(updated)
     onDataChange?.()
+    window.dispatchEvent(new Event('assignments-updated'))
   }
 
   const handleSavePlan = (form, taskData) => {
@@ -753,7 +755,7 @@ export default function CalendarPage({ onDataChange }) {
       </div>
 
       {/* Grid */}
-      <div ref={calHaloRef} style={{margin:'0 24px 24px',background:'var(--glass-bg)',border:'1px solid var(--glass-border)',borderRadius:'var(--radius-lg)',overflow:'hidden'}}>
+      <div style={{margin:'0 24px 24px',background:'var(--glass-bg)',border:'1px solid var(--glass-border)',borderRadius:'var(--radius-lg)',overflow:'hidden'}}>
         {/* Day headers */}
         <div style={{display:'grid',gridTemplateColumns:'repeat(7,1fr)',background:'var(--glass-bg-2)',borderBottom:'1px solid var(--glass-border)'}}>
           {DAYS_S.map(d=>(
@@ -838,10 +840,13 @@ export default function CalendarPage({ onDataChange }) {
                 {dayPlan.map((p,pi)=>(
                   <div key={`p-${p.id}-${pi}`}
                     draggable
-                    onDragStart={e=>handlePillDragStart(e,'plan',p)}
-                    style={{display:'flex',alignItems:'center',gap:2,marginBottom:2,borderRadius:0,background:`${p.color}30`,borderLeft:`3px solid ${p.color}`,color:p.color,transition:'all .1s',cursor:'grab',opacity:p.done?0.5:1,filter:p.done?'saturate(0.2)':'none'}}
+                    onDragStart={e=>{ handlePillDragStart(e,'plan',p); planDragId.current=p.id }}
+                    onDragOver={e=>{ e.preventDefault(); e.stopPropagation(); if(planDragId.current&&planDragId.current!==p.id) setPlanDragOverId(p.id) }}
+                    onDragLeave={()=>setPlanDragOverId(null)}
+                    onDrop={e=>{ e.preventDefault(); e.stopPropagation(); const fromId=planDragId.current; if(!fromId||fromId===p.id){setPlanDragOverId(null);return}; setPlans(ps=>{const same=ps.filter(q=>q.date===p.date);const rest=ps.filter(q=>q.date!==p.date);const fi=same.findIndex(q=>q.id===fromId);const ti=same.findIndex(q=>q.id===p.id);if(fi===-1||ti===-1)return ps;const r=[...same];const[m]=r.splice(fi,1);r.splice(ti,0,m);return[...rest,...r]}); planDragId.current=null; setPlanDragOverId(null) }}
+                    style={{display:'flex',alignItems:'center',gap:2,marginBottom:2,borderRadius:0,background:planDragOverId===p.id?`${p.color}55`:`${p.color}30`,borderLeft:`3px solid ${p.color}`,color:p.color,transition:'all .1s',cursor:'grab',opacity:p.done?0.5:1,filter:p.done?'saturate(0.2)':'none',outline:planDragOverId===p.id?`1px dashed ${p.color}`:'none'}}
                     onMouseEnter={e=>e.currentTarget.style.background=`${p.color}48`}
-                    onMouseLeave={e=>e.currentTarget.style.background=`${p.color}30`}
+                    onMouseLeave={e=>e.currentTarget.style.background=planDragOverId===p.id?`${p.color}55`:`${p.color}30`}
                   >
                     <span onClick={e=>{e.stopPropagation();setPlans(ps=>ps.map(q=>q.id===p.id?{...q,done:!q.done}:q))}} style={{cursor:'pointer',display:'flex',alignItems:'center',padding:'2px 2px 2px 4px',flexShrink:0}}>
                       {p.done ? <CheckCircle2 size={9} style={{color:'var(--accent)'}}/> : <Circle size={9} style={{color:'var(--text-3)'}}/>}

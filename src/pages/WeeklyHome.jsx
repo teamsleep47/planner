@@ -4,7 +4,6 @@ import { load, save } from '../utils/storage.js'
 import { formatRelativeDue } from '../utils/timeFormat.js'
 import { getActiveTermCourses, getCourseColorMap } from '../utils/termData.js'
 import Tooltip from '../components/Tooltip.jsx'
-import { useSaveHalo } from '../hooks/useSaveHalo.js'
 
 const URGENCY = {
   urgent: { color:'#ef4444', label:'🔴 Urgent' },
@@ -233,8 +232,6 @@ export default function WeeklyHome({ onDataChange }) {
   const [expandedTaskId, setExpandedTaskId] = useState(null)
   const [confirmModal,   setConfirmModal]   = useState(null) // { type, taskId, planId, message }
   const timerRef = useRef(null)
-  const { haloRef: taskHaloRef, triggerHalo: triggerTaskHalo } = useSaveHalo()
-
   const COURSE_COLORS = getCourseColorMap()
   const courseOptions = [...getActiveTermCourses().map(c=>c.name),'OTHER']
 
@@ -242,7 +239,6 @@ export default function WeeklyHome({ onDataChange }) {
   useEffect(()=>{
     save('home_tasks',tasks)
     onDataChange?.()
-    triggerTaskHalo('green')
   },[tasks])
   useEffect(()=>{ save('timer_settings',timerMins) },[timerMins])
   useEffect(()=>{ save('sem_end_date',semDate) },[semDate])
@@ -458,7 +454,7 @@ export default function WeeklyHome({ onDataChange }) {
         </div>
 
         <div className="home-main-grid">
-          <div className="card home-tasks-col" ref={taskHaloRef}>
+          <div className="card home-tasks-col">
             <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:8}}>
               <span className="card-title" style={{margin:0}}>Today's focus</span>
               <div style={{display:'flex',gap:6}}>

@@ -6,6 +6,7 @@ export default function LoginPage({ onSignIn, error, loading }) {
       alignItems: 'center',
       justifyContent: 'center',
       padding: 24,
+      background: 'radial-gradient(ellipse at 20% 30%, var(--bg-mesh-1) 0%, transparent 60%), radial-gradient(ellipse at 80% 70%, var(--bg-mesh-2) 0%, transparent 60%), var(--bg-base)',
     }}>
       <div style={{
         background: 'var(--glass-bg-2)',
@@ -19,17 +20,7 @@ export default function LoginPage({ onSignIn, error, loading }) {
         textAlign: 'center',
         boxShadow: 'var(--shadow)',
       }}>
-        <div style={{display:'flex',justifyContent:'center',marginBottom:28}}>
-          <svg width="52" height="52" viewBox="0 0 32 32">
-            <rect width="32" height="32" rx="9" fill="var(--accent)"/>
-            <rect x="6" y="6" width="8" height="8" rx="2.5" fill="white" opacity="0.95"/>
-            <rect x="18" y="6" width="8" height="8" rx="2.5" fill="white" opacity="0.55"/>
-            <rect x="6" y="18" width="8" height="8" rx="2.5" fill="white" opacity="0.55"/>
-            <rect x="18" y="18" width="8" height="8" rx="2.5" fill="white" opacity="0.95"/>
-          </svg>
-        </div>
-
-        <h1 style={{fontSize:26,fontWeight:700,letterSpacing:'-0.5px',marginBottom:8}}>My Planner</h1>
+        <h1 style={{fontSize:26,fontWeight:700,letterSpacing:'-0.5px',marginBottom:8}}>Assignment Planner</h1>
         <p style={{fontSize:14,color:'var(--text-2)',marginBottom:36}}>
           Your academic dashboard — sign in to continue
         </p>

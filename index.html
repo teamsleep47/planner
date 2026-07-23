@@ -7,6 +7,13 @@
     <meta name="theme-color" content="#111920" />
     <link rel="manifest" href="./manifest.json" />
     <title>Assignment Planner</title>
+    <script>
+      if ('serviceWorker' in navigator) {
+        navigator.serviceWorker.getRegistrations().then(regs => {
+          regs.forEach(r => r.unregister())
+        })
+      }
+    </script>
   </head>
   <body>
     <div id="root"></div>
