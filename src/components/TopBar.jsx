@@ -171,6 +171,12 @@ export default function TopBar({ theme, toggleTheme, saveState, onLinksChange, n
   useEffect(() => { onLinksChange?.() }, [links])
 
   useEffect(() => {
+    const handler = () => setLinks(load('quick_links', DEFAULT_LINKS))
+    window.addEventListener('drive-loaded', handler)
+    return () => window.removeEventListener('drive-loaded', handler)
+  }, [])
+
+  useEffect(() => {
     const handler = () => { setShowSaved(true); setTimeout(() => setShowSaved(false), 2000) }
     window.addEventListener('data-saved', handler)
     return () => window.removeEventListener('data-saved', handler)
