@@ -806,8 +806,9 @@ export default function CalendarPage({ onDataChange }) {
     const has = direction === 'prev' ? hasPulsingInPast : hasPulsingInFuture
     if (!has || !pulsingGroup) return {}
     return {
-      '--arrow-pc': `${pulsingGroup.color}99`,
-      animation: 'arrowGlow 1.2s ease-in-out infinite',
+      '--pc-light': `${pulsingGroup.color}55`,
+      '--pc-mid':   `${pulsingGroup.color}99`,
+      animation: 'groupPulse 2s ease-in-out infinite',
       background: `${pulsingGroup.color}22`,
       border: `1px solid ${pulsingGroup.color}66`,
     }
@@ -819,12 +820,8 @@ export default function CalendarPage({ onDataChange }) {
     <>
       <style>{`
         @keyframes groupPulse {
-          0%,100% { box-shadow: 0 1px 3px rgba(0,0,0,.25); }
-          50%     { box-shadow: 0 0 0 3px var(--pc-light), 0 0 16px var(--pc-mid); }
-        }
-        @keyframes groupPulseDim {
-          0%,100% { box-shadow: 0 1px 3px rgba(0,0,0,.1); }
-          50%     { box-shadow: 0 0 0 2px var(--pc-light), 0 0 8px var(--pc-mid); }
+          0%,100% { box-shadow: 0 1px 3px rgba(0,0,0,.2); }
+          50%     { box-shadow: 0 0 0 3px var(--pc-light), 0 0 14px var(--pc-mid); }
         }
         @keyframes chipRing {
           0%,100% { outline-color: var(--pc-light); outline-offset: 1px; }
@@ -836,10 +833,6 @@ export default function CalendarPage({ onDataChange }) {
           40%     { transform: translateX(4px); }
           60%     { transform: translateX(-3px); }
           80%     { transform: translateX(3px); }
-        }
-        @keyframes arrowGlow {
-          0%,100% { box-shadow: none; }
-          50%     { box-shadow: 0 0 0 2px var(--arrow-pc), 0 0 10px var(--arrow-pc); }
         }
       `}</style>
 
@@ -984,16 +977,16 @@ export default function CalendarPage({ onDataChange }) {
                   const isShaking = shakingChipId === p.id
 
                   const pulseVars = isPulsing && grp ? {
-                    '--pc-light': p.done ? `${grp.color}22` : `${grp.color}55`,
-                    '--pc-mid':   p.done ? `${grp.color}44` : `${grp.color}aa`,
+                    '--pc-light': p.done ? `${grp.color}44` : `${grp.color}55`,
+                    '--pc-mid':   p.done ? `${grp.color}70` : `${grp.color}aa`,
                   } : {}
 
                   const chipAnim = isShaking
                     ? 'chipShake 0.5s ease'
                     : isOrigin && grp
-                      ? 'chipRing 1s ease-in-out infinite'
+                      ? 'chipRing 2s ease-in-out infinite'
                       : isPulsing
-                        ? (p.done ? 'groupPulseDim 1.5s ease-in-out infinite' : 'groupPulse 1.5s ease-in-out infinite')
+                        ? 'groupPulse 2s ease-in-out infinite'
                         : undefined
 
                   const chipOutline = isOrigin && grp
@@ -1193,6 +1186,9 @@ export default function CalendarPage({ onDataChange }) {
             <div style={{padding:'12px 14px 10px', borderBottom:'1px solid var(--glass-border)', background:'var(--glass-bg-2)'}}>
               <div style={{fontWeight:700, fontSize:13, color:'var(--text-1)', marginBottom:2, display:'flex', alignItems:'center', gap:6}}>
                 <Link size={13} style={{color:'var(--accent-primary)'}}/> Relate Chips
+                <button onClick={toggleRelateMode} style={{marginLeft:'auto',background:'none',border:'none',color:'var(--text-3)',cursor:'pointer',display:'flex',padding:2,flexShrink:0}} title="Close">
+                  <X size={13}/>
+                </button>
               </div>
               <div style={{fontSize:10, color:'var(--text-3)', lineHeight:1.4}}>
                 {selectedGroupId
