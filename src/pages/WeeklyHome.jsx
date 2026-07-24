@@ -14,58 +14,16 @@ const URGENCY = {
   none:   { color:null,      label:'No priority' },
 }
 function WeatherWidget() {
-  const containerRef = useRef(null)
+  const ref = useRef(null)
 
   useEffect(() => {
-    console.log('[WeatherWidget] useEffect fired')
-    const container = containerRef.current
-    if (!container) {
-      console.log('[WeatherWidget] no container ref')
-      return
-    }
-
-    const WIDGET_ID = 'ww_aa6e45501116c'
-
-    // Clear any previous content
-    container.innerHTML = ''
-
-    // Create widget div
-    const div = document.createElement('div')
-    div.id = WIDGET_ID
-    div.setAttribute('v', '1.3')
-    div.setAttribute('loc', 'auto')
-    div.setAttribute('a', JSON.stringify({
-      t: 'responsive', lang: 'en', sl_lpl: 1, ids: [],
-      font: 'Times', sl_ics: 'one_a', sl_sot: 'fahrenheit',
-      cl_bkg: 'image', cl_font: '#FFFFFF', cl_cloud: '#FFFFFF',
-      cl_persp: '#81D4FA', cl_sun: '#FFC107', cl_moon: '#FFC107',
-      cl_thund: '#FF5722',
-    }))
-    container.appendChild(div)
-
-    const anchor = document.createElement('a')
-    anchor.id = WIDGET_ID + '_u'
-    anchor.href = 'https://oneweather.org/orlando/30_days/'
-    anchor.target = '_blank'
-    anchor.innerHTML = '30 day weather forecast Orlando'
-    anchor.style.display = 'none'
-    container.appendChild(anchor)
-
-    // Remove any existing script
-    const existing = document.getElementById('weatherwidget-script')
-    if (existing) existing.remove()
-
-    // Inject script
+    if (document.getElementById('weatherwidget-script')) return
     const script = document.createElement('script')
     script.id = 'weatherwidget-script'
-    script.src = 'https://app3.weatherwidget.org/js/?id=' + WIDGET_ID
     script.async = true
-    script.onload = () => console.log('[WeatherWidget] script loaded')
-    script.onerror = (e) => console.log('[WeatherWidget] script error', e)
+    script.src = 'https://app3.weatherwidget.org/js/?id=ww_22e1f55178b43'
     document.body.appendChild(script)
-
     return () => {
-      console.log('[WeatherWidget] cleanup')
       const s = document.getElementById('weatherwidget-script')
       if (s) s.remove()
     }
@@ -73,18 +31,12 @@ function WeatherWidget() {
 
   return (
     <div
-      ref={containerRef}
-      style={{
-        borderRadius: 'var(--radius-lg)',
-        overflow: 'hidden',
-        minHeight: 80,
-        background: 'var(--glass-bg-2)',
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center',
-      }}
+      id="ww_22e1f55178b43"
+      v="1.3"
+      loc="auto"
+      a='{"t":"responsive","lang":"en","sl_lpl":1,"ids":[],"font":"Times","sl_ics":"one_a","sl_sot":"fahrenheit","cl_bkg":"image","cl_font":"#FFFFFF","cl_cloud":"#FFFFFF","cl_persp":"#81D4FA","cl_sun":"#FFC107","cl_moon":"#FFC107","cl_thund":"#FF5722","cl_odd":"#00000000"}'
     >
-      <span style={{color:'var(--text-3)',fontSize:12}}>Loading weather…</span>
+      More forecasts: <a href="https://oneweather.org/orlando/30_days/" id="ww_22e1f55178b43_u" target="_blank">30 day weather forecast Orlando</a>
     </div>
   )
 }
