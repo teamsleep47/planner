@@ -15,25 +15,68 @@ const URGENCY = {
 }
 function WeatherWidget() {
   const containerRef = useRef(null)
+
   useEffect(() => {
-    console.log('[WeatherWidget] useEffect fired, container:', containerRef.current)
-    if (!containerRef.current) return
-    if (document.getElementById('ww_49be5c1debf05')) return
+    console.log('[WeatherWidget] useEffect fired')
+    const container = containerRef.current
+    if (!container) {
+      console.log('[WeatherWidget] no container ref')
+      return
+    }
+
+    const WIDGET_ID = 'ww_2d7caf62b4815'
+
+    // Clear any previous content
+    container.innerHTML = ''
+
+    // Create widget div
     const div = document.createElement('div')
-    div.id = 'ww_49be5c1debf05'
+    div.id = WIDGET_ID
     div.setAttribute('v', '1.3')
     div.setAttribute('loc', 'auto')
-    div.setAttribute('a', '{"t":"responsive","lang":"en","sl_lpl":1,"ids":[],"font":"Arial","sl_ics":"one_a","sl_sot":"fahrenheit","cl_bkg":"#1a1a2e","cl_font":"#FFFFFF","cl_cloud":"#FFFFFF","cl_persp":"#81D4FA","cl_sun":"#FFC107","cl_moon":"#FFC107","cl_thund":"#FF5722","cl_odd":"rgba(255,255,255,0.07)"}')
-    containerRef.current.appendChild(div)
+    div.setAttribute('a', JSON.stringify({
+      t: 'responsive', lang: 'en', sl_lpl: 1, ids: [],
+      font: 'Arial', sl_ics: 'one_a', sl_sot: 'fahrenheit',
+      cl_bkg: '#1a1a2e', cl_font: '#FFFFFF', cl_cloud: '#FFFFFF',
+      cl_persp: '#81D4FA', cl_sun: '#FFC107', cl_moon: '#FFC107',
+      cl_thund: '#FF5722', cl_odd: 'rgba(255,255,255,0.07)',
+    }))
+    container.appendChild(div)
+
+    // Remove any existing script
+    const existing = document.getElementById('weatherwidget-script')
+    if (existing) existing.remove()
+
+    // Inject script
     const script = document.createElement('script')
-    script.src = 'https://app3.weatherwidget.org/js/?id=ww_49be5c1debf05'
+    script.id = 'weatherwidget-script'
+    script.src = 'https://app3.weatherwidget.org/js/?id=' + WIDGET_ID
     script.async = true
+    script.onload = () => console.log('[WeatherWidget] script loaded')
+    script.onerror = (e) => console.log('[WeatherWidget] script error', e)
     document.body.appendChild(script)
-    return () => { try { document.body.removeChild(script) } catch(e) {} }
+
+    return () => {
+      console.log('[WeatherWidget] cleanup')
+      const s = document.getElementById('weatherwidget-script')
+      if (s) s.remove()
+    }
   }, [])
+
   return (
-    <div ref={containerRef} style={{borderRadius:'var(--radius-lg)', overflow:'hidden', minHeight: 80, background:'var(--glass-bg-2)', display:'flex', alignItems:'center', justifyContent:'center'}}>
-      <span style={{color:'var(--text-3)', fontSize:12}}>Loading weather…</span>
+    <div
+      ref={containerRef}
+      style={{
+        borderRadius: 'var(--radius-lg)',
+        overflow: 'hidden',
+        minHeight: 80,
+        background: 'var(--glass-bg-2)',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+      }}
+    >
+      <span style={{color:'var(--text-3)',fontSize:12}}>Loading weather…</span>
     </div>
   )
 }
