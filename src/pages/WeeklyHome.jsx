@@ -22,7 +22,7 @@ function WeatherWidget() {
     div.id = 'ww_49be5c1debf05'
     div.setAttribute('v', '1.3')
     div.setAttribute('loc', 'auto')
-    div.setAttribute('a', '{"t":"responsive","lang":"en","sl_lpl":1,"ids":[],"font":"Times","sl_ics":"one_a","sl_sot":"fahrenheit","cl_bkg":"image","cl_font":"#FFFFFF","cl_cloud":"#FFFFFF","cl_persp":"#81D4FA","cl_sun":"#FFC107","cl_moon":"#FFC107","cl_thund":"#FF5722","sl_tof":"7"}')
+    div.setAttribute('a', '{"t":"responsive","lang":"en","sl_lpl":1,"ids":[],"font":"Arial","sl_ics":"one_a","sl_sot":"fahrenheit","cl_bkg":"#1a1a2e","cl_font":"#FFFFFF","cl_cloud":"#FFFFFF","cl_persp":"#81D4FA","cl_sun":"#FFC107","cl_moon":"#FFC107","cl_thund":"#FF5722","cl_odd":"rgba(255,255,255,0.07)"}')
     containerRef.current.appendChild(div)
     const script = document.createElement('script')
     script.src = 'https://app3.weatherwidget.org/js/?id=ww_49be5c1debf05'
@@ -432,8 +432,8 @@ export default function WeeklyHome({ onDataChange }) {
           </div>
         </div>
 
-        {/* Weather widget */}
-        <div className="card" style={{padding:'10px 14px'}}>
+        {/* weatherwidget.org embed */}
+        <div className="card" style={{padding:0, overflow:'hidden'}}>
           <WeatherWidget/>
         </div>
 
