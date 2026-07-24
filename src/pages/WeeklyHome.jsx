@@ -43,6 +43,14 @@ function WeatherWidget() {
     }))
     container.appendChild(div)
 
+    const anchor = document.createElement('a')
+    anchor.id = WIDGET_ID + '_u'
+    anchor.href = 'https://weatherwidget.org/'
+    anchor.target = '_blank'
+    anchor.innerHTML = 'Weather Widget'
+    anchor.style.display = 'none'
+    container.appendChild(anchor)
+
     // Remove any existing script
     const existing = document.getElementById('weatherwidget-script')
     if (existing) existing.remove()
