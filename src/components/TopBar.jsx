@@ -21,7 +21,7 @@ const ALL_KEYS = [
   'course_notes', 'full_course_notes', 'full_course_notes_v2',
   'quick_links', 'page_links', 'weather_city', 'theme',
   'flashcard_decks', 'flashcard_cards',
-  'calendar_blocks', 'calendar_plans',
+  'calendar_blocks', 'calendar_plans', 'calendar_groups',
   'notification_settings',
   'saved_resources', 'resource_sort', 'resource_last_course',
   'hidden_tabs',

@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react'
-import { ChevronLeft, ChevronRight, X, ExternalLink, Edit2, Trash2, Check, Circle, CheckCircle2 } from 'lucide-react'
+import { ChevronLeft, ChevronRight, X, ExternalLink, Edit2, Trash2, Check, Circle, CheckCircle2, Link } from 'lucide-react'
 import { load, save } from '../utils/storage.js'
 import { useNavigate, useLocation } from 'react-router-dom'
 import { loadTerms, saveTerms, uid, ASSIGNMENT_TYPES, getCourseColorMap } from '../utils/termData.js'
@@ -16,13 +16,18 @@ const BLOCK_COLORS = [
 ]
 const PLAN_COLORS = BLOCK_COLORS
 
+const GROUP_PALETTE = [
+  '#f97316','#eab308','#22c55e','#06b6d4',
+  '#8b5cf6','#ec4899','#f43f5e','#84cc16',
+  '#10b981','#3b82f6',
+]
+
 const openUrl = (raw) => {
   if (!raw) return
   const url = /^https?:\/\//i.test(raw) ? raw : `https://${raw}`
   window.open(url, '_blank', 'noopener,noreferrer')
 }
 
-// Returns a darkened/saturated version of a hex color for text on tinted backgrounds
 function darkenColor(hex) {
   const r = parseInt(hex.slice(1,3),16)
   const g = parseInt(hex.slice(3,5),16)
@@ -57,7 +62,7 @@ function getActiveCourses() {
   } catch(e) { return [] }
 }
 
-// ── Plan popup — matches assignment popup style ──────────────────
+// ── Plan popup ───────────────────────────────────────────────────
 function PlanPopup({ plan, anchor, onClose, onEdit, onDelete }) {
   const style = {
     position:'fixed', zIndex:1000,
@@ -192,7 +197,6 @@ function PlanEditModal({ plan, onClose, onSave, onDelete, onAddAsTask }) {
             <input type="url" placeholder="https://… (optional)" value={form.url||''} onChange={e=>setForm(f=>({...f,url:e.target.value}))} style={inp}/>
           </div>
 
-          {/* ── Add as task mini-form ── */}
           <div style={{borderTop:'1px solid var(--glass-border)',paddingTop:14,marginBottom:16}}>
             <button onClick={()=>setShowTaskForm(s=>!s)} style={{
               display:'flex',alignItems:'center',gap:8,width:'100%',padding:'8px 12px',
@@ -276,10 +280,8 @@ function AddModal({ date, onClose, onSaveAssignment, onSavePlan }) {
         </div>
 
         <div style={{padding:18}}>
-          {/* Step 1: pick type */}
           {step==='pick' && (
             <div style={{display:'flex',flexDirection:'column',gap:12}}>
-              {/* Assignment: course quick-pick */}
               {courses.length > 0 && (
                 <div>
                   <div style={{fontSize:12,fontWeight:700,color:'var(--text-3)',textTransform:'uppercase',letterSpacing:'.06em',marginBottom:10}}>Add assignment to course</div>
@@ -320,7 +322,6 @@ function AddModal({ date, onClose, onSaveAssignment, onSavePlan }) {
             </div>
           )}
 
-          {/* Step 2a: assignment form */}
           {step==='assignment' && course && (
             <div>
               <div style={row}><label style={lbl}>Title *</label><input style={inp} value={aForm.title} onChange={e=>setAForm(f=>({...f,title:e.target.value}))} placeholder="Assignment title" autoFocus/></div>
@@ -352,7 +353,6 @@ function AddModal({ date, onClose, onSaveAssignment, onSavePlan }) {
             </div>
           )}
 
-          {/* Step 2b: plan/event form */}
           {step==='plan' && (
             <div>
               <div style={row}><label style={lbl}>Title *</label><input style={inp} value={pForm.title} onChange={e=>setPForm(f=>({...f,title:e.target.value}))} placeholder="Study session, appointment…" autoFocus/></div>
@@ -373,7 +373,6 @@ function AddModal({ date, onClose, onSaveAssignment, onSavePlan }) {
                 <input type="url" placeholder="https://… (optional)" value={pForm.url||''} onChange={e=>setPForm(f=>({...f,url:e.target.value}))} style={inp}/>
               </div>
 
-              {/* Also add as task — prominent, in creation form */}
               <div style={{marginBottom:16,padding:12,borderRadius:'var(--radius-md)',background:pForm.alsoTask?'var(--accent-dim)':'var(--glass-bg)',border:`2px solid ${pForm.alsoTask?'var(--accent)':'var(--glass-border)'}`,cursor:'pointer',transition:'all .2s'}}
                 onClick={()=>setPForm(f=>({...f,alsoTask:!f.alsoTask}))}>
                 <div style={{display:'flex',alignItems:'center',gap:10}}>
@@ -427,9 +426,8 @@ function AddModal({ date, onClose, onSaveAssignment, onSavePlan }) {
   )
 }
 
-
-// ── Mobile day overlay — tapping the date number shows all items ─
-function DayOverlay({ ds, x, y, assignments, plans, onClose, onAssignClick, onPlanClick, onPlanEdit, onAdd }) {
+// ── Mobile day overlay ───────────────────────────────────────────
+function DayOverlay({ ds, x, y, assignments, plans, onClose, onAssignClick, onPlanEdit, onAdd }) {
   const dues    = assignments.filter(a => a.due === ds)
   const starts  = assignments.filter(a => a.startDate === ds && a.startDate !== a.due)
   const dayPlan = plans.filter(p => p.date === ds)
@@ -438,7 +436,6 @@ function DayOverlay({ ds, x, y, assignments, plans, onClose, onAssignClick, onPl
   const date = new Date(ds + 'T12:00:00')
   const label = date.toLocaleDateString('en-US', { weekday:'long', month:'long', day:'numeric' })
 
-  // Position: try to keep on screen
   const overlayW = Math.min(300, window.innerWidth - 16)
   const posX = Math.min(Math.max(x, 8), window.innerWidth - overlayW - 8)
   const posY = Math.min(y, window.innerHeight - 320)
@@ -453,7 +450,6 @@ function DayOverlay({ ds, x, y, assignments, plans, onClose, onAssignClick, onPl
         boxShadow:'0 16px 48px rgba(0,0,0,0.45)',
         border:'1px solid var(--glass-border)',
       }}>
-        {/* Header */}
         <div style={{padding:'12px 14px 10px',borderBottom:'1px solid var(--glass-border)',display:'flex',alignItems:'center',justifyContent:'space-between',background:'var(--glass-bg-2)'}}>
           <div style={{fontSize:13,fontWeight:700,color:'var(--text-1)'}}>{label}</div>
           <div style={{display:'flex',gap:6}}>
@@ -462,13 +458,11 @@ function DayOverlay({ ds, x, y, assignments, plans, onClose, onAssignClick, onPl
           </div>
         </div>
 
-        {/* Items */}
         <div style={{padding:'10px',display:'flex',flexDirection:'column',gap:6,maxHeight:260,overflowY:'auto'}}>
           {allItems.length === 0 && (
             <div style={{fontSize:12,color:'var(--text-3)',textAlign:'center',padding:'12px 0'}}>Nothing scheduled — tap + to add</div>
           )}
 
-          {/* Assignment items */}
           {[...dues, ...starts].map((a, i) => {
             const due = a.due ? formatRelativeDue(a.due, a.dueTime) : null
             const isStart = a.startDate === ds && a.due !== ds
@@ -488,7 +482,6 @@ function DayOverlay({ ds, x, y, assignments, plans, onClose, onAssignClick, onPl
             )
           })}
 
-          {/* Plan items */}
           {dayPlan.map((p, i) => (
             <button key={`p-${p.id}-${i}`}
               onClick={()=>{ onPlanEdit(p); onClose() }}
@@ -517,27 +510,41 @@ export default function CalendarPage({ onDataChange }) {
     return new Date()
   })
   const [popup,    setPopup]    = useState(null)
-  const [addModal, setAddModal] = useState(null)   // date string
+  const [addModal, setAddModal] = useState(null)
   const [editPlan,      setEditPlan]      = useState(null)
   const [planPopup,     setPlanPopup]     = useState(null)
   const [dayOverlay,    setDayOverlay]    = useState(null)
   const [plans,         setPlans]         = useState(() => load('calendar_plans', []))
-  const [dragPill,      setDragPill]      = useState(null)   // { type:'plan'|'assignment', item, originDate }
+  const [dragPill,      setDragPill]      = useState(null)
   const [dragOverDate,  setDragOverDate]  = useState(null)
   const [planDragOverId, setPlanDragOverId] = useState(null)
   const planDragId = useRef(null)
-  const [dupModal,      setDupModal]      = useState(null)   // { type, item, newDate, oldDate }
-  const [confirmDelete, setConfirmDelete] = useState(null)   // { planId, taskId, planTitle }
+  const [dupModal,      setDupModal]      = useState(null)
+  const [confirmDelete, setConfirmDelete] = useState(null)
 
   const [assignments, setAssignments] = useState(() => getAllAssignments())
 
-  useEffect(() => { save('calendar_plans', plans); onDataChange?.() }, [plans])
+  // ── Chip Relation state ─────────────────────────────────────────
+  const [groups,           setGroups]          = useState(() => load('calendar_groups', []))
+  const [relateMode,       setRelateMode]       = useState(false)
+  const [selectedGroupId,  setSelectedGroupId]  = useState(null)
+  const [showNewGroupInput,setShowNewGroupInput]= useState(false)
+  const [newGroupName,     setNewGroupName]     = useState('')
+  const [shakingChipId,    setShakingChipId]    = useState(null)
+  const [shakeTooltip,     setShakeTooltip]     = useState(null)
+  const [pulsingGroupId,   setPulsingGroupId]   = useState(null)
+  const [pulseOriginPlanId,setPulseOriginPlanId]= useState(null)
+  const [popupOpenForGroup,setPopupOpenForGroup]= useState(false)
+  const pulseTimerRef = useRef(null)
 
-  // Re-read plans and assignments when Drive syncs or assignments updated
+  useEffect(() => { save('calendar_plans', plans); onDataChange?.() }, [plans])
+  useEffect(() => { save('calendar_groups', groups); onDataChange?.() }, [groups])
+
   useEffect(() => {
     const refreshPlans = () => setPlans(load('calendar_plans', []))
     const refreshAssignments = () => setAssignments(getAllAssignments())
-    const refreshAll = () => { refreshPlans(); refreshAssignments() }
+    const refreshGroups = () => setGroups(load('calendar_groups', []))
+    const refreshAll = () => { refreshPlans(); refreshAssignments(); refreshGroups() }
     window.addEventListener('drive-loaded', refreshAll)
     window.addEventListener('assignments-updated', refreshAssignments)
     return () => {
@@ -546,7 +553,9 @@ export default function CalendarPage({ onDataChange }) {
     }
   }, [])
 
-  // Local date — avoids UTC offset bug (toISOString returns yesterday before 8pm EDT)
+  // Clear pulse timer on unmount
+  useEffect(() => () => { if (pulseTimerRef.current) clearTimeout(pulseTimerRef.current) }, [])
+
   const today = (() => { const d=new Date(); return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}` })()
   const year  = anchor.getFullYear()
   const month = anchor.getMonth()
@@ -555,7 +564,6 @@ export default function CalendarPage({ onDataChange }) {
   const next    = () => setAnchor(d => { const n=new Date(d); n.setMonth(n.getMonth()+1); return n })
   const goToday = () => setAnchor(new Date())
 
-  // Calendar grid
   const firstDay = new Date(year, month, 1)
   const lastDay  = new Date(year, month+1, 0)
   const cells    = []
@@ -563,7 +571,6 @@ export default function CalendarPage({ onDataChange }) {
   for (let d=1; d<=lastDay.getDate(); d++) cells.push(new Date(year, month, d))
   while (cells.length % 7 !== 0) cells.push(null)
 
-  // Index by date
   const byDue   = {}
   const byStart = {}
   assignments.forEach(a => {
@@ -575,6 +582,7 @@ export default function CalendarPage({ onDataChange }) {
   const plansFor   = ds => plans.filter(p => p.date === ds)
 
   const handleAssignClick = (e, item) => {
+    if (relateMode) return
     e.stopPropagation()
     const rect = e.currentTarget.getBoundingClientRect()
     setPopup({ item, x: rect.left + rect.width/2, y: rect.bottom })
@@ -611,10 +619,10 @@ export default function CalendarPage({ onDataChange }) {
       onDataChange?.()
     }
   }
+
   const handleUpdatePlan = (id, form) => {
     const oldPlan = plans.find(p => p.id === id)
     setPlans(ps => ps.map(p => p.id===id ? { ...p, ...form } : p))
-    // Sync title change to linked task
     if (oldPlan?.taskId && form.title && form.title !== oldPlan.title) {
       const tasks = load('home_tasks', [])
       const updated = tasks.map(t => {
@@ -670,34 +678,29 @@ export default function CalendarPage({ onDataChange }) {
 
   const applyReschedule = (duplicate) => {
     if (!dupModal) return
-    const { type, item, newDate, oldDate } = dupModal
+    const { type, item, newDate } = dupModal
     if (type === 'plan') {
       if (duplicate) {
         setPlans(ps => [...ps, { ...item, id: uid(), date: newDate, tasked: false, taskId: undefined }])
       } else {
         setPlans(ps => ps.map(p => p.id===item.id ? { ...p, date: newDate } : p))
-        // Also update linked task due date
         if (item.taskId) {
           const tasks = load('home_tasks', [])
           save('home_tasks', tasks.map(t => t.id===item.taskId ? { ...t, due: newDate } : t))
         }
       }
     } else if (type === 'assignment') {
-      // Update due date in terms_v1
       const terms = loadTerms()
       const updated = terms.map(term => ({
         ...term,
         courses: term.courses.map(c => ({
           ...c,
           assignments: c.assignments.map(a =>
-            a.id === item.id
-              ? duplicate ? null : { ...a, due: newDate }
-              : a
+            a.id === item.id ? (duplicate ? null : { ...a, due: newDate }) : a
           ).filter(Boolean)
         }))
       }))
       if (duplicate) {
-        // Add a copy with new date to the correct course
         const active = terms.find(t=>t.active)||terms[0]
         const targetCourse = active?.courses.find(c=>c.name===item.courseName)
         if (targetCourse) {
@@ -717,30 +720,164 @@ export default function CalendarPage({ onDataChange }) {
     setDupModal(null)
   }
 
-  // Add a calendar plan as a home task; marks the plan as tasked
   const handleAddPlanAsTask = (taskData, planId) => {
     const taskId  = Date.now()
     const tasks   = load('home_tasks', [])
     const newTask = { ...taskData, text: '📅 '+taskData.text, id: taskId, done: false, calendarPlanId: planId }
     save('home_tasks', [newTask, ...tasks])
-    // Mark the plan as tasked and store taskId link
     if (planId) setPlans(ps => ps.map(p => p.id===planId ? {...p, tasked:true, taskId} : p))
     onDataChange?.()
+  }
+
+  // ── Chip Relation handlers ────────────────────────────────────
+  const toggleRelateMode = () => {
+    setRelateMode(m => {
+      if (m) { setSelectedGroupId(null); setShowNewGroupInput(false); setNewGroupName('') }
+      return !m
+    })
+  }
+
+  const createGroup = () => {
+    if (!newGroupName.trim()) return
+    const color = GROUP_PALETTE[groups.length % GROUP_PALETTE.length]
+    const newGroup = { id: uid(), name: newGroupName.trim(), color }
+    setGroups(gs => [...gs, newGroup])
+    setSelectedGroupId(newGroup.id)
+    setNewGroupName('')
+    setShowNewGroupInput(false)
+  }
+
+  const disbandGroup = (groupId) => {
+    setGroups(gs => gs.filter(g => g.id !== groupId))
+    setPlans(ps => ps.map(p => p.groupId === groupId ? { ...p, groupId: null } : p))
+    if (selectedGroupId === groupId) setSelectedGroupId(null)
+    if (pulsingGroupId === groupId) {
+      setPulsingGroupId(null)
+      setPulseOriginPlanId(null)
+      clearTimeout(pulseTimerRef.current)
+    }
+  }
+
+  const handlePlanChipRelateClick = (e, plan) => {
+    e.stopPropagation()
+    if (!selectedGroupId) return
+    if (!plan.groupId) {
+      setPlans(ps => ps.map(p => p.id === plan.id ? { ...p, groupId: selectedGroupId } : p))
+    } else if (plan.groupId === selectedGroupId) {
+      setPlans(ps => ps.map(p => p.id === plan.id ? { ...p, groupId: null } : p))
+    } else {
+      const rect = e.currentTarget.getBoundingClientRect()
+      setShakingChipId(plan.id)
+      setShakeTooltip({ x: rect.left + rect.width / 2, y: rect.bottom + 2, message: 'Already in another group' })
+      setTimeout(() => { setShakingChipId(null); setShakeTooltip(null) }, 800)
+    }
+  }
+
+  const handlePlanChipClick = (e, plan) => {
+    if (relateMode) { handlePlanChipRelateClick(e, plan); return }
+    if (pulseTimerRef.current) clearTimeout(pulseTimerRef.current)
+    if (plan.groupId) {
+      setPulsingGroupId(plan.groupId)
+      setPulseOriginPlanId(plan.id)
+      setPopupOpenForGroup(true)
+    }
+    const r = e.currentTarget.getBoundingClientRect()
+    setPlanPopup({ plan, x: r.left + r.width / 2, y: r.bottom })
+  }
+
+  const handlePlanPopupClose = () => {
+    setPlanPopup(null)
+    if (pulsingGroupId) {
+      setPulseOriginPlanId(null)
+      setPopupOpenForGroup(false)
+      if (pulseTimerRef.current) clearTimeout(pulseTimerRef.current)
+      pulseTimerRef.current = setTimeout(() => setPulsingGroupId(null), 4000)
+    }
+  }
+
+  // Cross-month pulse propagation
+  const currentMonthStr = `${year}-${String(month + 1).padStart(2, '0')}`
+  const pulsingGroup = groups.find(g => g.id === pulsingGroupId) || null
+  const pulsingGroupChips = pulsingGroupId ? plans.filter(p => p.groupId === pulsingGroupId) : []
+  const hasPulsingInPast   = pulsingGroupChips.some(p => p.date && p.date.slice(0, 7) < currentMonthStr)
+  const hasPulsingInFuture = pulsingGroupChips.some(p => p.date && p.date.slice(0, 7) > currentMonthStr)
+
+  const navArrowPulseStyle = (direction) => {
+    const has = direction === 'prev' ? hasPulsingInPast : hasPulsingInFuture
+    if (!has || !pulsingGroup) return {}
+    return {
+      '--arrow-pc': `${pulsingGroup.color}99`,
+      animation: 'arrowGlow 1.2s ease-in-out infinite',
+      background: `${pulsingGroup.color}22`,
+      border: `1px solid ${pulsingGroup.color}66`,
+    }
   }
 
   const cellH = 115
 
   return (
     <>
+      <style>{`
+        @keyframes groupPulse {
+          0%,100% { box-shadow: 0 1px 3px rgba(0,0,0,.25); }
+          50%     { box-shadow: 0 0 0 3px var(--pc-light), 0 0 16px var(--pc-mid); }
+        }
+        @keyframes groupPulseDim {
+          0%,100% { box-shadow: 0 1px 3px rgba(0,0,0,.1); }
+          50%     { box-shadow: 0 0 0 2px var(--pc-light), 0 0 8px var(--pc-mid); }
+        }
+        @keyframes chipRing {
+          0%,100% { outline-color: var(--pc-light); outline-offset: 1px; }
+          50%     { outline-color: var(--pc-mid); outline-offset: 2px; }
+        }
+        @keyframes chipShake {
+          0%,100% { transform: translateX(0); }
+          20%     { transform: translateX(-4px); }
+          40%     { transform: translateX(4px); }
+          60%     { transform: translateX(-3px); }
+          80%     { transform: translateX(3px); }
+        }
+        @keyframes arrowGlow {
+          0%,100% { box-shadow: none; }
+          50%     { box-shadow: 0 0 0 2px var(--arrow-pc), 0 0 10px var(--arrow-pc); }
+        }
+      `}</style>
+
       <div className="page-header" style={{flexWrap:'wrap',gap:10}}>
         <div>
           <div className="page-title">Calendar</div>
           <div className="page-subtitle">{MONTHS[month]} {year} — double-click a date to add</div>
         </div>
         <div style={{display:'flex',gap:6,alignItems:'center'}}>
+          {/* Relate Chips toggle */}
+          <button
+            onClick={toggleRelateMode}
+            className="btn btn-ghost"
+            style={{
+              fontSize:12,
+              background: relateMode ? 'var(--accent-dim)' : undefined,
+              border: relateMode ? '1.5px solid var(--accent-primary)' : undefined,
+              color: relateMode ? 'var(--accent-primary)' : undefined,
+              display:'flex', alignItems:'center', gap:5,
+            }}
+          >
+            <Link size={12}/> {relateMode ? 'Relating…' : 'Relate Chips'}
+          </button>
           <button className="btn btn-ghost cal-today-btn" onClick={goToday} style={{fontSize:12}}>Today</button>
-          <button className="btn-icon cal-nav-btn" onClick={prev} style={{padding:7}}><ChevronLeft size={16}/></button>
-          <button className="btn-icon cal-nav-btn" onClick={next} style={{padding:7}}><ChevronRight size={16}/></button>
+          <button
+            className="btn-icon cal-nav-btn"
+            onClick={prev}
+            style={{padding:7, ...navArrowPulseStyle('prev')}}
+          >
+            <ChevronLeft size={16}/>
+          </button>
+          <button
+            className="btn-icon cal-nav-btn"
+            onClick={next}
+            style={{padding:7, ...navArrowPulseStyle('next')}}
+          >
+            <ChevronRight size={16}/>
+          </button>
         </div>
       </div>
 
@@ -760,14 +897,12 @@ export default function CalendarPage({ onDataChange }) {
 
       {/* Grid */}
       <div style={{margin:'0 24px 24px',background:'var(--glass-bg)',border:'1px solid var(--glass-border)',borderRadius:'var(--radius-lg)',overflow:'hidden'}}>
-        {/* Day headers */}
         <div style={{display:'grid',gridTemplateColumns:'repeat(7,1fr)',background:'var(--glass-bg-2)',borderBottom:'1px solid var(--glass-border)'}}>
           {DAYS_S.map(d=>(
             <div key={d} style={{padding:'10px 0',textAlign:'center',fontSize:11,fontWeight:700,color:'var(--text-3)',letterSpacing:'.05em'}}>{d}</div>
           ))}
         </div>
 
-        {/* Day cells */}
         <div style={{display:'grid',gridTemplateColumns:'repeat(7,1fr)'}}>
           {cells.map((day, i) => {
             if (!day) return (
@@ -784,8 +919,8 @@ export default function CalendarPage({ onDataChange }) {
 
             return (
               <div key={ds} className="cal-day-cell"
-                onClick={e=>{ const r=e.currentTarget.getBoundingClientRect(); setDayOverlay({ds,x:r.left,y:r.bottom+2}) }}
-                onDoubleClick={e=>{ e.stopPropagation(); setAddModal(ds) }}
+                onClick={e=>{ if(relateMode) return; const r=e.currentTarget.getBoundingClientRect(); setDayOverlay({ds,x:r.left,y:r.bottom+2}) }}
+                onDoubleClick={e=>{ e.stopPropagation(); if(!relateMode) setAddModal(ds) }}
                 onDragOver={e=>handleCellDragOver(e,ds)}
                 onDragLeave={()=>setDragOverDate(null)}
                 onDrop={e=>handleCellDrop(e,ds)}
@@ -797,7 +932,7 @@ export default function CalendarPage({ onDataChange }) {
                   borderTop: isToday ? '2px solid #106c89' : '1px solid transparent',
                   padding:'6px 5px 5px', position:'relative',
                   background:dragOverDate===ds?'var(--accent-dim)':isToday?'rgba(16,108,137,0.10)':isPast?'rgba(0,0,0,.07)':'transparent',
-                  cursor:'pointer', transition:'background .1s',
+                  cursor: relateMode ? 'default' : 'pointer', transition:'background .1s',
                   outline: dragOverDate===ds ? '2px solid var(--accent)' : 'none',
                 }}
               >
@@ -815,7 +950,7 @@ export default function CalendarPage({ onDataChange }) {
 
                 {/* Start markers */}
                 {starts.map((a,si)=>(
-                  <button key={`s-${a.id}-${si}`} onClick={e=>handleAssignClick(e,a)} style={{display:'flex',alignItems:'center',gap:3,width:'100%',border:'none',cursor:'pointer',padding:'1px 3px',background:`${a.courseColor}18`,borderRadius:3,marginBottom:2,borderLeft:`2px solid ${a.courseColor}55`}}>
+                  <button key={`s-${a.id}-${si}`} onClick={e=>handleAssignClick(e,a)} style={{display:'flex',alignItems:'center',gap:3,width:'100%',border:'none',cursor:relateMode?'default':'pointer',padding:'1px 3px',background:`${a.courseColor}18`,borderRadius:3,marginBottom:2,borderLeft:`2px solid ${a.courseColor}55`}}>
                     <div style={{width:4,height:4,borderRadius:'50%',background:a.courseColor,opacity:.5,flexShrink:0}}/>
                     <span style={{fontSize:9,color:a.courseColor,fontWeight:600,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap',opacity:.8}}>▶ {a.title}</span>
                   </button>
@@ -827,10 +962,11 @@ export default function CalendarPage({ onDataChange }) {
                   const isDone=a.status==='Done'
                   return (
                     <button key={`d-${a.id}-${di}`} className="cal-pill cal-pill-nomobile"
-                      draggable={!isDone}
+                      draggable={!isDone&&!relateMode}
                       onDragStart={e=>handlePillDragStart(e,'assignment',a)}
-                      onClick={e=>{e.stopPropagation();handleAssignClick(e,a)}} style={{display:'flex',alignItems:'center',gap:3,width:'100%',border:`2px solid rgba(0,0,0,${isDone?.15:.55})`,cursor:isDone?'default':'grab',padding:'2px 5px',borderRadius:4,marginBottom:2,background:isDone?`${a.courseColor}15`:`${a.courseColor}30`,borderLeft:`4px solid ${isDone?a.courseColor+'44':a.courseColor}`,boxShadow:isDone?'none':`0 1px 3px rgba(0,0,0,.25)`,opacity:isDone?.5:1,transition:'all .1s'}}
-                      onMouseEnter={e=>{if(!isDone)e.currentTarget.style.background=`${a.courseColor}50`}}
+                      onClick={e=>{e.stopPropagation();handleAssignClick(e,a)}}
+                      style={{display:'flex',alignItems:'center',gap:3,width:'100%',border:`2px solid rgba(0,0,0,${isDone?.15:.55})`,cursor:relateMode?'default':isDone?'default':'grab',padding:'2px 5px',borderRadius:4,marginBottom:2,background:isDone?`${a.courseColor}15`:`${a.courseColor}30`,borderLeft:`4px solid ${isDone?a.courseColor+'44':a.courseColor}`,boxShadow:isDone?'none':`0 1px 3px rgba(0,0,0,.25)`,opacity:isDone?.5:1,transition:'all .1s'}}
+                      onMouseEnter={e=>{if(!isDone&&!relateMode)e.currentTarget.style.background=`${a.courseColor}50`}}
                       onMouseLeave={e=>{e.currentTarget.style.background=isDone?`${a.courseColor}15`:`${a.courseColor}30`}}>
                       <div style={{width:5,height:5,borderRadius:'50%',background:a.courseColor,flexShrink:0,boxShadow:`0 0 4px ${a.courseColor}`}}/>
                       <span style={{fontSize:9,fontWeight:700,color:'var(--text-1)',overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap',flex:1}}>{a.title}</span>
@@ -840,49 +976,115 @@ export default function CalendarPage({ onDataChange }) {
                   )
                 })}
 
-                {/* Plan pills — click=popup, double-click=edit, X=delete */}
-                {dayPlan.map((p,pi)=>(
-                  <div key={`p-${p.id}-${pi}`}
-                    draggable
-                    onDragStart={e=>{ handlePillDragStart(e,'plan',p); planDragId.current=p.id }}
-                    onDragOver={e=>{ e.preventDefault(); e.stopPropagation(); if(planDragId.current&&planDragId.current!==p.id) setPlanDragOverId(p.id) }}
-                    onDragLeave={()=>setPlanDragOverId(null)}
-                    onDrop={e=>{ e.preventDefault(); e.stopPropagation(); const fromId=planDragId.current; if(!fromId||fromId===p.id){setPlanDragOverId(null);return}; setPlans(ps=>{const same=ps.filter(q=>q.date===p.date);const rest=ps.filter(q=>q.date!==p.date);const fi=same.findIndex(q=>q.id===fromId);const ti=same.findIndex(q=>q.id===p.id);if(fi===-1||ti===-1)return ps;const r=[...same];const[m]=r.splice(fi,1);r.splice(ti,0,m);return[...rest,...r]}); planDragId.current=null; setPlanDragOverId(null) }}
-                    style={{display:'flex',alignItems:'center',gap:2,marginBottom:2,borderRadius:0,background:planDragOverId===p.id?`${p.color}55`:`${p.color}30`,borderLeft:`3px solid ${p.color}`,color:p.color,transition:'all .1s',cursor:'grab',opacity:p.done?0.5:1,filter:p.done?'saturate(0.2)':'none',outline:planDragOverId===p.id?`1px dashed ${p.color}`:'none'}}
-                    onMouseEnter={e=>e.currentTarget.style.background=`${p.color}48`}
-                    onMouseLeave={e=>e.currentTarget.style.background=planDragOverId===p.id?`${p.color}55`:`${p.color}30`}
-                  >
-                    <span onClick={e=>{e.stopPropagation();setPlans(ps=>ps.map(q=>q.id===p.id?{...q,done:!q.done}:q))}} style={{cursor:'pointer',display:'flex',alignItems:'center',padding:'2px 2px 2px 4px',flexShrink:0}}>
-                      {p.done ? <CheckCircle2 size={9} style={{color:'var(--accent)'}}/> : <Circle size={9} style={{color:'var(--text-3)'}}/>}
-                    </span>
-                    <button
-                      onClick={e=>{ e.stopPropagation(); const r=e.currentTarget.getBoundingClientRect(); setPlanPopup({plan:p,x:r.left+r.width/2,y:r.bottom}) }}
-                      onDoubleClick={e=>{ e.stopPropagation(); setPlanPopup(null); setEditPlan(p) }}
-                      style={{display:'flex',alignItems:'center',gap:3,flex:1,border:'none',cursor:'pointer',padding:'2px 3px 2px 1px',background:'transparent',minWidth:0}}
-                    >
-                      <span style={{fontSize:9,fontWeight:700,color:p.color,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap',flex:1,textDecoration:p.done?'line-through':'none'}}>{p.done?'✓ ':''}{p.title}</span>
-                      {p.tasked && <span style={{fontSize:7,padding:'0 3px',borderRadius:3,background:`${p.color}44`,color:p.color,fontWeight:700,flexShrink:0}}>tasked</span>}
-                    </button>
-                    {p.url && (
-                      <span onClick={e=>{e.stopPropagation();openUrl(p.url)}} style={{cursor:'pointer',display:'flex',alignItems:'center',flexShrink:0,padding:'0 2px'}}>
-                        <ExternalLink size={8} style={{color:'var(--text-3)'}}/>
-                      </span>
-                    )}
-                    <button onClick={e=>{ e.stopPropagation(); handleDeletePlan(p.id) }}
-                      style={{background:'none',border:'none',cursor:'pointer',padding:'2px 4px',color:'var(--text-3)',display:'flex',flexShrink:0,borderRadius:3}}
-                      onMouseEnter={e=>e.currentTarget.style.color='var(--coral)'}
-                      onMouseLeave={e=>e.currentTarget.style.color='var(--text-3)'}>
-                      <X size={8}/>
-                    </button>
-                  </div>
-                ))}
+                {/* Plan chips */}
+                {dayPlan.map((p,pi)=>{
+                  const grp = groups.find(g => g.id === p.groupId)
+                  const isPulsing = !!pulsingGroupId && p.groupId === pulsingGroupId
+                  const isOrigin  = pulseOriginPlanId === p.id && popupOpenForGroup
+                  const isShaking = shakingChipId === p.id
 
+                  const pulseVars = isPulsing && grp ? {
+                    '--pc-light': p.done ? `${grp.color}22` : `${grp.color}55`,
+                    '--pc-mid':   p.done ? `${grp.color}44` : `${grp.color}aa`,
+                  } : {}
+
+                  const chipAnim = isShaking
+                    ? 'chipShake 0.5s ease'
+                    : isOrigin && grp
+                      ? 'chipRing 1s ease-in-out infinite'
+                      : isPulsing
+                        ? (p.done ? 'groupPulseDim 1.5s ease-in-out infinite' : 'groupPulse 1.5s ease-in-out infinite')
+                        : undefined
+
+                  const chipOutline = isOrigin && grp
+                    ? `2px solid ${grp.color}88`
+                    : planDragOverId===p.id
+                      ? `1px dashed ${p.color}`
+                      : 'none'
+
+                  return (
+                    <div key={`p-${p.id}-${pi}`}
+                      draggable={!relateMode}
+                      onDragStart={e=>{ if(relateMode) return; handlePillDragStart(e,'plan',p); planDragId.current=p.id }}
+                      onDragOver={e=>{ if(relateMode) return; e.preventDefault(); e.stopPropagation(); if(planDragId.current&&planDragId.current!==p.id) setPlanDragOverId(p.id) }}
+                      onDragLeave={()=>setPlanDragOverId(null)}
+                      onDrop={e=>{ if(relateMode) return; e.preventDefault(); e.stopPropagation(); const fromId=planDragId.current; if(!fromId||fromId===p.id){setPlanDragOverId(null);return}; setPlans(ps=>{const same=ps.filter(q=>q.date===p.date);const rest=ps.filter(q=>q.date!==p.date);const fi=same.findIndex(q=>q.id===fromId);const ti=same.findIndex(q=>q.id===p.id);if(fi===-1||ti===-1)return ps;const r=[...same];const[m]=r.splice(fi,1);r.splice(ti,0,m);return[...rest,...r]}); planDragId.current=null; setPlanDragOverId(null) }}
+                      style={{
+                        display:'flex', alignItems:'center', gap:2, marginBottom:2,
+                        borderRadius:0, position:'relative',
+                        background: planDragOverId===p.id ? `${p.color}55` : `${p.color}30`,
+                        borderLeft:`3px solid ${p.color}`,
+                        color:p.color, transition: isShaking||isPulsing ? 'none' : 'all .1s',
+                        cursor: relateMode ? 'crosshair' : 'grab',
+                        opacity:p.done?0.5:1, filter:p.done?'saturate(0.2)':'none',
+                        outline: chipOutline,
+                        ...pulseVars,
+                        animation: chipAnim,
+                      }}
+                      onMouseEnter={e=>{ if(relateMode) return; e.currentTarget.style.background=`${p.color}48` }}
+                      onMouseLeave={e=>{ if(relateMode) return; e.currentTarget.style.background=planDragOverId===p.id?`${p.color}55`:`${p.color}30` }}
+                    >
+                      {/* Done toggle — suppressed in relate mode */}
+                      {!relateMode && (
+                        <span onClick={e=>{e.stopPropagation();setPlans(ps=>ps.map(q=>q.id===p.id?{...q,done:!q.done}:q))}} style={{cursor:'pointer',display:'flex',alignItems:'center',padding:'2px 2px 2px 4px',flexShrink:0}}>
+                          {p.done ? <CheckCircle2 size={9} style={{color:'var(--accent)'}}/> : <Circle size={9} style={{color:'var(--text-3)'}}/>}
+                        </span>
+                      )}
+
+                      {/* Title button */}
+                      <button
+                        onClick={e=>{ e.stopPropagation(); handlePlanChipClick(e, p) }}
+                        onDoubleClick={e=>{ if(relateMode) return; e.stopPropagation(); setPlanPopup(null); setEditPlan(p) }}
+                        style={{display:'flex',alignItems:'center',gap:3,flex:1,border:'none',cursor: relateMode ? 'crosshair' : 'pointer',padding: relateMode ? '3px 3px 3px 6px' : '2px 3px 2px 1px',background:'transparent',minWidth:0}}
+                      >
+                        <span style={{fontSize:9,fontWeight:700,color:p.color,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap',flex:1,textDecoration:p.done?'line-through':'none'}}>{p.done?'✓ ':''}{p.title}</span>
+                        {p.tasked && !relateMode && <span style={{fontSize:7,padding:'0 3px',borderRadius:3,background:`${p.color}44`,color:p.color,fontWeight:700,flexShrink:0}}>tasked</span>}
+                      </button>
+
+                      {/* Group link icon — always visible when grouped */}
+                      {grp && (
+                        <span style={{display:'flex',alignItems:'center',flexShrink:0,padding:'0 1px',pointerEvents:'none'}}>
+                          <Link size={7} style={{color:grp.color}}/>
+                        </span>
+                      )}
+
+                      {/* URL + delete — hidden in relate mode */}
+                      {!relateMode && p.url && (
+                        <span onClick={e=>{e.stopPropagation();openUrl(p.url)}} style={{cursor:'pointer',display:'flex',alignItems:'center',flexShrink:0,padding:'0 2px'}}>
+                          <ExternalLink size={8} style={{color:'var(--text-3)'}}/>
+                        </span>
+                      )}
+                      {!relateMode && (
+                        <button onClick={e=>{ e.stopPropagation(); handleDeletePlan(p.id) }}
+                          style={{background:'none',border:'none',cursor:'pointer',padding:'2px 4px',color:'var(--text-3)',display:'flex',flexShrink:0,borderRadius:3}}
+                          onMouseEnter={e=>e.currentTarget.style.color='var(--coral)'}
+                          onMouseLeave={e=>e.currentTarget.style.color='var(--text-3)'}>
+                          <X size={8}/>
+                        </button>
+                      )}
+                    </div>
+                  )
+                })}
 
               </div>
             )
           })}
         </div>
       </div>
+
+      {/* Shake tooltip */}
+      {shakeTooltip && (
+        <div style={{
+          position:'fixed', left:shakeTooltip.x, top:shakeTooltip.y,
+          transform:'translateX(-50%)',
+          background:'var(--glass-bg)', border:'1px solid var(--coral)',
+          color:'var(--coral)', fontSize:10, padding:'3px 8px',
+          zIndex:2000, pointerEvents:'none', fontWeight:600,
+          boxShadow:'var(--shadow-sm)',
+        }}>
+          {shakeTooltip.message}
+        </div>
+      )}
 
       {/* Assignment popup */}
       {popup && (
@@ -914,7 +1116,7 @@ export default function CalendarPage({ onDataChange }) {
         <PlanPopup
           plan={planPopup.plan}
           anchor={{x:planPopup.x, y:planPopup.y}}
-          onClose={()=>setPlanPopup(null)}
+          onClose={handlePlanPopupClose}
           onEdit={()=>setEditPlan(planPopup.plan)}
           onDelete={()=>handleDeletePlan(planPopup.plan.id)}
         />
@@ -931,14 +1133,14 @@ export default function CalendarPage({ onDataChange }) {
         />
       )}
 
-      {/* Drag-to-reschedule: duplicate? modal */}
+      {/* Drag-to-reschedule duplicate? modal */}
       {dupModal && (
         <div style={{position:'fixed',inset:0,zIndex:1000,display:'flex',alignItems:'center',justifyContent:'center',padding:16,background:'rgba(0,0,0,.6)',backdropFilter:'blur(4px)'}}>
           <div className="card" style={{maxWidth:360,width:'100%',padding:24,textAlign:'center'}}>
             <div style={{fontSize:24,marginBottom:12}}>📋</div>
             <div style={{fontWeight:700,fontSize:15,marginBottom:8}}>Moved to {new Date(dupModal.newDate+'T12:00:00').toLocaleDateString('en-US',{month:'short',day:'numeric'})}</div>
             <div style={{fontSize:13,color:'var(--text-2)',marginBottom:20,lineHeight:1.6}}>
-              Do you want to <strong>duplicate</strong> "{dupModal.item.title||dupModal.item.title}" on the new date, or <strong>reschedule</strong> (move it)?
+              Do you want to <strong>duplicate</strong> "{dupModal.item.title}" on the new date, or <strong>reschedule</strong> (move it)?
             </div>
             <div style={{display:'flex',flexDirection:'column',gap:8}}>
               <button className="btn btn-ghost" style={{justifyContent:'center'}} onClick={()=>applyReschedule(true)}>
@@ -974,6 +1176,104 @@ export default function CalendarPage({ onDataChange }) {
               <button className="btn btn-ghost" style={{justifyContent:'center',color:'var(--text-3)'}} onClick={()=>setConfirmDelete(null)}>
                 Cancel
               </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Floating group modal — only when relateMode is ON */}
+      {relateMode && (
+        <div style={{
+          position:'fixed', bottom:24, right:24, zIndex:850,
+          width:260, maxHeight:'70vh',
+          display:'flex', flexDirection:'column',
+        }}>
+          <div className="card" style={{padding:0, overflow:'hidden', border:'1.5px solid var(--accent-primary)', display:'flex', flexDirection:'column', maxHeight:'70vh'}}>
+            {/* Header */}
+            <div style={{padding:'12px 14px 10px', borderBottom:'1px solid var(--glass-border)', background:'var(--glass-bg-2)'}}>
+              <div style={{fontWeight:700, fontSize:13, color:'var(--text-1)', marginBottom:2, display:'flex', alignItems:'center', gap:6}}>
+                <Link size={13} style={{color:'var(--accent-primary)'}}/> Relate Chips
+              </div>
+              <div style={{fontSize:10, color:'var(--text-3)', lineHeight:1.4}}>
+                {selectedGroupId
+                  ? 'Click any event chip on the calendar to add or remove it from the selected group.'
+                  : 'Select or create a group, then click chips to add them.'}
+              </div>
+            </div>
+
+            {/* Group list */}
+            <div style={{flex:1, overflowY:'auto', padding:'8px 10px', display:'flex', flexDirection:'column', gap:5}}>
+              {groups.length === 0 && !showNewGroupInput && (
+                <div style={{fontSize:11, color:'var(--text-3)', textAlign:'center', padding:'12px 0'}}>No groups yet</div>
+              )}
+
+              {groups.map(g => {
+                const isSelected = selectedGroupId === g.id
+                const memberCount = plans.filter(p => p.groupId === g.id).length
+                return (
+                  <div key={g.id} style={{
+                    display:'flex', alignItems:'center', gap:8, padding:'7px 10px',
+                    background: isSelected ? `${g.color}22` : 'var(--glass-bg)',
+                    border: `1.5px solid ${isSelected ? g.color : 'var(--glass-border)'}`,
+                    cursor:'pointer', transition:'all .1s',
+                  }}
+                    onClick={()=>setSelectedGroupId(isSelected ? null : g.id)}
+                  >
+                    <div style={{width:10, height:10, borderRadius:'50%', background:g.color, flexShrink:0, boxShadow:`0 0 6px ${g.color}66`}}/>
+                    <div style={{flex:1, minWidth:0}}>
+                      <div style={{fontSize:12, fontWeight:700, color: isSelected ? g.color : 'var(--text-1)', overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap'}}>{g.name}</div>
+                      <div style={{fontSize:10, color:'var(--text-3)'}}>{memberCount} chip{memberCount!==1?'s':''}</div>
+                    </div>
+                    <button
+                      onClick={e=>{ e.stopPropagation(); disbandGroup(g.id) }}
+                      style={{background:'none', border:'none', cursor:'pointer', padding:2, color:'var(--text-3)', display:'flex', flexShrink:0, borderRadius:3}}
+                      title="Disband group"
+                      onMouseEnter={e=>e.currentTarget.style.color='var(--coral)'}
+                      onMouseLeave={e=>e.currentTarget.style.color='var(--text-3)'}
+                    >
+                      <X size={10}/>
+                    </button>
+                  </div>
+                )
+              })}
+
+              {/* New group input */}
+              {showNewGroupInput && (
+                <div style={{display:'flex', gap:4, marginTop:2}}>
+                  <input
+                    value={newGroupName}
+                    onChange={e=>setNewGroupName(e.target.value)}
+                    onKeyDown={e=>{ if(e.key==='Enter') createGroup(); if(e.key==='Escape'){setShowNewGroupInput(false);setNewGroupName('')} }}
+                    placeholder="Group name…"
+                    autoFocus
+                    style={{flex:1, padding:'5px 8px', background:'var(--glass-bg-2)', border:'1px solid var(--accent-primary)', color:'var(--text-1)', fontSize:11, fontFamily:'inherit'}}
+                  />
+                  <button onClick={createGroup} style={{background:'var(--accent-primary)', border:'none', color:'white', cursor:'pointer', padding:'4px 8px', display:'flex', alignItems:'center'}}>
+                    <Check size={11}/>
+                  </button>
+                  <button onClick={()=>{setShowNewGroupInput(false);setNewGroupName('')}} style={{background:'none', border:'1px solid var(--glass-border)', color:'var(--text-3)', cursor:'pointer', padding:'4px 6px', display:'flex', alignItems:'center'}}>
+                    <X size={10}/>
+                  </button>
+                </div>
+              )}
+            </div>
+
+            {/* Footer */}
+            <div style={{padding:'8px 10px', borderTop:'1px solid var(--glass-border)', background:'var(--glass-bg-2)', display:'flex', flexDirection:'column', gap:6}}>
+              {!showNewGroupInput && (
+                <button
+                  onClick={()=>setShowNewGroupInput(true)}
+                  className="btn btn-ghost"
+                  style={{justifyContent:'center', fontSize:11, padding:'6px 10px', width:'100%'}}
+                >
+                  + New Group
+                </button>
+              )}
+              {selectedGroupId && (
+                <div style={{fontSize:10, color:'var(--accent-primary)', textAlign:'center', fontWeight:600, padding:'2px 0', lineHeight:1.4}}>
+                  + Click any event chip to add / remove it
+                </div>
+              )}
             </div>
           </div>
         </div>
