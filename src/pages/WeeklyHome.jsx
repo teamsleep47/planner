@@ -16,6 +16,7 @@ const URGENCY = {
 function WeatherWidget() {
   const containerRef = useRef(null)
   useEffect(() => {
+    console.log('[WeatherWidget] useEffect fired, container:', containerRef.current)
     if (!containerRef.current) return
     if (document.getElementById('ww_49be5c1debf05')) return
     const div = document.createElement('div')
@@ -30,7 +31,11 @@ function WeatherWidget() {
     document.body.appendChild(script)
     return () => { try { document.body.removeChild(script) } catch(e) {} }
   }, [])
-  return <div ref={containerRef}/>
+  return (
+    <div ref={containerRef} style={{borderRadius:'var(--radius-lg)', overflow:'hidden', minHeight: 80, background:'var(--glass-bg-2)', display:'flex', alignItems:'center', justifyContent:'center'}}>
+      <span style={{color:'var(--text-3)', fontSize:12}}>Loading weather…</span>
+    </div>
+  )
 }
 
 function getSemCountdown(dateStr) {
