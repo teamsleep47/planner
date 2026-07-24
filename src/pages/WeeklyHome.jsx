@@ -24,7 +24,7 @@ function WeatherWidget() {
       return
     }
 
-    const WIDGET_ID = 'ww_2d7caf62b4815'
+    const WIDGET_ID = 'ww_aa6e45501116c'
 
     // Clear any previous content
     container.innerHTML = ''
@@ -36,18 +36,18 @@ function WeatherWidget() {
     div.setAttribute('loc', 'auto')
     div.setAttribute('a', JSON.stringify({
       t: 'responsive', lang: 'en', sl_lpl: 1, ids: [],
-      font: 'Arial', sl_ics: 'one_a', sl_sot: 'fahrenheit',
-      cl_bkg: '#1a1a2e', cl_font: '#FFFFFF', cl_cloud: '#FFFFFF',
+      font: 'Times', sl_ics: 'one_a', sl_sot: 'fahrenheit',
+      cl_bkg: 'image', cl_font: '#FFFFFF', cl_cloud: '#FFFFFF',
       cl_persp: '#81D4FA', cl_sun: '#FFC107', cl_moon: '#FFC107',
-      cl_thund: '#FF5722', cl_odd: 'rgba(255,255,255,0.07)',
+      cl_thund: '#FF5722',
     }))
     container.appendChild(div)
 
     const anchor = document.createElement('a')
     anchor.id = WIDGET_ID + '_u'
-    anchor.href = 'https://weatherwidget.org/'
+    anchor.href = 'https://oneweather.org/orlando/30_days/'
     anchor.target = '_blank'
-    anchor.innerHTML = 'Weather Widget'
+    anchor.innerHTML = '30 day weather forecast Orlando'
     anchor.style.display = 'none'
     container.appendChild(anchor)
 
