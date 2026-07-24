@@ -13,7 +13,25 @@ const URGENCY = {
   low:    { color:'#22c55e', label:'🟢 Relaxed' },
   none:   { color:null,      label:'No priority' },
 }
-const WX_ICONS = {0:'☀️',1:'🌤',2:'⛅',3:'☁️',45:'🌫',51:'🌦',53:'🌦',55:'🌧',61:'🌧',63:'🌧',65:'🌧',80:'🌦',82:'⛈',95:'⛈'}
+function WeatherWidget() {
+  const containerRef = useRef(null)
+  useEffect(() => {
+    if (!containerRef.current) return
+    if (document.getElementById('ww_49be5c1debf05')) return
+    const div = document.createElement('div')
+    div.id = 'ww_49be5c1debf05'
+    div.setAttribute('v', '1.3')
+    div.setAttribute('loc', 'auto')
+    div.setAttribute('a', '{"t":"responsive","lang":"en","sl_lpl":1,"ids":[],"font":"Times","sl_ics":"one_a","sl_sot":"fahrenheit","cl_bkg":"image","cl_font":"#FFFFFF","cl_cloud":"#FFFFFF","cl_persp":"#81D4FA","cl_sun":"#FFC107","cl_moon":"#FFC107","cl_thund":"#FF5722","sl_tof":"7"}')
+    containerRef.current.appendChild(div)
+    const script = document.createElement('script')
+    script.src = 'https://app3.weatherwidget.org/js/?id=ww_49be5c1debf05'
+    script.async = true
+    document.body.appendChild(script)
+    return () => { try { document.body.removeChild(script) } catch(e) {} }
+  }, [])
+  return <div ref={containerRef}/>
+}
 
 function getSemCountdown(dateStr) {
   if (!dateStr) return null
@@ -244,11 +262,6 @@ export default function WeeklyHome({ onDataChange }) {
   const [editUrgency, setEditUrgency]= useState('none')
   const [editDue,     setEditDue]    = useState('')
   const [editIsPlan,  setEditIsPlan] = useState(false)
-  const [weather,     setWeather]    = useState(null)
-  const [weatherError,setWeatherError]=useState(false)
-  const [city,        setCity]       = useState(()=>load('weather_city','Bradenton'))
-  const [cityDraft,   setCityDraft]  = useState(city)
-  const [showCityEdit,setShowCityEdit]=useState(false)
   const [greeting,    setGreeting]   = useState(getGreeting())
   const [semDate,     setSemDate]    = useState(()=>load('sem_end_date','2026-08-05'))
   const [editSemDate, setEditSemDate]=useState(false)
@@ -283,24 +296,6 @@ export default function WeeklyHome({ onDataChange }) {
   useEffect(()=>{ refreshUpcoming(); window.addEventListener('drive-loaded',refreshUpcoming); return()=>window.removeEventListener('drive-loaded',refreshUpcoming) },[])
   useEffect(()=>{ refreshUpcoming() },[tasks])
 
-  const fetchWeather=async(c=city)=>{
-    try{
-      const cached=sessionStorage.getItem('planner_weather_cache')
-      if(cached){const p=JSON.parse(cached);if(p.city===c){setWeather(p);setWeatherError(false);return}}
-      let lat=27.4989, lng=-82.5748
-      try{
-        const geo=await fetch(`https://geocoding-api.open-meteo.com/v1/search?name=${encodeURIComponent(c)}&count=1`)
-        const gd=await geo.json()
-        if(gd.results?.length){lat=gd.results[0].latitude;lng=gd.results[0].longitude}
-      }catch(e){ /* use fallback coords */ }
-      const wx=await fetch(`https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lng}&daily=weathercode,temperature_2m_max,temperature_2m_min&temperature_unit=fahrenheit&timezone=auto&forecast_days=7`)
-      const wd=await wx.json()
-      const res={city:c,daily:wd.daily}
-      setWeather(res);setWeatherError(false)
-      sessionStorage.setItem('planner_weather_cache',JSON.stringify(res))
-    }catch(e){setWeatherError(true)}
-  }
-  useEffect(()=>{ fetchWeather() },[])
 
   const addTask=useCallback(()=>{
     if(!newTask.text.trim())return
@@ -437,52 +432,9 @@ export default function WeeklyHome({ onDataChange }) {
           </div>
         </div>
 
-        {/* Weather card */}
-        <div className="card" style={{padding:'16px 20px'}}>
-          <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:10}}>
-            <span className="card-title" style={{margin:0}}>
-              {weather ? `🌤 ${weather.city}` : '🌤 Weather'}
-            </span>
-            {!showCityEdit&&<button className="btn-icon" onClick={()=>{setShowCityEdit(true);setCityDraft(city)}} style={{padding:4,fontSize:11,color:'var(--text-3)'}}>edit city</button>}
-          </div>
-          {showCityEdit&&(
-            <div style={{display:'flex',gap:6,marginBottom:10}}>
-              <input value={cityDraft} onChange={e=>setCityDraft(e.target.value)} style={{flex:1,padding:'6px 10px',background:'var(--glass-bg-2)',border:'1px solid var(--accent)',color:'var(--text-1)',fontSize:13}} placeholder="City name" onKeyDown={e=>{if(e.key==='Enter'){setCity(cityDraft);save('weather_city',cityDraft);setShowCityEdit(false);setWeather(null);setWeatherError(false);sessionStorage.removeItem('planner_weather_cache');fetchWeather(cityDraft)}if(e.key==='Escape')setShowCityEdit(false)}} autoFocus/>
-              <button className="btn btn-primary" style={{fontSize:12}} onClick={()=>{setCity(cityDraft);save('weather_city',cityDraft);setShowCityEdit(false);setWeather(null);setWeatherError(false);sessionStorage.removeItem('planner_weather_cache');fetchWeather(cityDraft)}}>Go</button>
-              <button className="btn btn-ghost" style={{fontSize:12}} onClick={()=>setShowCityEdit(false)}>Cancel</button>
-            </div>
-          )}
-          {weatherError ? (
-            <div style={{fontSize:12,color:'var(--coral)',display:'flex',alignItems:'center',gap:8}}>
-              Weather unavailable — check city name
-              <button className="btn-icon" style={{fontSize:11,color:'var(--coral)'}} onClick={()=>{setShowCityEdit(true);setCityDraft(city)}}>edit</button>
-            </div>
-          ) : weather ? (
-            <div style={{display:'flex',gap:6,overflowX:'auto',paddingBottom:4}}>
-              {(weather.daily?.time||[]).map((date,i)=>{
-                const code=weather.daily?.weathercode?.[i]??0
-                const hi=Math.round(weather.daily?.temperature_2m_max?.[i]??0)
-                const lo=Math.round(weather.daily?.temperature_2m_min?.[i]??0)
-                const icon=WX_ICONS[code]||'🌤'
-                const d=new Date(date+'T12:00:00')
-                const label=i===0?'Today':DAYS_SHORT[d.getDay()]
-                return(
-                  <div key={date} style={{flexShrink:0,textAlign:'center',padding:'8px 10px',background:'var(--glass-bg-2)',border:'1px solid var(--glass-border)',minWidth:62}}>
-                    <div style={{fontSize:10,fontWeight:700,color:'var(--text-3)',marginBottom:4}}>{label}</div>
-                    <div style={{fontSize:20,marginBottom:4}}>{icon}</div>
-                    <div style={{fontSize:12,fontWeight:700,color:'var(--text-1)'}}>{hi}°</div>
-                    <div style={{fontSize:10,color:'var(--text-3)'}}>{lo}°</div>
-                  </div>
-                )
-              })}
-            </div>
-          ) : (
-            <div style={{display:'flex',gap:6,overflowX:'auto'}}>
-              {[0,1,2,3,4,5,6].map(i=>(
-                <div key={i} style={{flexShrink:0,width:62,height:84,background:'var(--glass-bg-2)',border:'1px solid var(--glass-border)',animation:'pulse 1.5s ease-in-out infinite',animationDelay:`${i*0.1}s'`}}/>
-              ))}
-            </div>
-          )}
+        {/* Weather widget */}
+        <div className="card" style={{padding:'10px 14px'}}>
+          <WeatherWidget/>
         </div>
 
         <div className="home-main-grid">
