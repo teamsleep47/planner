@@ -273,6 +273,9 @@ export default function WeeklyHome({ onDataChange }) {
   const [greeting,    setGreeting]   = useState(getGreeting())
   const [semDate,     setSemDate]    = useState(()=>load('sem_end_date','2026-08-05'))
   const [editSemDate, setEditSemDate]=useState(false)
+  const [semLabel,    setSemLabel]   = useState(()=>load('sem_end_label','Semester ends'))
+  const [editSemLabel,setEditSemLabel]=useState(false)
+  const [semLabelDraft,setSemLabelDraft]=useState('')
   const [showHistory, setShowHistory]=useState(false)
   const [upcoming,    setUpcoming]   = useState([])
   const [showUpcomingModal, setShowUpcomingModal] = useState(false)
@@ -289,6 +292,7 @@ export default function WeeklyHome({ onDataChange }) {
     onDataChange?.()
   },[tasks])
   useEffect(()=>{ save('sem_end_date',semDate); onDataChange?.() },[semDate])
+  useEffect(()=>{ save('sem_end_label',semLabel); onDataChange?.() },[semLabel])
 
   // Re-read tasks from localStorage when Drive syncs (replaces driveKey remount)
   useEffect(() => {
@@ -418,7 +422,17 @@ export default function WeeklyHome({ onDataChange }) {
         <div className="grid-4">
           <div className="stat-card"><div className="stat-label">Tasks</div><div className="stat-value" style={{color:'var(--accent-primary)'}}>{activeTasks.length}</div><div className="stat-sub">{doneTasks.length} done</div></div>
           <div className="stat-card">
-            <div className="stat-label">Semester ends</div>
+            {editSemLabel
+              ? <input
+                  autoFocus
+                  value={semLabelDraft}
+                  onChange={e=>setSemLabelDraft(e.target.value)}
+                  onBlur={()=>{ const v=semLabelDraft.trim()||'Semester ends'; setSemLabel(v); setEditSemLabel(false) }}
+                  onKeyDown={e=>{ if(e.key==='Enter'){ const v=semLabelDraft.trim()||'Semester ends'; setSemLabel(v); setEditSemLabel(false) } if(e.key==='Escape') setEditSemLabel(false) }}
+                  style={{...inputSm,width:'100%',marginBottom:2,fontSize:10,fontWeight:700,textTransform:'uppercase',letterSpacing:'.06em'}}
+                />
+              : <div className="stat-label" style={{cursor:'text'}} onClick={()=>{ setSemLabelDraft(semLabel); setEditSemLabel(true) }}>{semLabel}</div>
+            }
             <div className="stat-value" style={{color:semCountdown?.past?'var(--text-3)':'var(--accent-primary)',fontSize:20,cursor:'pointer'}} onClick={()=>setEditSemDate(true)}>
               {semCountdown ? semCountdown.label : '—'}
             </div>

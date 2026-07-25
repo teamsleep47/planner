@@ -1,26 +1,15 @@
 export default function LoginPage({ onSignIn, error, loading }) {
   return (
     <div className="login-outer" style={{background:'radial-gradient(ellipse at 20% 30%, var(--bg-mesh-1) 0%, transparent 60%), radial-gradient(ellipse at 80% 70%, var(--bg-mesh-2) 0%, transparent 60%), var(--bg-base)'}}>
-      <div style={{
-        background: 'var(--glass-bg-2)',
-        backdropFilter: 'var(--blur)',
-        WebkitBackdropFilter: 'var(--blur)',
-        border: '1px solid var(--glass-border)',
-        borderRadius: 'var(--radius-xl)',
-        padding: '52px 44px',
-        width: '100%',
-        maxWidth: 400,
-        textAlign: 'center',
-        boxShadow: 'var(--shadow)',
-      }}>
+      <div style={{width:'100%',maxWidth:400,textAlign:'center',padding:'52px 44px'}}>
         <h1 style={{fontSize:26,fontWeight:700,letterSpacing:'-0.5px',marginBottom:8}}>Assignment Planner</h1>
         <p style={{fontSize:14,color:'var(--text-2)',marginBottom:36}}>
-          Your academic dashboard — sign in to continue
+          Your academic dashboard - sign in to continue
         </p>
 
         {error && (
           <div style={{background:'var(--coral-dim)',color:'var(--coral)',borderRadius:'var(--radius-md)',padding:'10px 14px',fontSize:13,marginBottom:20,border:'1px solid var(--coral-dim)'}}>
-            Sign-in failed — please try again.
+            Sign-in failed - please try again.
           </div>
         )}
 
