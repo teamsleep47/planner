@@ -1,6 +1,6 @@
 export default function LoginPage({ onSignIn, error, loading }) {
   return (
-    <div className="login-outer" style={{background:'radial-gradient(ellipse at 20% 30%, var(--bg-mesh-1) 0%, transparent 60%), radial-gradient(ellipse at 80% 70%, var(--bg-mesh-2) 0%, transparent 60%), var(--bg-base)'}}>
+    <div className="login-outer" style={{background:'radial-gradient(ellipse at 20% 30%, var(--bg-mesh-1) 0%, transparent 60%), radial-gradient(ellipse at 80% 70%, var(--bg-mesh-2) 0%, transparent 60%), var(--bg-base)',width:'100%',minHeight:'100vh',display:'flex',flexDirection:'column',justifyContent:'center',alignItems:'center'}}>
       <div style={{width:'100%',maxWidth:400,textAlign:'center',padding:'52px 44px'}}>
         <h1 style={{fontSize:26,fontWeight:700,letterSpacing:'-0.5px',marginBottom:8}}>Assignment Planner</h1>
         <p style={{fontSize:14,color:'var(--text-2)',marginBottom:36}}>
