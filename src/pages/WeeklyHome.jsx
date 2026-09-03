@@ -123,7 +123,8 @@ function getUpcomingPlans(count=2) {
 }
 
 // Countdown cards — Essays/Exams/Quizzes only
-function CountdownCards() {
+// excludedIds: Set of assignmentIds to hide in the natural view
+function CountdownCards({ excludedIds = new Set() }) {
   const now=new Date()
   try {
     const terms=JSON.parse(localStorage.getItem('planner_v1_terms_v1')||'[]')
@@ -131,7 +132,7 @@ function CountdownCards() {
     if(!active) return null
     const items=active.courses
       .flatMap(c=>c.assignments.map(a=>({...a,courseName:c.name,courseColor:c.color})))
-      .filter(a=>a.status!=='Done'&&a.due&&['Essay','Exam','Quiz'].includes(a.type))
+      .filter(a=>a.status!=='Done'&&a.due&&['Essay','Exam','Quiz'].includes(a.type)&&!excludedIds.has(a.id))
       .sort((a,b)=>new Date(a.due)-new Date(b.due))
       .slice(0,3)
     if(!items.length) return null
@@ -164,6 +165,63 @@ function CountdownCards() {
       </div>
     )
   } catch(e) { return null }
+}
+
+function PinnedTab({ pinnedAssignments }) {
+  const now = new Date()
+  let courses = []
+  try {
+    const terms = JSON.parse(localStorage.getItem('planner_v1_terms_v1') || '[]')
+    const active = terms.find(t => t.active) || terms[0]
+    if (active) courses = active.courses
+  } catch(e) {}
+
+  if (!courses.length) return (
+    <div className="card"><div style={{color:'var(--text-3)',fontSize:13,textAlign:'center',padding:'8px 0'}}>No courses in active term.</div></div>
+  )
+
+  return (
+    <div className="card">
+      <div className="card-title" style={{marginBottom:12}}>📌 Pinned</div>
+      <div style={{display:'flex',flexDirection:'column',gap:14}}>
+        {courses.map(course => {
+          const coursePins = pinnedAssignments.filter(p => p.pinned && p.courseId === course.id)
+          const assigns = coursePins
+            .map(p => course.assignments.find(a => a.id === p.assignmentId))
+            .filter(a => a && a.status !== 'Done')
+            .sort((a, b) => new Date(a.due) - new Date(b.due))
+            .slice(0, 3)
+          return (
+            <div key={course.id}>
+              <div style={{fontSize:10,fontWeight:700,color:course.color,marginBottom:5,textTransform:'uppercase',letterSpacing:'.06em'}}>{course.name}</div>
+              {assigns.length === 0
+                ? <div style={{fontSize:12,color:'var(--text-3)',fontStyle:'italic',paddingLeft:2}}>No pinned assignments.</div>
+                : assigns.map(a => {
+                    const days = a.due ? Math.ceil((new Date(a.due+'T23:59:00') - now) / 86400000) : null
+                    const urgColor = days === null ? 'var(--glass-border)' : days <= 7 ? 'var(--coral)' : days <= 14 ? 'var(--amber)' : 'var(--green)'
+                    return (
+                      <div key={a.id} style={{
+                        display:'flex',alignItems:'center',gap:10,padding:'7px 10px',marginBottom:4,
+                        background:'var(--glass-bg)',border:'1px solid var(--glass-border)',
+                        borderLeft:`3px solid ${urgColor}`,
+                      }}>
+                        <div style={{flex:1,minWidth:0}}>
+                          <div style={{fontSize:12,fontWeight:600,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{a.title}</div>
+                          {a.due && <div style={{fontSize:10,color:'var(--text-3)'}}>{new Date(a.due+'T12:00:00').toLocaleDateString('en-US',{month:'short',day:'numeric'})}</div>}
+                        </div>
+                        {days !== null && (
+                          <div style={{fontSize:18,fontWeight:800,fontFamily:'var(--font-mono)',color:urgColor,lineHeight:1,flexShrink:0}}>{days}d</div>
+                        )}
+                      </div>
+                    )
+                  })
+              }
+            </div>
+          )
+        })}
+      </div>
+    </div>
+  )
 }
 
 // TaskRow — defined OUTSIDE component to prevent remount-on-keystroke
@@ -283,6 +341,8 @@ export default function WeeklyHome({ onDataChange }) {
   const [dragOverId,  setDragOverId] = useState(null)
   const [expandedTaskId, setExpandedTaskId] = useState(null)
   const [confirmModal,   setConfirmModal]   = useState(null) // { type, taskId, planId, message }
+  const [countdownTab,   setCountdownTab]   = useState(()=>load('countdown_tab','natural'))
+  const [pinnedAssignments, setPinnedAssignments] = useState(()=>load('pinned_assignments',[]))
   const COURSE_COLORS = getCourseColorMap()
   const courseOptions = [...getActiveTermCourses().map(c=>c.name),'OTHER']
 
@@ -293,6 +353,13 @@ export default function WeeklyHome({ onDataChange }) {
   },[tasks])
   useEffect(()=>{ save('sem_end_date',semDate); onDataChange?.() },[semDate])
   useEffect(()=>{ save('sem_end_label',semLabel); onDataChange?.() },[semLabel])
+  useEffect(()=>{ save('countdown_tab',countdownTab) },[countdownTab])
+  useEffect(()=>{
+    const h=()=>setPinnedAssignments(load('pinned_assignments',[]))
+    window.addEventListener('pinned-assignments-updated',h)
+    window.addEventListener('drive-loaded',h)
+    return()=>{ window.removeEventListener('pinned-assignments-updated',h); window.removeEventListener('drive-loaded',h) }
+  },[])
 
   // Re-read tasks from localStorage when Drive syncs (replaces driveKey remount)
   useEffect(() => {
@@ -410,6 +477,7 @@ export default function WeeklyHome({ onDataChange }) {
   const activeTasks=tasks.filter(t=>!t.done),doneTasks=tasks.filter(t=>t.done)
   const streak=load('streak',0)
   const semCountdown = getSemCountdown(semDate)
+  const excludedIds = new Set(pinnedAssignments.filter(p=>p.excluded).map(p=>p.assignmentId))
   const inputSm={padding:'7px 10px',background:'var(--glass-bg-2)',border:'1px solid var(--glass-border)',borderRadius:'var(--radius-sm)',color:'var(--text-1)',fontSize:12,fontFamily:'inherit'}
 
   return(
@@ -569,7 +637,23 @@ export default function WeeklyHome({ onDataChange }) {
                 })}
             </div>
 
-            <CountdownCards/>
+            {/* Pinned / Natural countdown tabs */}
+            <div style={{display:'flex',flexDirection:'column',gap:8}}>
+              <div style={{display:'flex',gap:0,border:'1px solid var(--glass-border)',overflow:'hidden',width:'fit-content'}}>
+                {[['pinned','📌 Pinned'],['natural','⏳ Natural']].map(([tab,label])=>(
+                  <button key={tab} onClick={()=>setCountdownTab(tab)} style={{
+                    padding:'6px 14px',border:'none',cursor:'pointer',fontSize:12,fontWeight:600,
+                    background:countdownTab===tab?'var(--accent)':'var(--glass-bg)',
+                    color:countdownTab===tab?'white':'var(--text-2)',
+                    transition:'background .15s,color .15s',fontFamily:'inherit',
+                  }}>{label}</button>
+                ))}
+              </div>
+              {countdownTab==='natural'
+                ? <CountdownCards excludedIds={excludedIds}/>
+                : <PinnedTab pinnedAssignments={pinnedAssignments}/>
+              }
+            </div>
 
           </div>
         </div>

@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { useLocation } from 'react-router-dom'
-import { Plus, Trash2, Edit2, Check, X, ChevronDown, ChevronUp, BookOpen, ExternalLink } from 'lucide-react'
+import { Plus, Trash2, Edit2, Check, X, ChevronDown, ChevronUp, BookOpen, ExternalLink, Pin, EyeOff } from 'lucide-react'
 import { loadTerms, saveTerms, uid, ASSIGNMENT_TYPES, getCourseColorMap } from '../utils/termData.js'
 import { formatRelativeDue } from '../utils/timeFormat.js'
 import { load, save } from '../utils/storage.js'
@@ -37,6 +37,9 @@ export default function Courses({ onDataChange }) {
   // Accordion state: { courseId: bool } — persisted to localStorage
   const [expanded, setExpanded] = useState(()=>load(ACCORDION_KEY,{}))
 
+  const [pinnedAssignments, setPinnedAssignments] = useState(()=>load('pinned_assignments',[]))
+  const [shakingPinId, setShakingPinId] = useState(null)
+
   const [showAddTerm,    setShowAddTerm]    = useState(false)
   const [newTermName,    setNewTermName]    = useState('')
   const [editTermId,     setEditTermId]     = useState(null)
@@ -56,12 +59,18 @@ export default function Courses({ onDataChange }) {
   // Persist accordion state whenever it changes
   useEffect(()=>{ save(ACCORDION_KEY, expanded) },[expanded])
   useEffect(()=>{ saveTerms(terms); onDataChange?.(); window.dispatchEvent(new Event('assignments-updated')) },[terms])
+  useEffect(()=>{
+    save('pinned_assignments', pinnedAssignments)
+    onDataChange?.()
+    window.dispatchEvent(new Event('pinned-assignments-updated'))
+  },[pinnedAssignments])
   useEffect(() => {
     const h = () => {
       const t = loadTerms()
       setTerms(t)
       const active = t.find(x => x.active)
       setActiveTermId(active?.id || t[0]?.id)
+      setPinnedAssignments(load('pinned_assignments',[]))
     }
     window.addEventListener('drive-loaded', h)
     return () => window.removeEventListener('drive-loaded', h)
@@ -93,6 +102,45 @@ export default function Courses({ onDataChange }) {
     setTimeout(()=>{ const el=document.getElementById(`assign-${id}`); el?.scrollIntoView({behavior:'smooth',block:'center'}) },350)
   },[])
 
+  const getPinnedEntry = (assignId) => pinnedAssignments.find(p=>p.assignmentId===assignId)
+
+  const togglePin = (termId, courseId, assignId) => {
+    const course = terms.find(t=>t.id===termId)?.courses.find(c=>c.id===courseId)
+    if (!course) return
+    const existing = getPinnedEntry(assignId)
+    if (existing?.pinned) {
+      // Unpin
+      setPinnedAssignments(ps => ps.map(p=>p.assignmentId===assignId?{...p,pinned:false}:p).filter(p=>p.pinned||p.excluded))
+    } else {
+      // Check 3-pin limit (non-done pinned assignments in this course)
+      const pinCount = pinnedAssignments.filter(p=>p.pinned&&p.courseId===courseId&&p.assignmentId!==assignId).filter(p=>{
+        const a=course.assignments.find(a=>a.id===p.assignmentId)
+        return a&&a.status!=='Done'
+      }).length
+      if (pinCount >= 3) {
+        setShakingPinId(assignId)
+        setTimeout(()=>setShakingPinId(null), 500)
+        return
+      }
+      if (existing) {
+        setPinnedAssignments(ps=>ps.map(p=>p.assignmentId===assignId?{...p,pinned:true}:p))
+      } else {
+        setPinnedAssignments(ps=>[...ps,{assignmentId:assignId,courseId,termId,pinned:true,excluded:false}])
+      }
+    }
+  }
+
+  const toggleExclude = (termId, courseId, assignId) => {
+    const existing = getPinnedEntry(assignId)
+    if (existing?.excluded) {
+      setPinnedAssignments(ps=>ps.map(p=>p.assignmentId===assignId?{...p,excluded:false}:p).filter(p=>p.pinned||p.excluded))
+    } else if (existing) {
+      setPinnedAssignments(ps=>ps.map(p=>p.assignmentId===assignId?{...p,excluded:true}:p))
+    } else {
+      setPinnedAssignments(ps=>[...ps,{assignmentId:assignId,courseId,termId,pinned:false,excluded:true}])
+    }
+  }
+
   const toggleExpanded = (courseId) => setExpanded(e=>({...e,[courseId]:!e[courseId]}))
   const isExpanded     = (courseId) => expanded[courseId] !== false // default open
 
@@ -121,6 +169,7 @@ export default function Courses({ onDataChange }) {
 
   return(
     <>
+      <style>{`@keyframes pinShake{0%,100%{transform:translateX(0)}20%{transform:translateX(-4px)}40%{transform:translateX(4px)}60%{transform:translateX(-3px)}80%{transform:translateX(3px)}}`}</style>
       <div className="page-header">
         <div><div className="page-title">Assignments</div><div className="page-subtitle">Double-click any row to edit · accordion state saved</div></div>
         <button className="btn btn-primary" onClick={()=>setShowAddTerm(s=>!s)}><Plus size={14}/> Add term</button>
@@ -179,6 +228,7 @@ export default function Courses({ onDataChange }) {
               const open      = isExpanded(course.id)
               const doneCount = course.assignments.filter(a=>a.status==='Done').length
               const total     = course.assignments.length
+              const coursePinCount = pinnedAssignments.filter(p=>p.pinned&&p.courseId===course.id&&course.assignments.find(a=>a.id===p.assignmentId)?.status!=='Done').length
               const sorted    = [...course.assignments].sort((a,b)=>{
                 const ad=a.status==='Done',bd=b.status==='Done'
                 if(ad&&!bd)return 1;if(!ad&&bd)return -1
@@ -317,37 +367,54 @@ export default function Courses({ onDataChange }) {
                                   <button className="btn btn-ghost" style={{fontSize:12}} onClick={()=>setEditAssignId(null)}>Cancel</button>
                                 </div>
                               </div>
-                            ):(
-                              <div style={{display:'flex',alignItems:'center',gap:10,padding:'11px 16px',flexWrap:'wrap'}}>
-                                {/* Checkbox */}
-                                <button onClick={e=>{e.stopPropagation();patchAssign(activeTerm.id,course.id,a.id,{status:isDone?'To do':'Done'})}} style={{background:'none',border:'none',cursor:'pointer',padding:2,flexShrink:0,display:'flex',color:isDone?'var(--green)':'var(--glass-border)',transition:'color .15s'}}>
-                                  {isDone
-                                    ?<div style={{width:18,height:18,borderRadius:'50%',background:'var(--green)',display:'flex',alignItems:'center',justifyContent:'center'}}><Check size={11} color="white"/></div>
-                                    :<div style={{width:18,height:18,borderRadius:'50%',border:'2px solid var(--glass-border)'}}/>}
-                                </button>
-                                {/* Title */}
-                                <div style={{flex:1,minWidth:0}}>
-                                  <div style={{display:'flex',alignItems:'center',gap:6,flexWrap:'wrap',marginBottom:2}}>
-                                    <span style={{fontWeight:600,fontSize:13,color:isDone?'var(--text-3)':'var(--text-1)',textDecoration:isDone?'line-through':'none'}}>{a.title}</span>
-                                    {a.type&&<span style={{fontSize:10,padding:'1px 6px',borderRadius:20,background:'var(--glass-bg-2)',color:'var(--text-3)',border:'1px solid var(--glass-border)'}}>{a.type}</span>}
+                            ):((() => {
+                                const entry = getPinnedEntry(a.id)
+                                const isPinned = !!entry?.pinned
+                                const isExcluded = !!entry?.excluded
+                                const atLimit = !isPinned && coursePinCount >= 3
+                                return (
+                                <div style={{display:'flex',alignItems:'center',gap:10,padding:'11px 16px',flexWrap:'wrap'}}>
+                                  {/* Checkbox */}
+                                  <button onClick={e=>{e.stopPropagation();patchAssign(activeTerm.id,course.id,a.id,{status:isDone?'To do':'Done'})}} style={{background:'none',border:'none',cursor:'pointer',padding:2,flexShrink:0,display:'flex',color:isDone?'var(--green)':'var(--glass-border)',transition:'color .15s'}}>
+                                    {isDone
+                                      ?<div style={{width:18,height:18,borderRadius:'50%',background:'var(--green)',display:'flex',alignItems:'center',justifyContent:'center'}}><Check size={11} color="white"/></div>
+                                      :<div style={{width:18,height:18,borderRadius:'50%',border:'2px solid var(--glass-border)'}}/>}
+                                  </button>
+                                  {/* Title */}
+                                  <div style={{flex:1,minWidth:0}}>
+                                    <div style={{display:'flex',alignItems:'center',gap:6,flexWrap:'wrap',marginBottom:2}}>
+                                      <span style={{fontWeight:600,fontSize:13,color:isDone?'var(--text-3)':'var(--text-1)',textDecoration:isDone?'line-through':'none'}}>{a.title}</span>
+                                      {a.type&&<span style={{fontSize:10,padding:'1px 6px',borderRadius:20,background:'var(--glass-bg-2)',color:'var(--text-3)',border:'1px solid var(--glass-border)'}}>{a.type}</span>}
+                                    </div>
+                                    <div style={{display:'flex',alignItems:'center',gap:8,flexWrap:'wrap'}}>
+                                      {due&&<span style={{fontSize:11,fontWeight:700,color:isDone?'var(--text-3)':due.color}}>{due.label}</span>}
+                                      {hasScore&&<span style={{fontSize:11,fontWeight:700,color:scoreColor}}>{a.score}/{a.maxScore} = {scorePct}%</span>}
+                                    </div>
                                   </div>
-                                  <div style={{display:'flex',alignItems:'center',gap:8,flexWrap:'wrap'}}>
-                                    {due&&<span style={{fontSize:11,fontWeight:700,color:isDone?'var(--text-3)':due.color}}>{due.label}</span>}
-                                    {hasScore&&<span style={{fontSize:11,fontWeight:700,color:scoreColor}}>{a.score}/{a.maxScore} = {scorePct}%</span>}
+                                  {/* Desktop pills + pin/exclude buttons */}
+                                  <div className="desktop-only" style={{display:'flex',gap:4,flexShrink:0,alignItems:'center'}}>
+                                    {pri&&pri.key!=='none'&&<span style={{fontSize:10,padding:'2px 8px',borderRadius:20,background:pri.bg,color:pri.color,fontWeight:700,border:`1px solid ${pri.color}44`}}>{pri.label}</span>}
+                                    <span style={{fontSize:10,padding:'2px 8px',borderRadius:20,background:stCfg.bg,color:stCfg.color,fontWeight:700}}>{a.status}</span>
+                                    {a.url && (
+                                      <button onClick={e=>{e.stopPropagation();openUrl(a.url)}} style={{display:'flex',alignItems:'center',color:'var(--text-3)',background:'none',border:'none',cursor:'pointer',padding:2}}>
+                                        <ExternalLink size={11}/>
+                                      </button>
+                                    )}
+                                    <Tooltip text={isPinned?'Unpin':atLimit?'3-pin limit reached':'Pin to countdown'} position="top">
+                                      <button onClick={e=>{e.stopPropagation();togglePin(activeTerm.id,course.id,a.id)}} style={{display:'flex',alignItems:'center',background:isPinned?'var(--accent-dim)':'none',border:'none',cursor:'pointer',padding:3,color:isPinned?'var(--accent)':'var(--text-3)',animation:shakingPinId===a.id?'pinShake .4s ease':'none'}}>
+                                        <Pin size={11}/>
+                                      </button>
+                                    </Tooltip>
+                                    <Tooltip text={isExcluded?'Show in Natural tab':'Hide from Natural tab'} position="top">
+                                      <button onClick={e=>{e.stopPropagation();toggleExclude(activeTerm.id,course.id,a.id)}} style={{display:'flex',alignItems:'center',background:isExcluded?'var(--coral-dim)':'none',border:'none',cursor:'pointer',padding:3,color:isExcluded?'var(--coral)':'var(--text-3)'}}>
+                                        <EyeOff size={11}/>
+                                      </button>
+                                    </Tooltip>
                                   </div>
                                 </div>
-                                {/* Desktop pills */}
-                                <div className="desktop-only" style={{display:'flex',gap:4,flexShrink:0,alignItems:'center'}}>
-                                  {pri&&pri.key!=='none'&&<span style={{fontSize:10,padding:'2px 8px',borderRadius:20,background:pri.bg,color:pri.color,fontWeight:700,border:`1px solid ${pri.color}44`}}>{pri.label}</span>}
-                                  <span style={{fontSize:10,padding:'2px 8px',borderRadius:20,background:stCfg.bg,color:stCfg.color,fontWeight:700}}>{a.status}</span>
-                                  {a.url && (
-                                    <button onClick={e=>{e.stopPropagation();openUrl(a.url)}} style={{display:'flex',alignItems:'center',color:'var(--text-3)',background:'none',border:'none',cursor:'pointer',padding:2}}>
-                                      <ExternalLink size={11}/>
-                                    </button>
-                                  )}
-                                </div>
-                              </div>
-                            )}
+                                )
+                              })())
+                            }
 
                             {/* Notes collapsed */}
                             {!isEdit&&a.notes&&(

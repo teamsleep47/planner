@@ -67,6 +67,7 @@ const ALL_KEYS = [
   'notification_settings',
   'saved_resources', 'resource_sort', 'resource_last_course',
   'hidden_tabs',
+  'pinned_assignments', 'countdown_tab',
 ]
 
 function getAllData() {
